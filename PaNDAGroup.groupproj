@@ -1,0 +1,84 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{3CB2D15E-5BB4-4AC1-9EDF-23D6AF57200C}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="Python\UnitTests\panda4PyTests.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="Python\PyTest\NDAPyTest.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="Python\PaNDALib\pandapy.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="Tests\UnitTests\PandaTests.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="Tests\PerformanceTests\PerformanceTests.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="panda4PyTests">
+        <MSBuild Projects="Python\UnitTests\panda4PyTests.dproj"/>
+    </Target>
+    <Target Name="panda4PyTests:Clean">
+        <MSBuild Projects="Python\UnitTests\panda4PyTests.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="panda4PyTests:Make">
+        <MSBuild Projects="Python\UnitTests\panda4PyTests.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="NDAPyTest">
+        <MSBuild Projects="Python\PyTest\NDAPyTest.dproj"/>
+    </Target>
+    <Target Name="NDAPyTest:Clean">
+        <MSBuild Projects="Python\PyTest\NDAPyTest.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="NDAPyTest:Make">
+        <MSBuild Projects="Python\PyTest\NDAPyTest.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="pandapy">
+        <MSBuild Projects="Python\PaNDALib\pandapy.dproj"/>
+    </Target>
+    <Target Name="pandapy:Clean">
+        <MSBuild Projects="Python\PaNDALib\pandapy.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="pandapy:Make">
+        <MSBuild Projects="Python\PaNDALib\pandapy.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="PandaTests">
+        <MSBuild Projects="Tests\UnitTests\PandaTests.dproj"/>
+    </Target>
+    <Target Name="PandaTests:Clean">
+        <MSBuild Projects="Tests\UnitTests\PandaTests.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="PandaTests:Make">
+        <MSBuild Projects="Tests\UnitTests\PandaTests.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="PerformanceTests">
+        <MSBuild Projects="Tests\PerformanceTests\PerformanceTests.dproj"/>
+    </Target>
+    <Target Name="PerformanceTests:Clean">
+        <MSBuild Projects="Tests\PerformanceTests\PerformanceTests.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="PerformanceTests:Make">
+        <MSBuild Projects="Tests\PerformanceTests\PerformanceTests.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="panda4PyTests;NDAPyTest;pandapy;PandaTests;PerformanceTests"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="panda4PyTests:Clean;NDAPyTest:Clean;pandapy:Clean;PandaTests:Clean;PerformanceTests:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="panda4PyTests:Make;NDAPyTest:Make;pandapy:Make;PandaTests:Make;PerformanceTests:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>
