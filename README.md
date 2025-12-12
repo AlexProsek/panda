@@ -1,5 +1,10 @@
 # PaNDA - Pascal N-Dimensional Arrays
 
+> **Status:** Experimental  
+>
+> PaNDA is currently under active development. Some features are incomplete or may change in future versions.
+> While the core functionality is usable, the library should still be considered experimental.
+
 `PaNDA` is a small library that provides classes for working with N-dimensional arrays in Pascal (Delphi).
 It introduces an `INDArray` interface that supports slicing syntax similar to Python and Mathematica.
 Some basic examples are shown below:
@@ -11,7 +16,12 @@ Some basic examples are shown below:
 | `a[::2]`     | `a[[NDISpan(0, -1, 2)]]` or `a[[NDIAll(2)]]` |
 | `a[::2,::2]` | `a[[NDAll(2), NDIAll(2)]]` |
 | `a[[0,2,2]]` | `a[[NDISet([0,2,2])]]` or `a[[NDI([0,2,2])]]` |
-| `a[::,1]`     | `a[[NDIAll, NDI(1)]]` |
+| `a[::,1]`    | `a[[NDIAll, NDI(1)]]` |
+
+### Delphi Compatibility ###
+
+PaNDA has been tested with **Delphi 12** (Athens). 
+Other Delphi versions may work, but have not been fully verified.
 
 ## Tensor Types ##
 
@@ -49,12 +59,11 @@ Using OpenBLAS is optional. To enable it, the following conditions must be met:
 2. **Compile the library with the `BLAS` compiler directive**  
   Add `BLAS` to your project's conditional defines.
 
+### OpenBLAS/CBLAS Interface ###
+
+PaNDA uses the Delphi port of the CBLAS interface provided by [Eric Grange’s LibCBLAS](https://github.com/EricGrange/LibCBLAS) when OpenBLAS acceleration is enabled.
+
 ## PaNDA4Py ##
 
 The library includes the `TPyNDArray` type, which wraps a PaNDA array and exposes the **NumPy array interface protocol**.
 This allows sharing arrays between Python and Delphi, using the `Python4Delphi` framework.
-
-
-> **Status:** Experimental  
->
-> PaNDA is currently under active development. Some features are incomplete or may change in future versions. While the core functionality is usable, the library should still be considered experimental.
