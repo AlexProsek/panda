@@ -105,7 +105,7 @@ begin
 end;
 
 procedure TArithmeticTests.AddScalar_Int;
-var a: TNDARecI32;
+var a: TTensorI32;
     res: Integer;
 begin
   a := nda.Scalar<Integer>(5);
@@ -116,7 +116,7 @@ begin
 end;
 
 procedure TArithmeticTests.Add1D_Int;
-var a: TNDARecI32;
+var a: TTensorI32;
     res: TArray<Integer>;
     I: Integer;
 begin
@@ -130,7 +130,7 @@ begin
 end;
 
 procedure TArithmeticTests.Add2D_Int;
-var a: TNDARecI32;
+var a: TTensorI32;
     res: TArray<TArray<Integer>>;
     I, J: Integer;
 begin
@@ -147,8 +147,8 @@ begin
 end;
 
 procedure TArithmeticTests.CvtInt32ToF32;
-var a: TNDARecI32;
-    b: TNDARecF32;
+var a: TTensorI32;
+    b: TTensorF32;
     res: TArray<Single>;
     I: Integer;
 begin
@@ -161,7 +161,7 @@ begin
 end;
 
 procedure TArithmeticTests.DivCCArr1DByCCArr1D_Single;
-var a: TNDARecF32;
+var a: TTensorF32;
     res: TArray<Single>;
     I: Integer;
 begin
@@ -175,7 +175,7 @@ begin
 end;
 
 procedure TArithmeticTests.DivCCArr1DByScalar_Single;
-var a: TNDARecF32;
+var a: TTensorF32;
     res: TArray<Single>;
     I: Integer;
 begin
@@ -189,7 +189,7 @@ begin
 end;
 
 procedure TArithmeticTests.DivCCArr2DByScalar_Single;
-var a: TNDARecF32;
+var a: TTensorF32;
     res: TArray<TArray<Single>>;
     I, J: Integer;
 begin
@@ -206,7 +206,7 @@ begin
 end;
 
 procedure TArithmeticTests.DivScalarByCCArr1D_Single;
-var a: TNDARecF32;
+var a: TTensorF32;
     res: TArray<Single>;
     I: Integer;
 begin
@@ -220,7 +220,7 @@ begin
 end;
 
 procedure TArithmeticTests.DivScalarByCCArr2D_Single;
-var a: TNDARecF32;
+var a: TTensorF32;
     res: TArray<TArray<Single>>;
     I, J: Integer;
 begin
@@ -237,7 +237,7 @@ begin
 end;
 
 procedure TArithmeticTests.DivCCArr2DByCCArr1D_Single;
-var a, b: TNDARecF32;
+var a, b: TTensorF32;
     res: TArray<TArray<Single>>;
     I, J: Integer;
 begin
@@ -255,7 +255,7 @@ begin
 end;
 
 procedure TArithmeticTests.DivCCArr1DByCCArr2D_Single;
-var a, b: TNDARecF32;
+var a, b: TTensorF32;
     res: TArray<TArray<Single>>;
     I, J: Integer;
 begin
@@ -273,7 +273,7 @@ begin
 end;
 
 procedure TArithmeticTests.SubFrom_1DS_Single;
-var a: TNDARecF32;
+var a: TTensorF32;
     res: TArray<Single>;
     I: Integer;
 begin
@@ -287,7 +287,7 @@ begin
 end;
 
 procedure TArithmeticTests.SubFrom_1D1D_Single;
-var a: TNDARecF32;
+var a: TTensorF32;
     res: TArray<Single>;
     I: Integer;
 begin
@@ -301,7 +301,7 @@ begin
 end;
 
 procedure TArithmeticTests.SubFrom_2D1D_Single;
-var a, b: TNDARecF32;
+var a, b: TTensorF32;
     res: TArray<TArray<Single>>;
     I, J: Integer;
 begin

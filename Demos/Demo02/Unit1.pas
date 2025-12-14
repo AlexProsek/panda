@@ -43,7 +43,7 @@ implementation
 
 procedure LUDecomp(const A: INDArray<Double>; out aL, aU: INDArray<Double>);
 var m, n: NativeInt;
-    L, U: TNDARecF64;
+    L, U: TTensorF64;
     k: SNDIntIndex;
 begin
   Assert(A.NDim = 2);
@@ -66,7 +66,7 @@ end;
 function UpperTriangulationLinearSolve(const aU, aV: INDArray<Double>): INDArray<Double>;
 var i: SNDIntIndex;
     m, n: NativeInt;
-    U, v, x: TNDARecF64;
+    U, v, x: TTensorF64;
 begin
   Assert((aU.NDim = 2) and (aV.NDim = 1) and (aU.Shape[1] = aV.Shape[0]));
   m := aU.Shape[0];

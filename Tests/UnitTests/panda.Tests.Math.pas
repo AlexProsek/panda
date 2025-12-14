@@ -166,7 +166,7 @@ begin
 end;
 
 function softmax(const aX: INDArray<Single>): INDArray<Single>;
-var x, tmp: TNDARecF32;
+var x, tmp: TTensorF32;
 begin
   with nda do begin
     x := Exp(aX);

@@ -35,8 +35,6 @@ uses
   panda.consts in '..\..\panda.consts.pas',
   panda.Tests.NDATestCase in '..\panda.Tests.NDATestCase.pas',
   panda.Utils.StopWatch in '..\..\Utils\panda.Utils.StopWatch.pas',
-  panda.Broadcasting in '..\..\panda.Broadcasting.pas',
-  panda.Tests.Broadcasting in 'panda.Tests.Broadcasting.pas',
   panda.Tests.cvMath in 'panda.Tests.cvMath.pas',
   panda.cvCvt in '..\..\panda.cvCvt.pas',
   panda.vCvt in '..\..\panda.vCvt.pas',

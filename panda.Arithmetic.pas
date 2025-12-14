@@ -22,101 +22,101 @@ type
     class function AllClose<T>(const aA, aB: INDArray<T>; aCmp: TNDAEqComparer<T>; const aTol: T): Boolean; overload; static;
   end;
 
-  TNDARecI32 = record
+  TTensorI32 = record
   private
     fArr: INDArray<Integer>;
   public
-    class operator Implicit(const aArr: INDArray<Integer>): TNDARecI32;
-    class operator Implicit(const aArr: TNDARecI32): INDArray<Integer>;
-    class operator Add(const A, B: TNDARecI32): TNDARecI32;
-    class operator Subtract(const A, B: TNDARecI32): TNDARecI32;
-    class operator Multiply(const A, B: TNDARecI32): TNDARecI32;
+    class operator Implicit(const aArr: INDArray<Integer>): TTensorI32;
+    class operator Implicit(const aArr: TTensorI32): INDArray<Integer>;
+    class operator Add(const A, B: TTensorI32): TTensorI32;
+    class operator Subtract(const A, B: TTensorI32): TTensorI32;
+    class operator Multiply(const A, B: TTensorI32): TTensorI32;
 
     property NDA: INDArray<Integer> read fArr;
   end;
 
-  TNDARecI64 = record
+  TTensorI64 = record
   private
     fArr: INDArray<Int64>;
-    function GetPart(const aIdx: INDIndexSeq): TNDARecI64;
-    procedure SetPart(const aIdx: INDIndexSeq; const aValue: TNDARecI64);
+    function GetPart(const aIdx: INDIndexSeq): TTensorI64;
+    procedure SetPart(const aIdx: INDIndexSeq; const aValue: TTensorI64);
     function GetShape: TNDAShape;
   public
-    class operator Implicit(const aArr: INDArray<Int64>): TNDARecI64;
-    class operator Implicit(const aArr: TNDARecI64): INDArray<Int64>;
-    class operator Add(const A, B: TNDARecI64): TNDARecI64;
-    class operator Subtract(const A, B: TNDARecI64): TNDARecI64;
-    class operator Multiply(const A, B: TNDARecI64): TNDARecI64;
+    class operator Implicit(const aArr: INDArray<Int64>): TTensorI64;
+    class operator Implicit(const aArr: TTensorI64): INDArray<Int64>;
+    class operator Add(const A, B: TTensorI64): TTensorI64;
+    class operator Subtract(const A, B: TTensorI64): TTensorI64;
+    class operator Multiply(const A, B: TTensorI64): TTensorI64;
 
     property NDA: INDArray<Int64> read fArr;
     property Shape: TNDAShape read GetShape;
-    property Part[const aIdx: INDIndexSeq]: TNDARecI64 read GetPart write SetPart; default;
+    property Part[const aIdx: INDIndexSeq]: TTensorI64 read GetPart write SetPart; default;
   end;
 
-  TNDARecF32 = record
+  TTensorF32 = record
   private
     fArr: INDArray<Single>;
-    function GetPart(const aIdx: INDIndexSeq): TNDARecF32;
-    procedure SetPart(const aIdx: INDIndexSeq; const aValue: TNDARecF32);
+    function GetPart(const aIdx: INDIndexSeq): TTensorF32;
+    procedure SetPart(const aIdx: INDIndexSeq; const aValue: TTensorF32);
     function GetShape: TNDAShape;
   public
-    class operator Implicit(const aArr: INDArray<Single>): TNDARecF32;
-    class operator Implicit(const aArr: TNDARecF32): INDArray<Single>;
-    class operator Implicit(const aArr: TNDARecI32): TNDARecF32;
-    class operator Add(const A, B: TNDARecF32): TNDARecF32;
-    class operator Add(const A: TNDARecF32; B: Single): TNDARecF32;
-    class operator Add(A: Single; const B: TNDARecF32): TNDARecF32;
-    class operator Subtract(const A, B: TNDARecF32): TNDARecF32;
-    class operator Subtract(const A: TNDARecF32; B: Single): TNDARecF32;
-    class operator Subtract(A: Single; const B: TNDARecF32): TNDARecF32;
-    class operator Multiply(const A, B: TNDARecF32): TNDARecF32;
-    class operator Multiply(const A: TNDARecF32; B: Single): TNDARecF32;
-    class operator Multiply(A: Single; const B: TNDARecF32): TNDARecF32;
-    class operator Divide(const A, B: TNDARecF32): TNDARecF32;
-    class operator Divide(const A: TNDARecF32; B: Single): TNDARecF32;
-    class operator Divide(A: Single; const B: TNDARecF32): TNDARecF32;
-    procedure AddTo(const aArr: TNDARecF32); overload;
+    class operator Implicit(const aArr: INDArray<Single>): TTensorF32;
+    class operator Implicit(const aArr: TTensorF32): INDArray<Single>;
+    class operator Implicit(const aArr: TTensorI32): TTensorF32;
+    class operator Add(const A, B: TTensorF32): TTensorF32;
+    class operator Add(const A: TTensorF32; B: Single): TTensorF32;
+    class operator Add(A: Single; const B: TTensorF32): TTensorF32;
+    class operator Subtract(const A, B: TTensorF32): TTensorF32;
+    class operator Subtract(const A: TTensorF32; B: Single): TTensorF32;
+    class operator Subtract(A: Single; const B: TTensorF32): TTensorF32;
+    class operator Multiply(const A, B: TTensorF32): TTensorF32;
+    class operator Multiply(const A: TTensorF32; B: Single): TTensorF32;
+    class operator Multiply(A: Single; const B: TTensorF32): TTensorF32;
+    class operator Divide(const A, B: TTensorF32): TTensorF32;
+    class operator Divide(const A: TTensorF32; B: Single): TTensorF32;
+    class operator Divide(A: Single; const B: TTensorF32): TTensorF32;
+    procedure AddTo(const aArr: TTensorF32); overload;
     procedure AddTo(const aValue: Single); overload;
-    procedure SubtractFrom(const aArr: TNDARecF32); overload;
+    procedure SubtractFrom(const aArr: TTensorF32); overload;
     procedure SubtractFrom(const aValue: Single); overload;
-    procedure MultiplyBy(const aArr: TNDARecF32); overload;
+    procedure MultiplyBy(const aArr: TTensorF32); overload;
     procedure MultiplyBy(const aValue: Single); overload;
-    procedure DivideBy(const aArr: TNDARecF32); overload;
+    procedure DivideBy(const aArr: TTensorF32); overload;
     procedure DivideBy(const aValue: Single); overload;
 
     property NDA: INDArray<Single> read fArr;
     property Shape: TNDAShape read GetShape;
-    property Part[const aIdx: INDIndexSeq]: TNDARecF32 read GetPart write SetPart; default;
+    property Part[const aIdx: INDIndexSeq]: TTensorF32 read GetPart write SetPart; default;
   end;
 
-  TNDARecF64 = record
+  TTensorF64 = record
   private
     fArr: INDArray<Double>;
-    function GetPart(const aIdx: INDIndexSeq): TNDARecF64;
-    procedure SetPart(const aIdx: INDIndexSeq; const aValue: TNDARecF64);
+    function GetPart(const aIdx: INDIndexSeq): TTensorF64;
+    procedure SetPart(const aIdx: INDIndexSeq; const aValue: TTensorF64);
     function GetShape: TNDAShape;
   public
-    class operator Implicit(const aArr: INDArray<Double>): TNDARecF64;
-    class operator Implicit(const aArr: TNDARecF64): INDArray<Double>;
-    class operator Implicit(const aArr: INDArray<Single>): TNDARecF64;
-    class operator Add(const A, B: TNDARecF64): TNDARecF64;
-    class operator Subtract(const A, B: TNDARecF64): TNDARecF64;
-    class operator Multiply(const A, B: TNDARecF64): TNDARecF64;
-    class operator Divide(const A, B: TNDARecF64): TNDARecF64;
-    class operator Divide(const A: TNDARecF64; B: Double): TNDARecF64;
-    class operator Divide(A: Double; const B: TNDARecF64): TNDARecF64;
-    procedure AddTo(const aArr: TNDARecF64); overload;
+    class operator Implicit(const aArr: INDArray<Double>): TTensorF64;
+    class operator Implicit(const aArr: TTensorF64): INDArray<Double>;
+    class operator Implicit(const aArr: INDArray<Single>): TTensorF64;
+    class operator Add(const A, B: TTensorF64): TTensorF64;
+    class operator Subtract(const A, B: TTensorF64): TTensorF64;
+    class operator Multiply(const A, B: TTensorF64): TTensorF64;
+    class operator Divide(const A, B: TTensorF64): TTensorF64;
+    class operator Divide(const A: TTensorF64; B: Double): TTensorF64;
+    class operator Divide(A: Double; const B: TTensorF64): TTensorF64;
+    procedure AddTo(const aArr: TTensorF64); overload;
     procedure AddTo(const aValue: Double); overload;
-    procedure SubtractFrom(const aArr: TNDARecF64); overload;
+    procedure SubtractFrom(const aArr: TTensorF64); overload;
     procedure SubtractFrom(const aValue: Double); overload;
-    procedure MultiplyBy(const aArr: TNDARecF64); overload;
+    procedure MultiplyBy(const aArr: TTensorF64); overload;
     procedure MultiplyBy(const aValue: Double); overload;
-    procedure DivideBy(const aArr: TNDARecF64); overload;
+    procedure DivideBy(const aArr: TTensorF64); overload;
     procedure DivideBy(const aValue: Double); overload;
 
     property NDA: INDArray<Double> read fArr;
     property Shape: TNDAShape read GetShape;
-    property Part[const aIdx: INDIndexSeq]: TNDARecF64 read GetPart write SetPart; default;
+    property Part[const aIdx: INDIndexSeq]: TTensorF64 read GetPart write SetPart; default;
   end;
 
   function ndaAllClose(const aA, aB: INDArray<Integer>; aTol: Integer = 0): Boolean;  overload;
@@ -264,7 +264,7 @@ end;
 
 {$endregion}
 
-{$region 'TNDARecI32'}
+{$region 'TTensorI32'}
 
 {$region 'LR functions'}
 
@@ -380,29 +380,29 @@ end;
 
 {$endregion}
 
-class operator TNDARecI32.Implicit(const aArr: INDArray<Integer>): TNDARecI32;
+class operator TTensorI32.Implicit(const aArr: INDArray<Integer>): TTensorI32;
 begin
   Result.fArr := aArr;
 end;
 
-class operator TNDARecI32.Implicit(const aArr: TNDARecI32): INDArray<Integer>;
+class operator TTensorI32.Implicit(const aArr: TTensorI32): INDArray<Integer>;
 begin
   Result := aArr.fArr;
 end;
 
-class operator TNDARecI32.Add(const A, B: TNDARecI32): TNDARecI32;
+class operator TTensorI32.Add(const A, B: TTensorI32): TTensorI32;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Integer>(A, B, Result.fArr, AddL_I32, AddR_I32);
 end;
 
-class operator TNDARecI32.Subtract(const A, B: TNDARecI32): TNDARecI32;
+class operator TTensorI32.Subtract(const A, B: TTensorI32): TTensorI32;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Integer>(A, B, Result.fArr, SubL_I32, SubR_I32);
 end;
 
-class operator TNDARecI32.Multiply(const A, B: TNDARecI32): TNDARecI32;
+class operator TTensorI32.Multiply(const A, B: TTensorI32): TTensorI32;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Integer>(A, B, Result.fArr, MulL_I32, MulR_I32);
@@ -410,7 +410,7 @@ end;
 
 {$endregion}
 
-{$region 'TNDARecI64'}
+{$region 'TTensorI64'}
 
 {$region 'LR functions'}
 
@@ -526,52 +526,52 @@ end;
 
 {$endregion}
 
-class operator TNDARecI64.Implicit(const aArr: INDArray<Int64>): TNDARecI64;
+class operator TTensorI64.Implicit(const aArr: INDArray<Int64>): TTensorI64;
 begin
   Result.fArr := aArr;
 end;
 
-class operator TNDARecI64.Implicit(const aArr: TNDARecI64): INDArray<Int64>;
+class operator TTensorI64.Implicit(const aArr: TTensorI64): INDArray<Int64>;
 begin
   Result := aArr.fArr;
 end;
 
-class operator TNDARecI64.Add(const A, B: TNDARecI64): TNDARecI64;
+class operator TTensorI64.Add(const A, B: TTensorI64): TTensorI64;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Int64>(A, B, Result.fArr, AddL_I64, AddR_I64);
 end;
 
-class operator TNDARecI64.Subtract(const A, B: TNDARecI64): TNDARecI64;
+class operator TTensorI64.Subtract(const A, B: TTensorI64): TTensorI64;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Int64>(A, B, Result.fArr, SubL_I64, SubR_I64);
 end;
 
-class operator TNDARecI64.Multiply(const A, B: TNDARecI64): TNDARecI64;
+class operator TTensorI64.Multiply(const A, B: TTensorI64): TTensorI64;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Int64>(A, B, Result.fArr, MulL_I64, MulR_I64);
 end;
 
-function TNDARecI64.GetPart(const aIdx: INDIndexSeq): TNDARecI64;
+function TTensorI64.GetPart(const aIdx: INDIndexSeq): TTensorI64;
 begin
   Result := fArr[aIdx];
 end;
 
-procedure TNDARecI64.SetPart(const aIdx: INDIndexSeq; const aValue: TNDARecI64);
+procedure TTensorI64.SetPart(const aIdx: INDIndexSeq; const aValue: TTensorI64);
 begin
   fArr[aIdx] := aValue;
 end;
 
-function TNDARecI64.GetShape: TNDAShape;
+function TTensorI64.GetShape: TNDAShape;
 begin
   Result := fArr.Shape;
 end;
 
 {$endregion}
 
-{$region 'TNDARecF32'}
+{$region 'TTensorF32'}
 
 {$region 'LR functions'}
 
@@ -783,144 +783,144 @@ end;
 
 {$endregion}
 
-class operator TNDARecF32.Implicit(const aArr: INDArray<Single>): TNDARecF32;
+class operator TTensorF32.Implicit(const aArr: INDArray<Single>): TTensorF32;
 begin
   Result.fArr := aArr;
 end;
 
-class operator TNDARecF32.Implicit(const aArr: TNDARecF32): INDArray<Single>;
+class operator TTensorF32.Implicit(const aArr: TTensorF32): INDArray<Single>;
 begin
   Result := aArr.fArr;
 end;
 
-class operator TNDARecF32.Implicit(const aArr: TNDARecI32): TNDARecF32;
+class operator TTensorF32.Implicit(const aArr: TTensorI32): TTensorF32;
 begin
   Result := TNDAUt.AsType<Single>(aArr.NDA);
 end;
 
-class operator TNDARecF32.Add(const A, B: TNDARecF32): TNDARecF32;
+class operator TTensorF32.Add(const A, B: TTensorF32): TTensorF32;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Single>(A, B, Result.fArr, AddL_F32, AddR_F32);
 end;
 
-class operator TNDARecF32.Add(const A: TNDARecF32; B: Single): TNDARecF32;
+class operator TTensorF32.Add(const A: TTensorF32; B: Single): TTensorF32;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Single>(A, B, Result.fArr, AddR_F32);
 end;
 
-class operator TNDARecF32.Add(A: Single; const B: TNDARecF32): TNDARecF32;
+class operator TTensorF32.Add(A: Single; const B: TTensorF32): TTensorF32;
 begin
   Result := nil;
   TNDAUt.Map<Single>(A, B, Result.fArr, AddL_F32);
 end;
 
-class operator TNDARecF32.Subtract(const A, B: TNDARecF32): TNDARecF32;
+class operator TTensorF32.Subtract(const A, B: TTensorF32): TTensorF32;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Single>(A, B, Result.fArr, SubL_F32, SubR_F32);
 end;
 
-class operator TNDARecF32.Subtract(const A: TNDARecF32; B: Single): TNDARecF32;
+class operator TTensorF32.Subtract(const A: TTensorF32; B: Single): TTensorF32;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Single>(A, B, Result.fArr, SubR_F32);
 end;
 
-class operator TNDARecF32.Subtract(A: Single; const B: TNDARecF32): TNDARecF32;
+class operator TTensorF32.Subtract(A: Single; const B: TTensorF32): TTensorF32;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Single>(A, B, Result.fArr, SubL_F32);
 end;
 
-class operator TNDARecF32.Multiply(const A, B: TNDARecF32): TNDARecF32;
+class operator TTensorF32.Multiply(const A, B: TTensorF32): TTensorF32;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Single>(A, B, Result.fArr, MulL_F32, MulR_F32);
 end;
 
-class operator TNDARecF32.Multiply(const A: TNDARecF32; B: Single): TNDARecF32;
+class operator TTensorF32.Multiply(const A: TTensorF32; B: Single): TTensorF32;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Single>(A, B, Result.fArr, MulR_F32);
 end;
 
-class operator TNDARecF32.Multiply(A: Single; const B: TNDARecF32): TNDARecF32;
+class operator TTensorF32.Multiply(A: Single; const B: TTensorF32): TTensorF32;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Single>(A, B, Result.fArr, MulL_F32);
 end;
 
-class operator TNDARecF32.Divide(const A, B: TNDARecF32): TNDARecF32;
+class operator TTensorF32.Divide(const A, B: TTensorF32): TTensorF32;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Single>(A, B, Result.fArr, DivL_F32, DivR_F32);
 end;
 
-class operator TNDARecF32.Divide(const A: TNDARecF32; B: Single): TNDARecF32;
+class operator TTensorF32.Divide(const A: TTensorF32; B: Single): TTensorF32;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Single>(A, B, Result.fArr, DivR_F32);
 end;
 
-class operator TNDARecF32.Divide(A: Single; const B: TNDARecF32): TNDARecF32;
+class operator TTensorF32.Divide(A: Single; const B: TTensorF32): TTensorF32;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Single>(A, B, Result.fArr, DivL_F32);
 end;
 
-procedure TNDARecF32.AddTo(const aArr: TNDARecF32);
+procedure TTensorF32.AddTo(const aArr: TTensorF32);
 begin
   TNDAArith.MapR(fArr, aArr.fArr, AddR_F32);
 end;
 
-procedure TNDARecF32.AddTo(const aValue: Single);
+procedure TTensorF32.AddTo(const aValue: Single);
 begin
   TNDAArith.MapR(fArr, @aValue, AddR_F32);
 end;
 
-procedure TNDARecF32.SubtractFrom(const aArr: TNDARecF32);
+procedure TTensorF32.SubtractFrom(const aArr: TTensorF32);
 begin
   TNDAArith.MapR(fArr, aArr.fArr, SubR_F32);
 end;
 
-procedure TNDARecF32.SubtractFrom(const aValue: Single);
+procedure TTensorF32.SubtractFrom(const aValue: Single);
 begin
   TNDAArith.MapR(fArr, @aValue, SubR_F32);
 end;
 
-procedure TNDARecF32.MultiplyBy(const aArr: TNDARecF32);
+procedure TTensorF32.MultiplyBy(const aArr: TTensorF32);
 begin
   TNDAArith.MapR(fArr, aArr.fArr, MulR_F32);
 end;
 
-procedure TNDARecF32.MultiplyBy(const aValue: Single);
+procedure TTensorF32.MultiplyBy(const aValue: Single);
 begin
   TNDAArith.MapR(fArr, @aValue, MulR_F32);
 end;
 
-procedure TNDARecF32.DivideBy(const aArr: TNDARecF32);
+procedure TTensorF32.DivideBy(const aArr: TTensorF32);
 begin
   TNDAArith.MapR(fArr, aArr.fArr, DivR_F32);
 end;
 
-procedure TNDARecF32.DivideBy(const aValue: Single);
+procedure TTensorF32.DivideBy(const aValue: Single);
 begin
   TNDAArith.MapR(fArr, @aValue, DivR_F32);
 end;
 
-function TNDARecF32.GetPart(const aIdx: INDIndexSeq): TNDARecF32;
+function TTensorF32.GetPart(const aIdx: INDIndexSeq): TTensorF32;
 begin
   Result := fArr[aIdx];
 end;
 
-procedure TNDARecF32.SetPart(const aIdx: INDIndexSeq; const aValue: TNDARecF32);
+procedure TTensorF32.SetPart(const aIdx: INDIndexSeq; const aValue: TTensorF32);
 begin
   fArr[aIdx] := aValue;
 end;
 
-function TNDARecF32.GetShape: TNDAShape;
+function TTensorF32.GetShape: TNDAShape;
 begin
   Result := fArr.Shape;
 end;
@@ -1093,108 +1093,108 @@ end;
 
 {$endregion}
 
-class operator TNDARecF64.Implicit(const aArr: INDArray<Double>): TNDARecF64;
+class operator TTensorF64.Implicit(const aArr: INDArray<Double>): TTensorF64;
 begin
   Result.fArr := aArr;
 end;
 
-class operator TNDARecF64.Implicit(const aArr: TNDARecF64): INDArray<Double>;
+class operator TTensorF64.Implicit(const aArr: TTensorF64): INDArray<Double>;
 begin
   Result := aArr.fArr;
 end;
 
-class operator TNDARecF64.Implicit(const aArr: INDArray<Single>): TNDARecF64;
+class operator TTensorF64.Implicit(const aArr: INDArray<Single>): TTensorF64;
 begin
   Result := TNDAUt.AsType<Double>(aArr);
 end;
 
-class operator TNDARecF64.Add(const A, B: TNDARecF64): TNDARecF64;
+class operator TTensorF64.Add(const A, B: TTensorF64): TTensorF64;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Double>(A, B, Result.fArr, AddL_F64, AddR_F64);
 end;
 
-class operator TNDARecF64.Subtract(const A, B: TNDARecF64): TNDARecF64;
+class operator TTensorF64.Subtract(const A, B: TTensorF64): TTensorF64;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Double>(A, B, Result.fArr, SubL_F32, SubR_F64);
 end;
 
-class operator TNDARecF64.Multiply(const A, B: TNDARecF64): TNDARecF64;
+class operator TTensorF64.Multiply(const A, B: TTensorF64): TTensorF64;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Double>(A, B, Result.fArr, MulL_F64, MulR_F64);
 end;
 
-class operator TNDARecF64.Divide(const A, B: TNDARecF64): TNDARecF64;
+class operator TTensorF64.Divide(const A, B: TTensorF64): TTensorF64;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Double>(A, B, Result.fArr, DivL_F64, DivR_F64);
 end;
 
-class operator TNDARecF64.Divide(const A: TNDARecF64; B: Double): TNDARecF64;
+class operator TTensorF64.Divide(const A: TTensorF64; B: Double): TTensorF64;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Double>(A, B, Result.fArr, DivR_F64);
 end;
 
-class operator TNDARecF64.Divide(A: Double; const B: TNDARecF64): TNDARecF64;
+class operator TTensorF64.Divide(A: Double; const B: TTensorF64): TTensorF64;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Double>(A, B, Result.fArr, DivL_F64);
 end;
 
-procedure TNDARecF64.AddTo(const aArr: TNDARecF64);
+procedure TTensorF64.AddTo(const aArr: TTensorF64);
 begin
   TNDAArith.MapR(fArr, aArr.fArr, AddR_F64);
 end;
 
-procedure TNDARecF64.AddTo(const aValue: Double);
+procedure TTensorF64.AddTo(const aValue: Double);
 begin
   TNDAArith.MapR<Double>(fArr, aValue, AddR_F64);
 end;
 
-procedure TNDARecF64.SubtractFrom(const aArr: TNDARecF64);
+procedure TTensorF64.SubtractFrom(const aArr: TTensorF64);
 begin
   TNDAArith.MapR(fArr, aArr.fArr, AddR_F64);
 end;
 
-procedure TNDARecF64.SubtractFrom(const aValue: Double);
+procedure TTensorF64.SubtractFrom(const aValue: Double);
 begin
   TNDAArith.MapR<Double>(fArr, aValue, SubR_F64);
 end;
 
-procedure TNDARecF64.MultiplyBy(const aArr: TNDARecF64);
+procedure TTensorF64.MultiplyBy(const aArr: TTensorF64);
 begin
   TNDAArith.MapR(fArr, aArr.fArr, AddR_F64);
 end;
 
-procedure TNDARecF64.MultiplyBy(const aValue: Double);
+procedure TTensorF64.MultiplyBy(const aValue: Double);
 begin
   TNDAArith.MapR<Double>(fArr, aValue, MulR_F64);
 end;
 
-procedure TNDARecF64.DivideBy(const aArr: TNDARecF64);
+procedure TTensorF64.DivideBy(const aArr: TTensorF64);
 begin
   TNDAArith.MapR(fArr, aArr.fArr, AddR_F64);
 end;
 
-procedure TNDARecF64.DivideBy(const aValue: Double);
+procedure TTensorF64.DivideBy(const aValue: Double);
 begin
   TNDAArith.MapR<Double>(fArr, aValue, DivR_F64);
 end;
 
-function TNDARecF64.GetPart(const aIdx: INDIndexSeq): TNDARecF64;
+function TTensorF64.GetPart(const aIdx: INDIndexSeq): TTensorF64;
 begin
   Result := fArr[aIdx];
 end;
 
-procedure TNDARecF64.SetPart(const aIdx: INDIndexSeq; const aValue: TNDARecF64);
+procedure TTensorF64.SetPart(const aIdx: INDIndexSeq; const aValue: TTensorF64);
 begin
   fArr[aIdx] := aValue;
 end;
 
-function TNDARecF64.GetShape: TNDAShape;
+function TTensorF64.GetShape: TNDAShape;
 begin
   Result := fArr.Shape;
 end;
@@ -1224,7 +1224,7 @@ end;
 
 function ndaAdd(const aArrays: array of INDArray<Integer>): INDArray<Integer>;
 var I, count: Integer;
-    arr: TNDARecI32;
+    arr: TTensorI32;
 begin
   count := Length(aArrays);
   Assert(count > 0);
@@ -1236,7 +1236,7 @@ end;
 
 function ndaAdd(const aArrays: array of INDArray<Int64>): INDArray<Int64>;
 var I, count: Integer;
-    arr: TNDARecI64;
+    arr: TTensorI64;
 begin
   count := Length(aArrays);
   Assert(count > 0);
@@ -1248,7 +1248,7 @@ end;
 
 function ndaAdd(const aArrays: array of INDArray<Single>): INDArray<Single>;
 var I, count: Integer;
-    arr: TNDARecF32;
+    arr: TTensorF32;
 begin
   count := Length(aArrays);
   Assert(count > 0);
@@ -1260,7 +1260,7 @@ end;
 
 function ndaAdd(const aArrays: array of INDArray<Double>): INDARray<Double>;
 var I, count: Integer;
-    arr: TNDARecF64;
+    arr: TTensorF64;
 begin
   count := Length(aArrays);
   Assert(count > 0);
@@ -1320,7 +1320,7 @@ end;
 
 function ndaMultiply(const aArrays: array of INDArray<Integer>): INDArray<Integer>;
 var I, count: Integer;
-    arr: TNDARecI32;
+    arr: TTensorI32;
 begin
   count := Length(aArrays);
   Assert(count > 0);
@@ -1332,7 +1332,7 @@ end;
 
 function ndaMultiply(const aArrays: array of INDArray<Int64>): INDArray<Int64>;
 var I, count: Integer;
-    arr: TNDARecI64;
+    arr: TTensorI64;
 begin
   count := Length(aArrays);
   Assert(count > 0);
@@ -1344,7 +1344,7 @@ end;
 
 function ndaMultiply(const aArrays: array of INDArray<Single>): INDArray<Single>;
 var I, count: Integer;
-    arr: TNDARecF32;
+    arr: TTensorF32;
 begin
   count := Length(aArrays);
   Assert(count > 0);
@@ -1356,7 +1356,7 @@ end;
 
 function ndaMultiply(const aArrays: array of INDArray<Double>): INDARray<Double>;
 var I, count: Integer;
-    arr: TNDARecF64;
+    arr: TTensorF64;
 begin
   count := Length(aArrays);
   Assert(count > 0);
