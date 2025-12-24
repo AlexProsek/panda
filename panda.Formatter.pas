@@ -42,7 +42,12 @@ type
     fPrefix, fSuffix: String;
     fNLType: TNewLineType;
     fFormatter: TItemFmtProc;
+    function Format_Int8(const aValue): String;
+    function Format_UInt8(const aValue): String;
+    function Format_Int16(const aValue): String;
+    function Format_UInt16(const aValue): String;
     function Format_Int32(const aValue): String;
+    function Format_UInt32(const aValue): String;
     function Format_Real32(const aValue): String;
     function Format_Real64(const aValue): String;
     function Format_Extended(const aValue): String;
@@ -168,9 +173,34 @@ begin
   fItemDelim := ', ';
 end;
 
+function TNDAFormatter.Format_Int8(const aValue): String;
+begin
+  Result := IntToStr(Int8(aValue));
+end;
+
+function TNDAFormatter.Format_UInt8(const aValue): String;
+begin
+  Result := IntToStr(UInt8(aValue));
+end;
+
+function TNDAFormatter.Format_Int16(const aValue): String;
+begin
+  Result := IntToStr(Int16(aValue));
+end;
+
+function TNDAFormatter.Format_UInt16(const aValue): String;
+begin
+  Result := IntToStr(UInt16(aValue));
+end;
+
 function TNDAFormatter.Format_Int32(const aValue): String;
 begin
   Result := IntToStr(Integer(aValue));
+end;
+
+function TNDAFormatter.Format_UInt32(const aValue): String;
+begin
+  Result := IntToStr(Cardinal(aValue));
 end;
 
 function TNDAFormatter.Format_Real32(const aValue): String;
@@ -197,12 +227,12 @@ begin
   case ti^.Kind of
     tkInteger: begin
       case ti^.TypeData^.OrdType of
-//        otSByte: ;
-//        otUByte: ;
-//        otSWord: ;
-//        otUWord: ;
+        otSByte:  Result := Format_Int8;
+        otUByte:  Result := Format_UInt8;
+        otSWord:  Result := Format_Int16;
+        otUWord:  Result := Format_UInt16;
         otSLong:  Result := Format_Int32;
-//        otULong: ;
+        otULong:  Result := Format_UInt32;
       end;
     end;
 
@@ -230,7 +260,7 @@ begin
 end;
 
 function TNDAFormatter.GetString(const aArr: INDArray): String;
-var I, nDim, hiLvl: Integer;
+var I, nDim, hiLvl, lvl: Integer;
     hiSz, step: NativeInt;
     sb: TStringBuilder;
     it: TFmtIt;
@@ -270,9 +300,12 @@ begin
               sb.Append(fArrEnd)
             else begin
               sb.Append(fItemDelim);
+              lvl := I + 1;
               break;
             end;
           end;
+          for I := lvl to hiLvl - 1 do
+            sb.Append(fArrBegin);
         end;
       finally
         it.Free;

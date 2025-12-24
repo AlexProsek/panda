@@ -25,7 +25,9 @@ uses
   panda.PTests.cvMath in 'panda.PTests.cvMath.pas',
   panda.PTests.cvCvt in 'panda.PTests.cvCvt.pas',
   panda.cvCvt in '..\..\panda.cvCvt.pas',
-  panda.PTests.Experiments in 'panda.PTests.Experiments.pas';
+  panda.PTests.Experiments in 'panda.PTests.Experiments.pas',
+  panda.PTests.Conv in 'panda.PTests.Conv.pas',
+  panda.BLASInit in '..\..\panda.BLASInit.pas';
 
 {$R *.RES}
 

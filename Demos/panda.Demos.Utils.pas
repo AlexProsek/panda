@@ -27,6 +27,14 @@ type
     property Bitmap: TBitmap read fBmp;
   end;
 
+  TRGB24Channels = class(TNDA<Byte>)
+  protected
+    fImg: INDArray<TRGB24>;
+  public
+    constructor Create(const aImg: INDArray<TRGB24>); overload;
+    function Data: PByte; override;
+  end;
+
 implementation
 
 {$region 'TImageRGB24'}
@@ -66,6 +74,35 @@ end;
 function TImageRGB24.RowWidth: Integer;
 begin
   Result := ((3 * fBmp.Width + 3) div 4) * 4;
+end;
+
+{$endregion}
+
+{$region 'TRGB24Channels'}
+
+constructor TRGB24Channels.Create(const aImg: INDArray<TRGB24>);
+var count: Integer;
+    imgSh, imgStr: TArray<NativeInt>;
+begin
+  Assert(aImg.NDim = 2);
+  fImg := aImg;
+  count := fImg.NDim;
+  SetLength(fShape, count + 1);
+  SetLength(fStrides, count + 1);
+  imgSh := aImg.Shape;
+  imgStr := aImg.Strides;
+  Move(imgSh[0], fShape[0], count * SizeOf(NativeInt));
+  Move(imgStr[0], fStrides[0], count * SizeOf(NativeInt));
+  fShape[count] := 3;
+  fStrides[count] := 1;
+  fFlags := NDAF_WRITEABLE;
+  if (fShape[1] mod 4) = 0 then
+    fFlags := fFlags or NDAF_C_CONTIGUOUS;
+end;
+
+function TRGB24Channels.Data: PByte;
+begin
+  Result := fImg.Data;
 end;
 
 {$endregion}

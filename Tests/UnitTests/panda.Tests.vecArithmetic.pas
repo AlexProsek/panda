@@ -70,13 +70,18 @@ type
     procedure TestScal_10_Single;
     procedure TestScal_3_Double;
     procedure TestScal_8_Double;
+    procedure TestAXPY_1;
     procedure TestAXPY_3;
     procedure TestAXPY_4;
     procedure TestAXPY_5;
     procedure TestAXPY_6;
+    procedure TestAXPY_3_Single;
     procedure TestAXPY_4_Single;
-    procedure TestAXPY_5_Single;
     procedure TestAXPY_6_Single;
+  {$ifdef AVX}
+    procedure TestAXPY_8_Single;
+    procedure TestAXPY_9_Single;
+  {$endif}
     procedure TestAXPY_A1;
     procedure TestAXPY_1_DblCmplx;
     procedure TestAXPY_2_DblCmplx;
@@ -899,6 +904,15 @@ begin
     CheckEquals(2 * c[I], src[I], dtol);
 end;
 
+procedure TTestVectorMath.TestAXPY_1;
+var x, y: TArray<Double>;
+begin
+  x := TArray<Double>.Create(1);
+  y := TArray<Double>.Create(3);
+  axpy(2, PDouble(x), PDouble(y), 1);
+  CheckEquals(5, y[0]);
+end;
+
 procedure TTestVectorMath.TestAXPY_3;
 var x, y: TArray<Double>;
 begin
@@ -949,6 +963,17 @@ begin
   CheckEquals(20, y[5]);
 end;
 
+procedure TTestVectorMath.TestAXPY_3_Single;
+var x, y: TArray<Single>;
+begin
+  x := TArray<Single>.Create(1, 2, 3);
+  y := TArray<Single>.Create(3, 4, 5);
+  axpy(2, PSingle(x), PSingle(y), 3);
+  CheckEquals(5, y[0]);
+  CheckEquals(8, y[1]);
+  CheckEquals(11, y[2]);
+end;
+
 procedure TTestVectorMath.TestAXPY_4_Single;
 var x, y: TArray<Single>;
 begin
@@ -959,19 +984,6 @@ begin
   CheckEquals(8, y[1]);
   CheckEquals(11, y[2]);
   CheckEquals(14, y[3]);
-end;
-
-procedure TTestVectorMath.TestAXPY_5_Single;
-var x, y: TArray<Single>;
-begin
-  x := TArray<Single>.Create(1, 2, 3, 4, 5);
-  y := TArray<Single>.Create(3, 4, 5, 6, 7);
-  axpy(2, PSingle(x), PSingle(y), 5);
-  CheckEquals(5, y[0]);
-  CheckEquals(8, y[1]);
-  CheckEquals(11, y[2]);
-  CheckEquals(14, y[3]);
-  CheckEquals(17, y[4]);
 end;
 
 procedure TTestVectorMath.TestAXPY_6_Single;
@@ -987,6 +999,43 @@ begin
   CheckEquals(17, y[4]);
   CheckEquals(20, y[5]);
 end;
+
+{$ifdef AVX}
+
+procedure TTestVectorMath.TestAXPY_8_Single;
+var x, y: TArray<Single>;
+begin
+  x := TArray<Single>.Create(1, 2, 3, 4, 5, 6, 7, 8);
+  y := TArray<Single>.Create(3, 4, 5, 6, 7, 8, 9, 10);
+  axpy(2, PSingle(x), PSingle(y), Length(x));
+  CheckEquals(5, y[0]);
+  CheckEquals(8, y[1]);
+  CheckEquals(11, y[2]);
+  CheckEquals(14, y[3]);
+  CheckEquals(17, y[4]);
+  CheckEquals(20, y[5]);
+  CheckEquals(23, y[6]);
+  CheckEquals(26, y[7]);
+end;
+
+procedure TTestVectorMath.TestAXPY_9_Single;
+var x, y: TArray<Single>;
+begin
+  x := TArray<Single>.Create(1, 2, 3, 4, 5, 6, 7, 8, 9);
+  y := TArray<Single>.Create(3, 4, 5, 6, 7, 8, 9, 10,11);
+  axpy(2, PSingle(x), PSingle(y), Length(x));
+  CheckEquals(5, y[0]);
+  CheckEquals(8, y[1]);
+  CheckEquals(11, y[2]);
+  CheckEquals(14, y[3]);
+  CheckEquals(17, y[4]);
+  CheckEquals(20, y[5]);
+  CheckEquals(23, y[6]);
+  CheckEquals(26, y[7]);
+  CheckEquals(29, y[8]);
+end;
+
+{$endif}
 
 procedure TTestVectorMath.TestAXPY_A1;
 var x, y: TArray<Double>;

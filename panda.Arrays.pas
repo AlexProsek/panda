@@ -315,6 +315,7 @@ type
       const aIdxPerm: TArray<Integer> = nil); overload; virtual;
     function MoveNext: Boolean; virtual;
     procedure Reset; virtual;
+    procedure ResetData; virtual;
 
     property Current: PByte read fCurrent;
     property LowLevel: Integer read GetLowLvl;
@@ -458,7 +459,7 @@ type
   TNDAUt = class
   public type
     TOArray<T> = array of T;  // open array
-    TOArray2D<T> = array of TArray<T>;
+    TOArray2D<T> = array of TOArray<T>;
   protected class var
     fConstrs: TDictionary<PTypeInfo, TNDAFactory>;
     fCvtFuncs: TDictionary<TPair<PTypeInfo, PTypeInfo>, TIPProcVV>;
@@ -484,7 +485,7 @@ type
     class procedure FillR<T>(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt); static;
     class procedure Copy<T>(aSrc, aDst: PByte; aCount: NativeInt); overload; static;
     class procedure Copy<T>(aSrc, aDst: PByte; aCount, aStep: NativeInt); overload; static;
-    class procedure Copy<T>(const aArr: INDArray<T>; aDst: PByte); overload; static;
+    class procedure Copy<T>(const aArr: INDArray; aDst: PByte); overload; static;
     class function Permute<T>(const aData: TArray<T>; const aIndices: array of Integer): TArray<T>;
   public
     class constructor Create;
@@ -538,6 +539,7 @@ type
   function SameQ(const aIdx1, aIdx2: array of NativeInt; out aUpTo: Integer): Boolean; overload;
   function SameUpToQ(const aIdx1, aIdx2: array of NativeInt; aUpTo: Integer): Boolean; overload;
   function SameShapeQ(const A, B: INDArray): Boolean; inline;
+  function ValidShapeQ(const aShape: TNDAShape): Boolean; inline;
   function AxesPermQ(const aAxes: array of Integer): Boolean;
   function IdPermQ(const aAxes: array of Integer): Boolean;
   function GetItemSize(aType: PTypeInfo): Integer;
@@ -549,12 +551,13 @@ type
   function MatrixQ(const aArr: INDArray): Boolean;
   function GetCContLvl(const aArr: INDArray; out aBlockSz: NativeInt): Integer;
   function GetCommonCContLvl(const A, B: INDArray; out aSz: NativeInt): Integer;
+  function CheckCContLvl(const aArr: INDArray; aRequiredLvl: Integer): Boolean;
   function BroadcastLvl(A, B: INDArray): Integer;
   function GetPartShape(const A: INDArray; const aIdx: INDIndexSeq): TNDAShape;
   function CompatibleQ(const aShapes: array of TNDAShape; out aResShape: TNDAShape): Boolean; overload;
   function CompatibleQ(const aArrays: array of INDArray; out aResShape: TNDAShape; out aType: PTypeInfo): Boolean; overload;
   function GetCommonType(const aArrays: array of INDArray; out aType: PTypeInfo): Boolean;
-  function ContinguousQ(aElemSz: Integer; const aShape, aStrides: array of NativeInt): Boolean; overload;
+  function ContiguousQ(aElemSz: Integer; const aShape, aStrides: array of NativeInt): Boolean; overload;
 
   function NDISpan(aLo: NativeInt = 0; aHi: NativeInt = -1; aStep: NativeInt = 1): INDSpanIndex; inline;
   function NDISet(const aIndices: array of NativeInt): INDSetIndex;
@@ -656,6 +659,14 @@ begin
   Result := SameQ(A.Shape, B.Shape);
 end;
 {$endif}
+
+function ValidShapeQ(const aShape: TNDAShape): Boolean;
+var I: Integer;
+begin
+  for I := 0 to High(aShape) do
+    if aShape[I] <= 0 then exit(False);
+  Result := True;
+end;
 
 function AxesPermQ(const aAxes: array of Integer): Boolean;
 var I, count: Integer;
@@ -785,6 +796,12 @@ begin
   aSz := Min(szA, szB);
 end;
 
+function CheckCContLvl(const aArr: INDArray; aRequiredLvl: Integer): Boolean;
+var bSz: NativeInt;
+begin
+  Result := (GetCContLvl(aArr, bSz) <= aRequiredLvl);
+end;
+
 function BroadcastLvl(A, B: INDArray): Integer;
 var sA, sB: TArray<NativeInt>;
     hiLvlA, hiLvlB, I: Integer;
@@ -903,7 +920,7 @@ begin
   Result := True;
 end;
 
-function ContinguousQ(aElemSz: Integer; const aShape, aStrides: array of NativeInt): Boolean;
+function ContiguousQ(aElemSz: Integer; const aShape, aStrides: array of NativeInt): Boolean;
 var hi, I: Integer;
     s: NativeInt;
 begin
@@ -1488,7 +1505,7 @@ end;
 
 function TNDScalar<T>.Flags: Cardinal;
 begin
-  Result := NDAF_COW or NDAF_F_CONTINGUOUS;
+  Result := NDAF_COW or NDAF_F_CONTIGUOUS;
 end;
 
 procedure TNDScalar<T>.SetFlags(aValue: Cardinal);
@@ -1849,7 +1866,7 @@ begin
   fShape := aShape;
   fStrides := aStrides;
   fFlags := 0;
-  if ContinguousQ(SizeOf(T), fShape, fStrides) then
+  if ContiguousQ(SizeOf(T), fShape, fStrides) then
     fFlags := fFlags or NDAF_C_CONTIGUOUS;
 end;
 
@@ -1952,7 +1969,7 @@ begin
   fArray := aArray;
   InitPermuted(fArray.Shape, fArray.Strides, aAxesPerm);
   fFlags := fArray.Flags and (not NDAF_CONTIGUOUS);
-  if ContinguousQ(ItemSize, fShape, fStrides) then
+  if ContiguousQ(ItemSize, fShape, fStrides) then
     fFlags := fFlags or NDAF_C_CONTIGUOUS;
 end;
 
@@ -1972,7 +1989,7 @@ begin
   fShape[0] := Length(aArray);
   SetLength(fStrides, 1);
   fStrides[0] := SizeOf(T);
-  fFlags := NDAF_COW or NDAF_F_CONTINGUOUS;
+  fFlags := NDAF_COW or NDAF_F_CONTIGUOUS;
 end;
 
 constructor TDynArrWrapper<T>.Create(const aArray: TArray<T>; const aShape: array of NativeInt);
@@ -1986,7 +2003,7 @@ begin
   fStrides := GetStrides(fShape);
   fFlags := NDAF_COW;
   if nDim = 1 then
-    fFlags := NDAF_F_CONTINGUOUS;
+    fFlags := NDAF_F_CONTIGUOUS;
 end;
 
 function TDynArrWrapper<T>.Data: PByte;
@@ -2272,6 +2289,11 @@ begin
     Offset := -Step;
     Base := 0;
   end;
+  fData := fArr.Data;
+end;
+
+procedure TNDAIt.ResetData;
+begin
   fData := fArr.Data;
 end;
 
@@ -2699,10 +2721,12 @@ class constructor TNDAUt.Create;
 begin
   fCvtFuncs := TDictionary<TPair<PTypeInfo, PTypeInfo>, TIPProcVV>.Create;
 
+  AddCvtFunc<Byte,    Single>(cvt_UI8F32);
   AddCvtFunc<Integer, Single>(cvt_I32F32);
-  AddCvtFunc<Single,  Double>(cvt_F32F64);
   AddCvtFunc<Double,  Single>(cvt_F64F32);
 
+  AddCvtFunc<Single,    Byte>(cvt_F32UI8);
+  AddCvtFunc<Single,  Double>(cvt_F32F64);
 
   fConstrs := TObjectDictionary<PTypeInfo, TNDAFactory>.Create([doOwnsValues]);
 
@@ -3289,7 +3313,7 @@ begin
   Map<T, T, T>(L, R, aRes, aLFnc, aRFnc);
 end;
 
-class procedure TNDAUt.Copy<T>(const aArr: INDArray<T>; aDst: PByte);
+class procedure TNDAUt.Copy<T>(const aArr: INDArray; aDst: PByte);
 var sz, count: NativeInt;
     cLvl: Integer;
     it: TNDAIt;

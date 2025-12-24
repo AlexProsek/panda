@@ -34,6 +34,7 @@ type
     procedure TestScal_Double;
     procedure TestAXPY;
     procedure TestAXPY_A1;
+    procedure TestAXPY_Single;
     procedure TestAXPY_Cmplx;
     procedure TestDot;
     procedure TestDot_Single;
@@ -424,7 +425,7 @@ begin
   SetLength(y, N);
 
   SWStart;
-  axpy(2, @x[0], @y[0], N);
+  axpy(2, PDouble(x), PDouble(y), N);
   SWStop;
 end;
 
@@ -436,7 +437,19 @@ begin
   SetLength(y, N);
 
   SWStart;
-  axpy(1, @x[0], @y[0], N);
+  axpy(1, PDouble(x), PDouble(y), N);
+  SWStop;
+end;
+
+procedure TVecMathPerformance.TestAXPY_Single;
+var x, y: TArray<Double>;
+const N = 10000000;
+begin
+  SetLength(x, N);
+  SetLength(y, N);
+
+  SWStart;
+  axpy(2, PSingle(x), PSingle(y), N);
   SWStop;
 end;
 

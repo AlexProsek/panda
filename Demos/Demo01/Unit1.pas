@@ -37,39 +37,6 @@ implementation
 
 {$R *.dfm}
 
-{$region 'TRGB24Channels'}
-
-type
-  TRGB24Channels = class(TNDA<Byte>)
-  protected
-    fData: PByte;
-  public
-    constructor Create(aData: Pointer; const aDims, aStrides: array of NativeInt); overload;
-    function Data: PByte; override;
-  end;
-
-constructor TRGB24Channels.Create(aData: Pointer; const aDims, aStrides: array of NativeInt);
-var count: Integer;
-begin
-  fData := PByte(aData);
-  count := Length(aDims);
-  SetLength(fShape, count);
-  SetLength(fStrides, count);
-  count := count * SizeOf(NativeInt);
-  Move(aDims[0], fShape[0], count);
-  Move(aStrides[0], fStrides[0], count);
-  fFlags := NDAF_WRITEABLE;
-  if (fShape[1] mod 4) = 0 then
-    fFlags := fFlags or NDAF_C_CONTIGUOUS;
-end;
-
-function TRGB24Channels.Data: PByte;
-begin
-  Result := fData;
-end;
-
-{$endregion}
-
 procedure TForm1.btFlipChanged(Sender: TObject);
 var i: INDArray<TRGB24>;
 begin
@@ -96,12 +63,12 @@ var i: INDArray<TRGB24>;
 begin
   w := fImg.Shape[1];
   h := fImg.Shape[0];
-  chSrc := TRGB24Channels.Create(fImg.Data, [h, w, 3], [TImageRGB24(fImg).RowWidth, 3, 1]);
+  chSrc := TRGB24Channels.Create(fImg);
   chSrc := chSrc[[NDIAll(2), NDIAll(2)]];
   w2 := chSrc.Shape[1];
   h2 := chSrc.Shape[0];
   i := TImageRGB24.Create(2*w2, 2*h2);
-  chDst := TRGB24Channels.Create(i.Data, [2*h2, 2*w2, 3], [TImageRGB24(i).RowWidth, 3, 1]);
+  chDst := TRGB24Channels.Create(i);
 
   TNDAUt.Fill<Byte>(chDst, 0);
   chDst[[NDISpan(h2, -1), NDISpan(0, w2 - 1)]] := chSrc;

@@ -488,7 +488,6 @@ begin
   CheckTrue(ndaAllClose(expected, m, tol));
 end;
 
-
 {$endregion}
 
 initialization

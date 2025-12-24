@@ -64,12 +64,12 @@ type
 
 const
   NDAF_C_CONTIGUOUS     = $0001;
-  NDAF_F_CONTINGUOUS    = $0002;
+  NDAF_F_CONTIGUOUS     = $0002;
   NDAF_OWNDATA          = $0004;
   NDAF_ALIGNED          = $0100;
   NDAF_WRITEABLE        = $0400;
 
-  NDAF_CONTIGUOUS = NDAF_C_CONTIGUOUS or NDAF_F_CONTINGUOUS;
+  NDAF_CONTIGUOUS = NDAF_C_CONTIGUOUS or NDAF_F_CONTIGUOUS;
   NDAF_COW = NDAF_C_CONTIGUOUS or NDAF_OWNDATA or NDAF_WRITEABLE;
 
 type
@@ -208,7 +208,7 @@ end;
 
 function FContiguousQ(const aArr: INDArray): Boolean;
 begin
-  Result := (aArr.Flags and NDAF_F_CONTINGUOUS) <> 0;
+  Result := (aArr.Flags and NDAF_F_CONTIGUOUS) <> 0;
 end;
 
 function ContiguousQ(const aArr: INDArray): Boolean;

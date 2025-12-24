@@ -38,7 +38,10 @@ uses
   panda.Tests.cvMath in 'panda.Tests.cvMath.pas',
   panda.cvCvt in '..\..\panda.cvCvt.pas',
   panda.vCvt in '..\..\panda.vCvt.pas',
-  panda.Tests.cvCvt in 'panda.Tests.cvCvt.pas';
+  panda.Tests.cvCvt in 'panda.Tests.cvCvt.pas',
+  panda.Conv in '..\..\panda.Conv.pas',
+  panda.Tests.Conv in 'panda.Tests.Conv.pas',
+  panda.BLASInit in '..\..\panda.BLASInit.pas';
 
 {$R *.RES}
 

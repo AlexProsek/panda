@@ -2,7 +2,9 @@ unit panda.vCvt;
 
 interface
 
+procedure cvt_UI8F32(N: NativeInt; X: PByte; XInc: NativeInt; Y: PByte; Yinc: NativeInt);
 procedure cvt_I32F32(N: NativeInt; X: PByte; XInc: NativeInt; Y: PByte; YInc: NativeInt);
+procedure cvt_F32UI8(N: NativeInt; X: PByte; XInc: NativeInt; Y: PByte; YInc: NativeInt);
 procedure cvt_F32F64(N: NativeInt; X: PByte; XInc: NativeInt; Y: PByte; YInc: NativeInt);
 procedure cvt_F64F32(N: NativeInt; X: PByte; XInc: NativeInt; Y: PByte; YInc: NativeInt);
 
@@ -11,6 +13,17 @@ implementation
 uses
     panda.cvCvt
   ;
+
+procedure cvt_UI8F32(N: NativeInt; X: PByte; XInc: NativeInt; Y: PByte; Yinc: NativeInt);
+var pEnd: PByte;
+begin
+  pEnd := X + XInc * N;
+  while X < pEnd do begin
+    PSingle(Y)^ := X^;
+    Inc(X, XInc);
+    Inc(Y, YInc);
+  end;
+end;
 
 procedure cvt_I32F32(N: NativeInt; X: PByte; XInc: NativeInt; Y: PByte; YInc: NativeInt);
 var pEnd: PByte;
@@ -24,6 +37,24 @@ begin
     end;
   end else
     cvt(PInteger(X), PSingle(Y), N);
+end;
+
+procedure cvt_F32UI8(N: NativeInt; X: PByte; XInc: NativeInt; Y: PByte; YInc: NativeInt);
+var pEnd: PByte;
+    s: Single;
+begin
+  pEnd := X + XInc * N;
+  while X < pEnd do begin
+    s := PSingle(X)^;
+    if s < 0 then
+      Y^ := 0
+    else if s > 255 then
+      Y^ := 255
+    else
+      Y^ := Round(s);
+    Inc(X, XInc);
+    Inc(Y, YInc);
+  end;
 end;
 
 procedure cvt_F32F64(N: NativeInt; X: PByte; XInc: NativeInt; Y: PByte; YInc: NativeInt);

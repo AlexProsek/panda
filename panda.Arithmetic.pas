@@ -694,7 +694,7 @@ begin
     // R <- l * R
     s := PSingle(L)^;
     if IncR = cF32Sz then begin
-      VecMul(PSingle(L), s, PSingle(R), N);
+      VecMul(PSingle(R), s, PSingle(R), N);
       exit;
     end;
 
@@ -927,7 +927,7 @@ end;
 
 {$endregion}
 
-{$region 'TNDARecF64'}
+{$region 'TTensorF64'}
 
 {$region 'LR functions'}
 

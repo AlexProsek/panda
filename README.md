@@ -1,9 +1,25 @@
 # PaNDA - Pascal N-Dimensional Arrays
 
-> **Status:** Experimental  
->
-> PaNDA is currently under active development. Some features are incomplete or may change in future versions.
-> While the core functionality is usable, the library should still be considered experimental.
+<p align="center">
+  <a href="https://github.com/AlexProsek/panda">
+    <img src="https://img.shields.io/badge/status-experimental-orange" alt="Status">
+  </a>
+  <a href="https://github.com/AlexProsek/panda">
+    <img src="https://img.shields.io/badge/tested%20with-Delphi%2012-blue" alt="Delphi Version">
+  </a>
+  <a href="https://github.com/AlexProsek/panda">
+    <img src="https://img.shields.io/badge/OpenBLAS-optional%20acceleration-green" alt="OpenBLAS">
+  </a>
+  <a href="https://github.com/AlexProsek/panda/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/AlexProsek/panda" alt="License">
+  </a>
+  <a href="https://github.com/AlexProsek/panda/stargazers">
+    <img src="https://img.shields.io/github/stars/AlexProsek/panda?style=flat" alt="GitHub stars">
+  </a>
+  <a href="https://github.com/AlexProsek/panda/releases">
+    <img src="https://img.shields.io/github/v/release/AlexProsek/panda?label=release" alt="Release">
+  </a>
+</p>
 
 `PaNDA` is a small library that provides classes for working with N-dimensional arrays in Pascal (Delphi).
 It introduces an `INDArray` interface that supports slicing syntax similar to Python and Mathematica.

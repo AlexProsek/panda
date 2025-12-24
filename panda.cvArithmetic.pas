@@ -2334,7 +2334,7 @@ begin
 end;
 
 procedure axpy(const a: Double; pX, pY: PDouble; aCount: NativeInt);
-{$ifdef ASMx86}
+{$if defined(ASMx86)}
 //EAX <- pX, EDX <- pY, ECX <- aCount, [EBP + 8] <- a
 const OneVal: Double = 1.0;
 asm
@@ -2346,17 +2346,10 @@ asm
   movddup xmm2, [ebp + 8]  // xmm2 <- (a, a)
 
   movsd xmm1, [OneVal] // Move constant 1.0 to XMM1 register
-  comisd xmm2, xmm1      // Compare 'Value' to 1.0
+  comisd xmm2, xmm1      // Compare 'a' to 1.0
   je @A1            // Jump if ZF is set (values are equal)
 
-//// different approach to (a == 1) test on FPU stack
-//  fld a            // Load 'Value' onto the FPU stack
-//  fld1                 // Load constant 1.0 onto the FPU stack
-//  fcomip st(0), st(1)  // Compare 'Value' to 1.0
-//  fstp st(0)           // Clean up the FPU stack
-//  je @A1            // Jump if ZF is set (values are equal)
-
-  shr ecx, 2//3
+  shr ecx, 2
   jz @rest
 @L:
   movupd xmm0, [esi]
@@ -2375,27 +2368,11 @@ asm
   add esi, 16
   add edi, 16
 
-//  movupd xmm0, [esi]
-//  movupd xmm1, [edi]
-//  mulpd xmm0, xmm2
-//  addpd xmm0, xmm1
-//  movupd [edi], xmm0
-//  add esi, 16
-//  add edi, 16
-//
-//  movupd xmm0, [esi]
-//  movupd xmm1, [edi]
-//  mulpd xmm0, xmm2
-//  addpd xmm0, xmm1
-//  movupd [edi], xmm0
-//  add esi, 16
-//  add edi, 16
-
   dec ecx
   jnz @L
 
 @rest:
-  and eax, 3//7
+  and eax, 3
   jz @end
   mov ecx, eax
 @Lr:
@@ -2449,6 +2426,67 @@ asm
 @end:
   pop edi
   pop esi
+end;
+{$elseif defined(ASMx64)}
+{$CODEALIGN 16}
+asm
+  // XMM0 <- a, RDX <- pX, R8 <- pY, R9 <- aCount
+  mov rcx, r9
+  shr rcx, 2
+  jz @rest
+{$ifdef AVX}
+  vbroadcastsd ymm0, xmm0
+@L:
+  vmovups ymm1, [rdx] // ymm1 <- x
+  vmovups ymm2, [r8] // ymm2 <- y
+  vmulpd ymm1, ymm1, ymm0 // ymm1 <- a * x
+  vaddpd ymm1, ymm1, ymm2 // ymm1 <- a * x + y
+  vmovups [r8], ymm1
+  add rdx, 32
+  add r8, 32
+  dec rcx
+  jnz @L
+
+  vzeroupper
+{$else}
+  movddup xmm0, xmm0
+@L:
+  movupd xmm1, [rdx]
+  movupd xmm2, [r8]
+  mulpd xmm1, xmm0 // xmm0 <- a * x
+  addpd xmm1, xmm2 // xmm0 <- a * x + y
+  movupd [r8], xmm1
+  add rdx, 16
+  add r8, 16
+
+  movupd xmm1, [rdx]
+  movupd xmm2, [r8]
+  mulpd xmm1, xmm0
+  addpd xmm1, xmm2
+  movupd [r8], xmm1
+  add rdx, 16
+  add r8, 16
+
+  dec rcx
+  jnz @L
+{$endif}
+
+@rest:
+  and r9, 3
+  jz @end
+@Lr:
+  movsd xmm1, [rdx]
+  movsd xmm2, [r8]
+  mulsd xmm1, xmm0
+  addsd xmm1, xmm2
+  movsd [r8], xmm1
+  add rdx, 8
+  add r8, 8
+  dec r9
+  jnz @Lr
+
+  jmp @end;
+@end:
 end;
 {$else}
 var pEnd, pEndu: PByte;
@@ -2509,9 +2547,9 @@ asm
   mov edi, edx
   mov eax, ecx
   shr ecx, 2
-  jz @rest
   movd xmm1, [ebp + 8]
   movss xmm2, xmm1
+  jz @rest
   shufps xmm2, xmm1, 0 // xmm2 <- (a, a, a, a)
 @L:
   movupd xmm0, [esi]
@@ -2544,37 +2582,60 @@ asm
   pop esi
 end;
 {$elseif defined(ASMx64)}
+{$CODEALIGN 16}
 asm
   // XMM0 <- a, RDX <- pX, R8 <- pY, R9 <- aCount
   mov rax, r8 // (RAX, RDX) <- (pY, pX)
   mov rcx, r9
+{$ifdef AVX}
+  shr rcx, 3
+  jz @rest
+  vbroadcastss ymm0, xmm0
+@L:
+  vmovups ymm1, [rdx] // ymm1 <- x
+  vmovups ymm2, [rax] // ymm2 <- y
+  vmulps ymm1, ymm1, ymm0 // ymm1 <- a * x
+  vaddps ymm1, ymm1, ymm2 // ymm1 <- a * x + y
+  vmovups [rax], ymm1
+  add rax, 32
+  add rdx, 32
+  dec rcx
+  jnz @L
+
+  vzeroupper
+@rest:
+  and r9, 7
+{$else}
+  movss xmm2, xmm0
   shr rcx, 2
   jz @rest
-  movss xmm2, xmm0
-  shufps xmm2, xmm0, 0  // xmm0 <- (a, a, a, a)
+  shufps xmm0, xmm0, 0  // xmm0 <- (a, a, a, a)
 @L:
-  movupd xmm0, [rdx] // xmm0 <- x
-  movupd xmm1, [rax] // xmm1 <- y
-  mulps xmm0, xmm2 // xmm0 <- a * x
-  addps xmm0, xmm1 // xmm0 <- a * x + y
-  movups [rax], xmm0
+  movupd xmm1, [rdx] // xmm0 <- x
+  movupd xmm2, [rax] // xmm1 <- y
+  mulps xmm1, xmm0 // xmm0 <- a * x
+  addps xmm1, xmm2 // xmm0 <- a * x + y
+  movups [rax], xmm1
   add rax, 16
   add rdx, 16
-  loop @L
+  dec rcx
+  jnz @L
 
 @rest:
   and r9, 3
+{$endif}
   jz @end
   mov rcx, r9
 @Lrest:
-  movss xmm0, [rdx]
-  movss xmm1, [rax]
-  mulss xmm0, xmm2
-  addss xmm0, xmm1
-  movd [rax], xmm0
+  movss xmm1, [rdx]
+  movss xmm2, [rax]
+  mulss xmm1, xmm0
+  addss xmm1, xmm2
+  movd [rax], xmm1
   add rax, 4
   add rdx, 4
-  loop @Lrest
+  dec rcx
+  jnz @Lrest
 @end:
 end;
 {$else}
@@ -2806,7 +2867,7 @@ asm
 @L:
   vmovups ymm1, [rsi]
   vmovups ymm2, [rdi]
-  vmulps ymm1, ymm1, ymm2 // ymm0 <- X * Y
+  vmulps ymm1, ymm1, ymm2 // ymm1 <- X * Y
   vaddps ymm0, ymm0, ymm1
   add rsi, 32
   add rdi, 32

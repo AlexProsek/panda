@@ -124,6 +124,7 @@ type
   published
     procedure Array2DRows;
     procedure Array2DCols;
+    procedure Array3D_SliceAxes01;
   end;
 
   TNDASliceItChainTests = class(TNDATestCase)
@@ -1451,6 +1452,30 @@ begin
   end;
 end;
 
+procedure TNDASliceItTests.Array3D_SliceAxes01;
+var a: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+    it: TNDASliceIt;
+begin
+  a := iRng2NDA([2, 3, 2]);
+  it := TNDASliceIt.Create(a, 2, -1);
+  try
+    CheckTrue(it.MoveNext);
+    CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(it.CurrentSlice, m));
+    CheckEquals([1, 3, 5],  m[0]);
+    CheckEquals([7, 9, 11], m[1]);
+
+    CheckTrue(it.MoveNext);
+    CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(it.CurrentSlice, m));
+    CheckEquals([2, 4, 6],   m[0]);
+    CheckEquals([8, 10, 12], m[1]);
+
+    CheckFalse(it.MoveNext);
+  finally
+    it.Free;
+  end;
+end;
+
 {$endregion}
 
 {$region 'TNDASliceSetItTests'}
@@ -2298,8 +2323,8 @@ var s, str: TNDAShape;
 begin
   s := TNDAShape.Create(3);
   str := TNDAShape.Create(8);
-  CheckTrue(ContinguousQ(8, s, str));
-  CheckFalse(ContinguousQ(4, s, str));
+  CheckTrue(ContiguousQ(8, s, str));
+  CheckFalse(ContiguousQ(4, s, str));
 end;
 
 procedure TBinMapTests.TestContinguousQ_Mat;
@@ -2307,11 +2332,11 @@ var s, str: TNDAShape;
 begin
   s := TNDAShape.Create(2, 3);
   str := TNDAShape.Create(24, 8);
-  CheckTrue(ContinguousQ(8, s, str));
-  CheckFalse(ContinguousQ(4, s, str));
+  CheckTrue(ContiguousQ(8, s, str));
+  CheckFalse(ContiguousQ(4, s, str));
 
   str := TNDAShape.Create(30, 8);
-  CheckFalse(ContinguousQ(8, s, str));
+  CheckFalse(ContiguousQ(8, s, str));
 end;
 
 procedure TBinMapTests.Scalar_Scalar;
