@@ -26,6 +26,7 @@ type
     TCorr1DProc = procedure (pK: PByte; aKStep, aKSz: NativeInt; pIn, pOut: PByte; aOutSz: NativeInt);
   protected
     fNDim: Integer;
+    fMapLvl: Integer;
     fInSh, fOutSh: TNDAShape;
     fInitialized: Boolean;
     fCorrProc: TCorr1DProc;
@@ -58,14 +59,13 @@ type
   protected
     fItRes, fItArr: TNDAIt;
     fItK, fItAb, fItRb: TNDAIt;
-    fSItKs, fSItRes: TNDASliceIt;
+    fSItKs, fSItK, fSItRes: TNDASliceIt;
     fItKs: TBlockIt;
     fKer, fRes, fRs, fRb, fKs: INDArray;
     fKsPtr: PByte;
     fAbIdx, fArIdx: INDIndexSeq;
     fKnSt, fKnSz, fKsSz, fRnSz: NativeInt;
     fTotalProc: TTotalProc;
-    fMapLvl: Integer;
     procedure InternalInit(const aK: INDArray; const aInShape: TNDAShape); virtual;
     procedure InternalEval1D(const aInput: INDArray); virtual;
     procedure InternalEvalND(const aInput: INDArray); virtual;
@@ -105,12 +105,6 @@ type
   public
     procedure AfterConstruction; override;
   end;
-
-  TCorrSep = class abstract
-  public
-    procedure Init(const aKs: array of INDArray; const aInShape: TNDAShape); virtual;
-  end;
-
 
 function ndaCorrelate(const aKer, aArr: INDArray<Single>): INDArray<Single>; overload;
 function ndaCorrelate(const aKer, aArr: INDArray<Double>): INDArray<Double>; overload;
@@ -209,7 +203,11 @@ begin
   kLvl0 := Max(0, fMapLvl);
   inLvl0 := Max(0, -fMapLvl);
   fNDim := Min(aK.NDim, Length(aInShape));
-  fKer := aK;
+  if kLvl0 > 0 then begin
+    fSItK := TNDASliceIt.Create(aK, 0, Abs(fMapLvl) - 1);
+    fKer := fSItK.CurrentSlice;
+  end else
+    fKer := aK;
   fInSh := aInShape;
   kSh := aK.Shape;
   fOutSh := OutShape(aInShape, kSh);
@@ -225,7 +223,7 @@ begin
   case fNDim of
     1: begin
       fKnSz := kSh[kLvl0];
-      fKnSt := fKer.Strides[kLvl0 + fNDim - 1];
+      fKnSt := aK.Strides[kLvl0 + fNDim - 1];
       fRnSz := aInShape[inLvl0] - kSh[kLvl0] + 1;
       fInitialized := True;
       exit;
@@ -252,7 +250,10 @@ begin
     fItRes := TNDAIt.Create(fSItRes.CurrentSlice, 0, fNDim - 2)
   else
     fItRes := TNDAIt.Create(fRes, 0, fNDim - 2);
-  fItK  := TNDAIt.Create(fKer, 0, fNDim - 2);
+  if kLvl0 > 0 then
+    fItK  := TNDAIt.Create(fSItK.CurrentSlice, 0, fNDim - 2)
+  else
+    fItK  := TNDAIt.Create(fKer, 0, fNDim - 2);
   fItRb := TNDAIt.Create(fRb, 0, fNDim - 2);
   fSItKs := TNDASliceIt.Create(fRb, fNDim - 1, -1);
   fItKs := TBlockIt.Create(fSItKs.CurrentSlice);
@@ -261,7 +262,7 @@ begin
   fKsPtr := fKs.Data;
   fKsSz := GetSize(fKs);
   fKnSz := kSh[kLvl0 + fNDim - 1];
-  fKnSt := fKer.Strides[kLvl0 + fNDim - 1];
+  fKnSt := aK.Strides[kLvl0 + fNDim - 1];
   fInitialized := True;
 end;
 
@@ -271,6 +272,7 @@ begin
   FreeAndNil(fSItRes);
   FreeAndNil(fItK);
   FreeAndNil(fItRb);
+  FreeAndNil(fSItK);
   FreeAndNil(fSItKs);
   FreeAndNil(fItKs);
   fKer := nil;
@@ -319,11 +321,11 @@ begin
       while fItK.MoveNext and itAb.MoveNext and fItRb.MoveNext do
         fCorrProc(fItK.Current, fKnSt, fKnSz, itAb.Current, fItRb.Current, fRnSz);
       p := fItRes.Current;
+      fSItKs.Reset;
       while fSItKs.MoveNext do begin
         fTotalProc(fItKs, p);
         Inc(p, elSz);
       end;
-      fSItKs.Reset;
     end;
   finally
     itArr.Free;
@@ -370,7 +372,15 @@ begin
 
   if fMapLvl > 0 then begin
     // fMapLvl > 0 -> mapping over kernel slices
-    raise ENotImplemented.Create('Correlation broadcasting over kernel slices is not implemented yet.');
+    fSItK.Reset;
+    fSItRes.Reset;
+    if fNDim = 1 then begin
+      while fSItK.MoveNext and fSItRes.MoveNext do
+        InternalEval1D(aInput);
+    end else begin
+      while fSItK.MoveNext and fSItRes.MoveNext do
+        InternalEvalND(aInput);
+    end;
   end;
 end;
 
@@ -505,14 +515,6 @@ end;
 
 {$endregion}
 
-{$region 'TCorrSep'}
-
-procedure TCorrSep.Init(const aKs: array of INDArray; const aInShape: TNDAShape);
-begin
-end;
-
-{$endregion}
-
 {$region 'ndaCorrelate'}
 
 function ndaCorrelate(const aKer, aArr: INDArray<Single>): INDArray<Single>;
@@ -541,7 +543,7 @@ end;
 
 {$endregion}
 
-{$region ndaConvolve}
+{$region 'ndaConvolve'}
 
 function ndaConvolve(const aKer, aArr: INDArray<Single>): INDArray<Single>;
 begin

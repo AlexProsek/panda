@@ -2248,7 +2248,6 @@ function TNDAIt.MoveNext: Boolean;
 var ppos: PNDAPos;
     b: NativeInt;
 begin
-  Result := False;
   ppos := fTopIt;
   while PByte(ppos) >= fBaseIt do begin
     with ppos^ do begin
@@ -2268,12 +2267,13 @@ begin
         Offset := 0;
       end;
     end;
-    Result := True;
-    break;
+
+    with fTopIt^ do
+      fCurrent := fData + Base + Offset;
+    exit(True);
   end;
 
-  with fTopIt^ do
-    fCurrent := fData + Base + Offset;
+  Result := False;
 end;
 
 procedure TNDAIt.Reset;

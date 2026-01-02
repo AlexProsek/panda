@@ -4,14 +4,17 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ExtCtrls, Vcl.StdCtrls, Vcl.Samples.Spin, Vcl.ComCtrls
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ExtCtrls, Vcl.StdCtrls, Vcl.Samples.Spin, Vcl.ComCtrls,
+  Vcl.Menus
   , panda.Intfs
   , panda.Arrays
   , panda.ArrManip
   , panda.Arithmetic
+  , panda.Math
   , panda.Conv
   , panda.Demos.Utils
   , System.Diagnostics
+  , System.UITypes
   ;
 
 type
@@ -25,14 +28,15 @@ type
     edKernelSize: TSpinEdit;
     btExecute: TButton;
     Label2: TLabel;
-    cbKernelType: TComboBox;
+    cbFilterType: TComboBox;
     StatusBar1: TStatusBar;
+    cbUseSepKer: TCheckBox;
     procedure btExecuteClick(Sender: TObject);
     procedure Button1Click(Sender: TObject);
   private
     { Private declarations }
     fImg: INDArray<TRGB24>;
-    function CreateKernel: INDArray<Single>;
+    function CreateKernel(aDim: Integer): INDArray<Single>;
     procedure ShowImage(const aData: INDArray<Byte>);
   public
     { Public declarations }
@@ -45,26 +49,51 @@ implementation
 
 {$R *.dfm}
 
-function TForm4.CreateKernel: INDArray<Single>;
+function TForm4.CreateKernel(aDim: Integer): INDArray<Single>;
 var sz: Integer;
+    s, r: Single;
+    x: TTensorF32;
 begin
   sz := edKernelSize.Value;
-  // Mean filter
-  Result := TNDAUt.Full<Single>([sz, sz], 1/(sz*sz));
+
+  case cbFilterType.ItemIndex of
+    0: Result := TNDAUt.Full<Single>([sz], 1/sz); // mean filter
+    1: begin // Gaussian filter
+      r := sz div 2;
+      s := r / 2;
+      x := ndaRange(Single(-r), Single(r) + 1);
+      Result := ndaExp(x * x / (-2 * s * s));
+      Result := TTensorF32(Result) / ndaTotal(Result);
+    end;
+  else
+    MessageDlg('Unknown filter type.', mtError, [mbOk], 0);
+    exit;
+  end;
+
+  if aDim = 2 then
+    Result := ndaOuter(Result, Result);
 end;
 
 procedure TForm4.btExecuteClick(Sender: TObject);
-var src, dst, k, ch0, ch1, ch2: INDArray<Single>;
+var src, dst, k: INDArray<Single>;
     ch: INDArray<Byte>;
-    sh: TNDAShape;
     sw: TStopWatch;
 begin
+  sw.Reset;
   sw.Start;
 
   ch := TNDAMan.Transpose<Byte>(TRGB24Channels.Create(fImg), [2, 0, 1]);
   src := TNDAUt.AsType<Single>(ch);
-  k := CreateKernel();
-  dst := ndaCorrelate(k, src);
+  if cbUseSepKer.Checked then begin
+    k := CreateKernel(1);
+    dst := ndaCorrelate(k, src);
+    dst := TNDAMan.Transpose<Single>(dst, [0, 2, 1]);
+    dst := ndaCorrelate(k, dst);
+    dst := TNDAMan.Transpose<Single>(dst, [0, 2, 1]);
+  end else begin
+    k := CreateKernel(2);
+    dst := ndaCorrelate(k, src);
+  end;
   ch := TNDAUt.AsType<Byte>(dst);
   ch := TNDAMan.Transpose<Byte>(ch, [1, 2, 0]);
 
