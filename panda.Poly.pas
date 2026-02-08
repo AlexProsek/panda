@@ -48,6 +48,7 @@ type
     class operator Explicit(const aV: Double): TPolyF64; inline;
 
     function Order: NativeInt; inline;
+    function IsZero(const aEps: Double = cEpsF64): Boolean;
     class function PolyZero: TPolyF64; inline; static;
     class function PolyOne: TPolyF64; inline; static;
     class function PolyConst(const aValue: Double): TPolyF64; inline; static;
@@ -70,6 +71,7 @@ type
     /// </summary>
     function Substitute(const aQ: TPolyF64): TPolyF64;
     function Derivative: TPolyF64;
+    class function GCD(const aP, aQ: TPolyF64; const aZeroTol: Double = cEpsF64): TPolyF64; static;
 
     property Coeff[I: NativeInt]: Double read GetCoeff write SetCoeff;
     property CoeffList: TArray<Double> read fCoeffs;
@@ -455,7 +457,7 @@ class procedure TPolyF64.TrimZeros(var aValue: TArray<Double>; aEps: Double);
 var n: NativeInt;
 begin
   n := High(aValue);
-  while (n > 0) and IsZero(aValue[n]) do Dec(n);
+  while (n > 0) and System.Math.IsZero(aValue[n], aEps) do Dec(n);
   if n <> High(aValue) then SetLength(aValue, n + 1);
 end;
 
@@ -483,11 +485,9 @@ begin
 end;
 
 class function TPolyF64.PolyAdd(const aP: TArray<Double>; const aV: Double): TArray<Double>;
-var I: NativeInt;
 begin
-  SetLength(Result, Length(aP));
-  for I := 0 to High(Result) do
-    Result[I] := aP[I] + aV;
+  Result := Copy(aP, 0, Length(aP));
+  Result[0] := Result[0] + aV;
   TrimZeros(Result);
 end;
 
@@ -620,6 +620,15 @@ begin
   Result := High(fCoeffs);
 end;
 
+function TPolyF64.IsZero(const aEps: Double): Boolean;
+var I, count: NativeInt;
+begin
+  count := Length(fCoeffs);
+  for I := 0 to count - 1 do
+    if not System.Math.IsZero(fCoeffs[I], aEps) then exit(False);
+  Result := True;
+end;
+
 class function TPolyF64.PolyZero: TPolyF64;
 begin
   with Result do begin
@@ -741,6 +750,25 @@ begin
   Result.Init(res);
 end;
 
+class function TPolyF64.GCD(const aP, aQ: TPolyF64; const aZeroTol: Double): TPolyF64;
+var a, b, t: TPolyF64;
+begin
+  if aP.Order >= aQ.Order then begin
+    a := aP;
+    b := aQ;
+  end else begin
+    a := aQ;
+    b := aP;
+  end;
+
+  while not b.IsZero(aZeroTol) do begin
+    t := b;
+    b := a mod b;
+    a := t;
+  end;
+  Result := a / a.HighCoeff;
+end;
+
 {$endregion}
 
 {$region 'TPolyC128'}
@@ -832,11 +860,9 @@ begin
 end;
 
 class function TPolyC128.PolyAdd(const aP: TArray<TCmplx128>; const aV: TCmplx128): TArray<TCmplx128>;
-var I: NativeInt;
 begin
-  SetLength(Result, Length(aP));
-  for I := 0 to High(Result) do
-    Result[I] := aP[I] + aV;
+  Result := Copy(aP, 0, Length(aP));
+  Result[0] := Result[0] + aV;
   TrimZeros(Result);
 end;
 
@@ -1142,7 +1168,7 @@ begin
     b := a mod b;
     a := t;
   end;
-  Result := a;
+  Result := a / a.HighCoeff;
 end;
 
 {$endregion}
@@ -1226,11 +1252,9 @@ begin
 end;
 
 class function TPolyC256.PolyAdd(const aP: TArray<TCmplx256>; const aV: TCmplx256): TArray<TCmplx256>;
-var I: NativeInt;
 begin
-  SetLength(Result, Length(aP));
-  for I := 0 to High(Result) do
-    Result[I] := aP[I] + aV;
+  Result := Copy(aP, 0, Length(aP));
+  Result[0] := Result[0] + aV;
   TrimZeros(Result, cEpsF128);
 end;
 
@@ -1552,7 +1576,7 @@ begin
     b := a mod b;
     a := t;
   end;
-  Result := a;
+  Result := a / a.HighCoeff;
 end;
 
 {$endregion}
