@@ -5,7 +5,7 @@ interface
 uses
     System.Math
   , System.SysUtils
-  , panda.Consts
+  , panda.Nums
   , panda.Intfs
   , panda.Arrays
   , panda.cvArithmetic

@@ -17,16 +17,6 @@ uses
   ;
 
 type
-  TCmplx64 = record
-    Re, Im: Single;
-  end;
-  PCmlx64 = ^TCmplx64;
-
-  TCmplx128 = record
-    Re, Im: Double;
-  end;
-  PCmlx128 = ^TCmplx128;
-
   TNDIndexType = (nditInt, nditSpan, nditSet);
   TNDIndexTypes = set of TNDIndexType;
 
@@ -183,7 +173,7 @@ begin
     tkInt64:    Result := (td1^.MinInt64Value = td2^.MinInt64Value);
     tkFloat:    Result := (td1^.FloatType = td2^.FloatType);
   else
-    exit(False);
+    Result := (aT1 = aT2);
   end;
 end;
 

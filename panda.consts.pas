@@ -2,13 +2,6 @@ unit panda.Consts;
 
 interface
 
-const
-  cI32Sz  = SizeOf(Integer);
-  cI64Sz  = SizeOf(Int64);
-  cNISz   = SizeOf(NativeInt);
-  cF32Sz  = SizeOf(Single);
-  cF64Sz  = SizeOf(Double);
-
 resourcestring
   csSameArrays = 'Source and Destination arrays must not be the same.';
   csArgumentOutOfRange = 'Argument out of range.';

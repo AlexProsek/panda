@@ -19,6 +19,7 @@ uses
   , IOUtils
   , Forms
   , Windows
+  , panda.Nums
   , panda.Intfs
   , panda.Arrays
   , panda.DynArrayUtils
@@ -34,11 +35,15 @@ type
     function _AddRef: Integer; {$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
     function _Release: Integer; {$IFNDEF WINDOWS}cdecl{$ELSE}stdcall{$ENDIF};
   {$endif}
+    function GetTestDataPath(const aFileName: String): String;
   public
-    procedure CheckEquals(const aExpected: array of NativeInt; aValue: array of NativeInt); overload;
+    procedure CheckEquals(const aExpected, aValue: array of NativeInt); overload;
   {$ifdef CPUX64}
-    procedure CheckEquals(const aExpected: array of Integer; aValue: array of Integer); overload;
+    procedure CheckEquals(const aExpected, aValue: array of Integer); overload;
   {$endif}
+    procedure CheckEquals(const aExpected, aValue: array of Double; const aTol: Double = 0); overload;
+    procedure CheckEquals(const aExpected: array of String; const aValue: array of String); overload;
+    procedure CheckEquals(const aExpected, aValue: TCmplx128; const aTol: Double = 0); overload;
 
     function iRng2NDA(const aShape: array of NativeInt;
       aLo: Integer = 1; aStep: Integer = 1): INDArray<Integer>; overload;
@@ -106,7 +111,13 @@ end;
 
 {$endif}
 
-procedure TNDATestCase.CheckEquals(const aExpected: array of NativeInt; aValue: array of NativeInt);
+function TNDATestCase.GetTestDataPath(const aFileName: String): String;
+begin
+  Result := TPath.GetDirectoryName(Application.ExeName);
+  Result := TPath.Combine(Result, Format('..\..\TestData\%s', [aFileName]));
+end;
+
+procedure TNDATestCase.CheckEquals(const aExpected, aValue: array of NativeInt);
 var I: Integer;
 begin
   CheckEquals(Length(aExpected), Length(aValue));
@@ -115,7 +126,7 @@ begin
 end;
 
 {$ifdef CPUX64}
-procedure TNDATestCase.CheckEquals(const aExpected: array of Integer; aValue: array of Integer);
+procedure TNDATestCase.CheckEquals(const aExpected, aValue: array of Integer);
 var I: Integer;
 begin
   CheckEquals(Length(aExpected), Length(aValue));
@@ -123,6 +134,28 @@ begin
     CheckEquals(aExpected[I], aValue[I]);
 end;
 {$endif}
+
+procedure TNDATestCase.CheckEquals(const aExpected, aValue: array of Double; const aTol: Double);
+var I: Integer;
+begin
+  CheckEquals(Length(aExpected), Length(aValue));
+  for I := 0 to High(aExpected) do
+    CheckEquals(aExpected[I], aValue[I], aTol);
+end;
+
+procedure TNDATestCase.CheckEquals(const aExpected: array of String; const aValue: array of String);
+var I: Integer;
+begin
+  CheckEquals(Length(aExpected), Length(aValue));
+  for I := 0 to High(aExpected) do
+    CheckEquals(aExpected[I], aValue[I]);
+end;
+
+procedure TNDATestCase.CheckEquals(const aExpected, aValue: TCmplx128; const aTol: Double);
+begin
+  CheckEquals(aExpected.Re, aValue.Re, aTol);
+  CheckEquals(aExpected.Im, aValue.Im, aTol);
+end;
 
 function TNDATestCase.iRng2NDA(const aShape: array of NativeInt; aLo, aStep: Integer): INDArray<Integer>;
 var items: TArray<Integer>;
@@ -152,6 +185,18 @@ begin
   s := TPath.GetDirectoryName(Application.ExeName);
   s := TPath.Combine(s, Format('%s.txt', [ClassName]));
   fWriter := TStreamWriter.Create(s);
+
+{$if defined(NoASM)}
+  fWriter.WriteLine('ASM: False');
+{$else}
+  fWriter.WriteLine('ASM: True');
+{$endif}
+{$if defined(CPUx86)}
+  fWriter.WriteLine('Arch: x86');
+{$elseif defined(CPUx64)}
+  fWriter.WriteLine('Arch: x64');
+{$endif}
+  fWriter.WriteLine;
 end;
 
 class destructor TNDAPerformanceTestCase.Destroy;

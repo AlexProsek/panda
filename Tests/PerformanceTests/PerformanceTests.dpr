@@ -20,14 +20,17 @@ uses
   panda.Tests.NDATestCase in '..\panda.Tests.NDATestCase.pas',
   panda.Intfs in '..\..\panda.Intfs.pas',
   pandalib in '..\..\pandalib.pas',
-  panda.PTests.vecArithmetic in 'panda.PTests.vecArithmetic.pas',
+  panda.PTests.cvArithmetic in 'panda.PTests.cvArithmetic.pas',
   panda.Utils.StopWatch in '..\..\Utils\panda.Utils.StopWatch.pas',
   panda.PTests.cvMath in 'panda.PTests.cvMath.pas',
   panda.PTests.cvCvt in 'panda.PTests.cvCvt.pas',
   panda.cvCvt in '..\..\panda.cvCvt.pas',
   panda.PTests.Experiments in 'panda.PTests.Experiments.pas',
   panda.PTests.Conv in 'panda.PTests.Conv.pas',
-  panda.BLASInit in '..\..\panda.BLASInit.pas';
+  panda.BLASInit in '..\..\panda.BLASInit.pas',
+  panda.PTests.MPNums in 'panda.PTests.MPNums.pas',
+  panda.PTests.Nums in 'panda.PTests.Nums.pas',
+  panda.PTests.Poly in 'panda.PTests.Poly.pas';
 
 {$R *.RES}
 

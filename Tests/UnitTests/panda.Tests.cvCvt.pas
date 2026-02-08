@@ -26,6 +26,14 @@ type
     procedure TestCvtF64F32_6;
   end;
 
+  TByteSwappingTests = class(TNDATestCase)
+  published
+    procedure SwapInPlace16_4;
+    procedure SwapInPlace16_5;
+    procedure SwapInPlace32_4;
+    procedure SwapInPlace64_2;
+  end;
+
 implementation
 
 {$region 'TCvtTests'}
@@ -167,8 +175,60 @@ end;
 
 {$endregion}
 
+{$region 'TByteSwappingTests'}
+
+procedure TByteSwappingTests.SwapInPlace16_4;
+var data: TArray<Word>;
+begin
+  data := TArray<Word>.Create($0102, $0203, $0304, $0405);
+  bswap16(PByte(data), PByte(data), Length(data) * SizeOf(Word));
+
+  CheckEquals($0201, data[0]);
+  CheckEquals($0302, data[1]);
+  CheckEquals($0403, data[2]);
+  CheckEquals($0504, data[3]);
+end;
+
+procedure TByteSwappingTests.SwapInPlace16_5;
+var data: TArray<Word>;
+begin
+  data := TArray<Word>.Create($0102, $0203, $0304, $0405, $0506);
+  bswap16(PByte(data), PByte(data), Length(data) * SizeOf(Word));
+
+  CheckEquals($0201, data[0]);
+  CheckEquals($0302, data[1]);
+  CheckEquals($0403, data[2]);
+  CheckEquals($0504, data[3]);
+  CheckEquals($0605, data[4]);
+end;
+
+procedure TByteSwappingTests.SwapInPlace32_4;
+var data: TArray<Integer>;
+begin
+  data := TArray<Integer>.Create($01020304, $02030405, $03040506, $04050607);
+  bswap32(PByte(data), PByte(data), Length(data) * SizeOf(Integer));
+
+  CheckEquals($04030201, data[0]);
+  CheckEquals($05040302, data[1]);
+  CheckEquals($06050403, data[2]);
+  CheckEquals($07060504, data[3]);
+end;
+
+procedure TByteSwappingTests.SwapInPlace64_2;
+var data: TArray<Int64>;
+begin
+  data := TArray<Int64>.Create($0102030405060708, $0203040506070809);
+  bswap64(PByte(data), PByte(data), Length(data) * SizeOf(Int64));
+
+  CheckEquals($0807060504030201, data[0]);
+  CheckEquals($0908070605040302, data[1]);
+end;
+
+{$endregion}
+
 initialization
 
   RegisterTest(TCvtTests.Suite);
+  RegisterTest(TByteSwappingTests.Suite);
 
 end.

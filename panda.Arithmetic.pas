@@ -4,6 +4,7 @@ interface
 
 uses
     panda.Intfs
+  , panda.Nums
   , panda.Consts
   , panda.Arrays
   , System.SysUtils
@@ -117,6 +118,35 @@ type
     property NDA: INDArray<Double> read fArr;
     property Shape: TNDAShape read GetShape;
     property Part[const aIdx: INDIndexSeq]: TTensorF64 read GetPart write SetPart; default;
+  end;
+
+  TTensorC128 = record
+  private
+    fArr: INDArray<TCmplx128>;
+    function GetPart(const aIdx: INDIndexSeq): TTensorC128;
+    procedure SetPart(const aIdx: INDIndexSeq; const aValue: TTensorC128);
+    function GetShape: TNDAShape;
+  public
+    class operator Implicit(const aArr: INDArray<TCmplx128>): TTensorC128;
+    class operator Implicit(const aArr: TTensorC128): INDArray<TCmplx128>;
+    class operator Add(const A, B: TTensorC128): TTensorC128;
+    class operator Subtract(const A, B: TTensorC128): TTensorC128;
+    class operator Multiply(const A, B: TTensorC128): TTensorC128;
+    class operator Divide(const A, B: TTensorC128): TTensorC128;
+    class operator Divide(const A: TTensorC128; B: TCmplx128): TTensorC128;
+    class operator Divide(A: TCmplx128; const B: TTensorC128): TTensorC128;
+    procedure AddTo(const aArr: TTensorC128); overload;
+    procedure AddTo(const aValue: TCmplx128); overload;
+    procedure SubtractFrom(const aArr: TTensorC128); overload;
+    procedure SubtractFrom(const aValue: TCmplx128); overload;
+    procedure MultiplyBy(const aArr: TTensorC128); overload;
+    procedure MultiplyBy(const aValue: TCmplx128); overload;
+    procedure DivideBy(const aArr: TTensorC128); overload;
+    procedure DivideBy(const aValue: TCmplx128); overload;
+
+    property NDA: INDArray<TCmplx128> read fArr;
+    property Shape: TNDAShape read GetShape;
+    property Part[const aIdx: INDIndexSeq]: TTensorC128 read GetPart write SetPart; default;
   end;
 
   function ndaAllClose(const aA, aB: INDArray<Integer>; aTol: Integer = 0): Boolean;  overload;
@@ -587,7 +617,6 @@ begin
       exit;
     end;
 
-    s := PSingle(L)^;
     pEnd := R + N * IncR;
     while R < pEnd do begin
       PSingle(R)^ := s + PSingle(R)^;
@@ -958,7 +987,7 @@ end;
 
 procedure AddR_F64(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
 begin
-  AddL_F32(N, R, IncR, L, IncL);
+  AddL_F64(N, R, IncR, L, IncL);
 end;
 
 procedure SubL_F64(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
@@ -1038,7 +1067,7 @@ end;
 
 procedure MulR_F64(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
 begin
-  MulL_F32(N, R, IncR, L, IncL);
+  MulL_F64(N, R, IncR, L, IncL);
 end;
 
 procedure DivL_F64(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
@@ -1117,7 +1146,7 @@ end;
 class operator TTensorF64.Subtract(const A, B: TTensorF64): TTensorF64;
 begin
   Result.fArr := nil;
-  TNDAUt.Map<Double>(A, B, Result.fArr, SubL_F32, SubR_F64);
+  TNDAUt.Map<Double>(A, B, Result.fArr, SubL_F64, SubR_F64);
 end;
 
 class operator TTensorF64.Multiply(const A, B: TTensorF64): TTensorF64;
@@ -1195,6 +1224,365 @@ begin
 end;
 
 function TTensorF64.GetShape: TNDAShape;
+begin
+  Result := fArr.Shape;
+end;
+
+{$endregion}
+
+{$region 'TTensorC128'}
+
+{$region 'LR functions'}
+
+procedure AddL_C128(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+var pEnd: PByte;
+    s: TCmplx128;
+begin
+  if IncL = 0 then begin
+    // R <- l + R
+    s := PCmplx128(L)^;
+    if IncR = cC128Sz then begin
+      VecAdd(PCmplx128(R), s, PCmplx128(R), N);
+      exit;
+    end;
+
+    pEnd := R + N * IncR;
+    while R < pEnd do begin
+      with PCmplx128(R)^ do begin
+        Re := s.Re + Re;
+        Im := s.Im + Im;
+      end;
+      Inc(R, IncR);
+    end;
+
+    exit;
+  end;
+
+  // R <- L + R
+//  if (IncL = cC128Sz) and (IncR = cC128Sz) then begin
+//    VecAdd(PCmplx128(L), PCmplx128(R), PCmplx128(R), N);
+//    exit;
+//  end;
+
+  pEnd := R + N * IncL;
+  while R < pEnd do begin
+    with PCmplx128(R)^ do begin
+      Re := PCmplx128(L)^.Re + Re;
+      Im := PCmplx128(L)^.Im + Im;
+    end;
+    Inc(L, IncL);
+    Inc(R, IncR);
+  end;
+end;
+
+procedure AddR_C128(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+begin
+  AddL_C128(N, R, IncR, L, IncL);
+end;
+
+procedure SubL_C128(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+var pEnd: PByte;
+    s: TCmplx128;
+begin
+  if IncL = 0 then begin
+    // R <- L - R
+    s := PCmplx128(L)^;
+//    if IncR = cC128Sz then begin
+//      VecSub(s, PCmplx128(R), PCmplx128(R), N);
+//      exit;
+//    end;
+
+    pEnd := R + N * IncR;
+    while R < pEnd do begin
+      with PCmplx128(R)^ do begin
+        Re := s.Re - Re;
+        Im := s.Im - Im;
+      end;
+      Inc(R, IncR);
+    end;
+
+    exit;
+  end;
+
+  // R <- L - R
+  pEnd := R + N * IncL;
+//  if (IncL = cC128Sz) and (IncR = cC128Sz) then begin
+//    VecSub(PCmplx128(L), PCmplx128(R), PCmplx128(R), N);
+//    exit;
+//  end;
+
+  while R < pEnd do begin
+    with PCmplx128(R)^ do begin
+      Re := PCmplx128(L)^.Re - Re;
+      Im := PCmplx128(L)^.Im - Im;
+    end;
+    Inc(L, IncL);
+    Inc(R, IncR);
+  end;
+end;
+
+procedure SubR_C128(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+var pEnd: PByte;
+    s: TCmplx128;
+begin
+  if IncR = 0 then begin
+    // L <- L - R
+    s := PCmplx128(R)^;
+//    if IncL = cC128Sz then begin
+//      VecSub(PCmplx128(L), s, PCmplx128(L), N);
+//      exit;
+//    end;
+
+    pEnd := L + N * IncL;
+    while L < pEnd do begin
+      with PCmplx128(L)^ do begin
+        Re := Re - s.Re;
+        Im := Im - s.Im;
+      end;
+      Inc(L, IncL);
+    end;
+
+    exit;
+  end;
+
+  // L <- L - R
+  pEnd := L + N * IncL;
+//  if (IncL = cC128Sz) and (IncR = cC128Sz) then begin
+//    VecSub(PSingle(L), PSingle(R), PSingle(L), N);
+//    exit;
+//  end;
+
+  while L < pEnd do begin
+    with PCmplx128(L)^ do begin
+      Re := Re - PCmplx128(R)^.Re;
+      Im := Im - PCmplx128(R)^.Im;
+    end;
+    Inc(L, IncL);
+    Inc(R, IncR);
+  end;
+end;
+
+procedure MulL_C128(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+var pEnd: PByte;
+    s: TCmplx128;
+begin
+  if IncL = 0 then begin
+    // R <- l * R
+    s := PCmplx128(L)^;
+//    if IncR = cC128Sz then begin
+//      VecMul(PCmplx128(R), s, PCmplx128(R), N);
+//      exit;
+//    end;
+
+    pEnd := R + N * IncR;
+    while R < pEnd do begin
+      with PCmplx128(R)^ do begin
+        Re := s.Re * Re - s.Im * Im;
+        Im := s.Re * Im + s.Im * Re;
+      end;
+      Inc(R, IncR);
+    end;
+
+    exit;
+  end;
+
+  // R <- L * R
+//  if (IncL = cC128Sz) and (IncR = cC128Sz) then begin
+//    VecMul(PCmplx128(L), PCmplx128(R), PCmplx128(R), N);
+//    exit;
+//  end;
+
+  pEnd := R + N * IncL;
+  while R < pEnd do begin
+    s := PCmplx128(L)^;
+    with PCmplx128(R)^ do begin
+      Re := s.Re * Re - s.Im * Im;
+      Im := s.Re * Im + s.Im * Re;
+    end;
+    Inc(L, IncL);
+    Inc(R, IncR);
+  end;
+end;
+
+procedure MulR_C128(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+begin
+  MulL_C128(N, R, IncR, L, IncL);
+end;
+
+procedure DivL_C128(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+var pEnd: PByte;
+    s: TCmplx128;
+    d: Double;
+begin
+  if IncL = 0 then begin
+    // R <- l / R
+    s := PCmplx128(L)^;
+    pEnd := R + N * IncR;
+    while R < pEnd do begin
+      with PCmplx128(R)^ do begin
+        d := Re * Re + Im * Im;
+        Re := (s.Re * Re - s.Im * Im) / d;
+        Im := (s.Im * Re + s.Re * Im) / d;
+      end;
+      Inc(R, IncR);
+    end;
+
+    exit;
+  end;
+
+  // R <- L / R
+  pEnd := R + N * IncL;
+  while R < pEnd do begin
+    with PCmplx128(R)^ do begin
+      d := Re * Re + Im * Im;
+      s := PCmplx128(L)^;
+      Re := (s.Re * Re - s.Im * Im) / d;
+      Im := (s.Im * Re + s.Re * Im) / d;
+    end;
+    Inc(L, IncL);
+    Inc(R, IncR);
+  end;
+end;
+
+procedure DivR_C128(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+var pEnd: PByte;
+    s: TCmplx128;
+    d: Double;
+begin
+  if IncR = 0 then begin
+    // L <- L / r
+    s := PCmplx128(R)^;
+//    if IncL = cC128Sz then begin
+//      VecMul(PCmplx128(L), 1/s, PCmplx128(L), N);
+//      exit;
+//    end;
+
+    pEnd := L + N * IncL;
+    d := s.Re * s.Re + s.Im * s.Im;
+    while L < pEnd do begin
+      with PCmplx128(L)^ do begin
+        Re := (Re * s.Re - Im * s.Im) / d;
+        Im := (Re * s.Im + Im * s.Re) / d;
+      end;
+      Inc(L, IncL);
+    end;
+
+    exit;
+  end;
+
+  // L <- L / R
+  pEnd := L + N * IncL;
+  while L < pEnd do begin
+    s := PCmplx128(R)^;
+    d := s.Re * s.Re + s.Im * s.Im;
+    with PCmplx128(L)^ do begin
+      Re := (Re * s.Re - Im * s.Im) / d;
+      Im := (Re * s.Im + Im * s.Re) / d;
+    end;
+    Inc(L, IncL);
+    Inc(R, IncR);
+  end;
+end;
+
+{$endregion}
+
+class operator TTensorC128.Implicit(const aArr: INDArray<TCmplx128>): TTensorC128;
+begin
+  Result.fArr := aArr;
+end;
+
+class operator TTensorC128.Implicit(const aArr: TTensorC128): INDArray<TCmplx128>;
+begin
+  Result := aArr.fArr;
+end;
+
+class operator TTensorC128.Add(const A, B: TTensorC128): TTensorC128;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<TCmplx128>(A, B, Result.fArr, AddL_C128, AddR_C128);
+end;
+
+class operator TTensorC128.Subtract(const A, B: TTensorC128): TTensorC128;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<TCmplx128>(A, B, Result.fArr, SubL_C128, SubR_C128);
+end;
+
+class operator TTensorC128.Multiply(const A, B: TTensorC128): TTensorC128;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<TCmplx128>(A, B, Result.fArr, MulL_C128, MulR_C128);
+end;
+
+class operator TTensorC128.Divide(const A, B: TTensorC128): TTensorC128;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<TCmplx128>(A, B, Result.fArr, DivL_C128, DivR_C128);
+end;
+
+class operator TTensorC128.Divide(const A: TTensorC128; B: TCmplx128): TTensorC128;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<TCmplx128>(A, B, Result.fArr, DivR_C128);
+end;
+
+class operator TTensorC128.Divide(A: TCmplx128; const B: TTensorC128): TTensorC128;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<TCmplx128>(A, B, Result.fArr, DivL_C128);
+end;
+
+procedure TTensorC128.AddTo(const aArr: TTensorC128);
+begin
+  TNDAArith.MapR(fArr, aArr.fArr, AddR_C128);
+end;
+
+procedure TTensorC128.AddTo(const aValue: TCmplx128);
+begin
+  TNDAArith.MapR<TCmplx128>(fArr, aValue, AddR_C128);
+end;
+
+procedure TTensorC128.SubtractFrom(const aArr: TTensorC128);
+begin
+  TNDAArith.MapR(fArr, aArr.fArr, AddR_C128);
+end;
+
+procedure TTensorC128.SubtractFrom(const aValue: TCmplx128);
+begin
+  TNDAArith.MapR<TCmplx128>(fArr, aValue, SubR_C128);
+end;
+
+procedure TTensorC128.MultiplyBy(const aArr: TTensorC128);
+begin
+  TNDAArith.MapR(fArr, aArr.fArr, AddR_C128);
+end;
+
+procedure TTensorC128.MultiplyBy(const aValue: TCmplx128);
+begin
+  TNDAArith.MapR<TCmplx128>(fArr, aValue, MulR_C128);
+end;
+
+procedure TTensorC128.DivideBy(const aArr: TTensorC128);
+begin
+  TNDAArith.MapR(fArr, aArr.fArr, AddR_C128);
+end;
+
+procedure TTensorC128.DivideBy(const aValue: TCmplx128);
+begin
+  TNDAArith.MapR<TCmplx128>(fArr, aValue, DivR_C128);
+end;
+
+function TTensorC128.GetPart(const aIdx: INDIndexSeq): TTensorC128;
+begin
+  Result := fArr[aIdx];
+end;
+
+procedure TTensorC128.SetPart(const aIdx: INDIndexSeq; const aValue: TTensorC128);
+begin
+  fArr[aIdx] := aValue;
+end;
+
+function TTensorC128.GetShape: TNDAShape;
 begin
   Result := fArr.Shape;
 end;
@@ -1380,7 +1768,7 @@ begin
     case t^.Kind of
       tkInteger:
         case td^.OrdType of
-//          otULong: aRes := ndaAdd(TNDACon.AsType<Cardinal>(aArrays));
+//          otULong: aRes := ndaMultiply(TNDACon.AsType<Cardinal>(aArrays));
           otSLong: aRes := ndaMultiply(TNDAUt.AsType<Integer>(aArrays));
         else
           exit;

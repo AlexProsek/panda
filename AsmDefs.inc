@@ -30,3 +30,13 @@
     {$define ASM}
   {$endif}
 {$endif}
+
+{$undef RANGEON}
+{$ifopt R+}
+  {$define RANGEON}
+{$endif}
+
+{$undef OVERFLOWON}
+{$ifopt Q+}
+  {$define OVERFLOWON}
+{$endif}

@@ -25,6 +25,7 @@ type
     class function Flatten<T>(const aArr: INDArray<T>): INDArray<T>; static;
     class function Transpose<T>(const aArr: INDArray<T>): INDArray<T>; overload; static;
     class function Transpose<T>(const aArr: INDArray<T>; const aAxes: TArray<Integer>): INDArray<T>; overload; static;
+    class procedure Transpose<T>(const aSrc, aDst: INDArray<T>; const aAxes: TArray<Integer>); overload; static;
     /// <summary>
     ///   <c>Flip<T>(aArr, axis)</c> reverses the order of elements in an array along the given axis.
     /// </summary>
@@ -48,29 +49,29 @@ begin
     case Kind of
       tkInteger:
         case TypeData^.OrdType of
-          otSByte: Result := TNDArray<Int8>(aArr)[aIdx];
-          otUByte: Result := TNDArray<UInt8>(aArr)[aIdx];
-          otSWord: Result := TNDArray<Int16>(aArr)[aIdx];
-          otUWord: Result := TNDArray<UInt16>(aArr)[aIdx];
-          otSLong: Result := TNDArray<Int32>(aArr)[aIdx];
-          otULong: Result := TNDArray<UInt32>(aArr)[aIdx];
+          otSByte: Result := (aArr as INDArray<Int8>)[aIdx];
+          otUByte: Result := (aArr as INDArray<UInt8>)[aIdx];
+          otSWord: Result := (aArr as INDArray<Int16>)[aIdx];
+          otUWord: Result := (aArr as INDArray<UInt16>)[aIdx];
+          otSLong: Result := (aArr as INDArray<Int32>)[aIdx];
+          otULong: Result := (aArr as INDArray<UInt32>)[aIdx];
         else
           exit(nil);
         end;
 
       tkFloat:
         case TypeData^.FloatType of
-          ftSingle:   Result := TNDArray<Single>(aArr)[aIdx];
-          ftDouble:   Result := TNDArray<Double>(aArr)[aIdx];
+          ftSingle:   Result := (aArr as INDArray<Single>)[aIdx];
+          ftDouble:   Result := (aArr as INDArray<Double>)[aIdx];
         else
           exit(nil);
         end;
 
       tkInt64:
         if TypeData^.MinInt64Value = 0 then
-          Result := TNDArray<UInt64>(aArr)[aIdx]
+          Result := (aArr as INDArray<UInt64>)[aIdx]
         else
-          Result := TNDArray<Int64>(aArr)[aIdx];
+          Result := (aArr as INDArray<Int64>)[aIdx];
     else
       exit(nil);
     end;
@@ -144,9 +145,44 @@ begin
   end;
 end;
 
+class procedure TNDAMan.Transpose<T>(const aSrc, aDst: INDArray<T>; const aAxes: TArray<Integer>);
+var shape: TArray<NativeInt>;
+    itSrc, itDst: TNDAIt;
+    p: TNDA<T>.PT;
+const sErrMsg = 'Transpose error: output array shape doesn''t match.';
+begin
+  if aSrc.NDim <> aDst.NDim then
+    raise ENDAShapeError.Create(sErrMsg);
+  shape := Permute<NativeInt>(aSrc.Shape, aAxes);
+  if not SameQ(shape, aDst.Shape) then
+    raise ENDAShapeError.Create(sErrMsg);
+
+  if CContiguousQ(aDst) then begin
+    p := TNDA<T>.PT(aDst.Data);
+    itSrc := TNDAIt.Create(aSrc, 0, -1, aAxes);
+    try
+      while itSrc.MoveNext do begin
+        p^ := TNDA<T>.PT(itSrc.Current)^;
+        Inc(p);
+      end;
+    finally
+      itSrc.Free;
+    end;
+  end else begin
+    itSrc := TNDAIt.Create(aSrc, 0, -1, aAxes);
+    itDst := TNDAIt.Create(aDst);
+    try
+      while itSrc.MoveNext and itDst.MoveNext do
+        TNDA<T>.PT(itDst.Current)^ := TNDA<T>.PT(itSrc.Current)^;
+    finally
+      itSrc.Free;
+      itDst.Free;
+    end;
+  end;
+end;
+
 class function TNDAMan.FlippedAxesIdx(aDim: Integer; const aAxes: array of Integer): INDIndexSeq;
-var s: TArray<Integer>;
-    I: Integer;
+var I: Integer;
 begin
   SetLength(Result, aDim);
   for I := 0 to High(Result) do

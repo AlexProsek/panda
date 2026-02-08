@@ -62,6 +62,23 @@
         <Cfg_2>true</Cfg_2>
         <Base>true</Base>
     </PropertyGroup>
+    <PropertyGroup Condition="'$(Config)'=='PurePascal' or '$(Cfg_3)'!=''">
+        <Cfg_3>true</Cfg_3>
+        <CfgParent>Base</CfgParent>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Cfg_3)'=='true') or '$(Cfg_3_Win32)'!=''">
+        <Cfg_3_Win32>true</Cfg_3_Win32>
+        <CfgParent>Cfg_3</CfgParent>
+        <Cfg_3>true</Cfg_3>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win64' and '$(Cfg_3)'=='true') or '$(Cfg_3_Win64)'!=''">
+        <Cfg_3_Win64>true</Cfg_3_Win64>
+        <CfgParent>Cfg_3</CfgParent>
+        <Cfg_3>true</Cfg_3>
+        <Base>true</Base>
+    </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
         <DCC_DcuOutput>.\$(Platform)\$(Config)</DCC_DcuOutput>
         <DCC_ExeOutput>.\$(Platform)\$(Config)</DCC_ExeOutput>
@@ -133,6 +150,16 @@
         <Manifest_File>(None)</Manifest_File>
         <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
     </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_3_Win32)'!=''">
+        <DCC_Define>NoASM;DEBUG;$(DCC_Define)</DCC_Define>
+        <VerInfo_Locale>1033</VerInfo_Locale>
+        <Manifest_File>(None)</Manifest_File>
+        <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_3_Win64)'!=''">
+        <VerInfo_Locale>1033</VerInfo_Locale>
+        <DCC_Define>NoASM;DEBUG;$(DCC_Define)</DCC_Define>
+    </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
@@ -152,7 +179,7 @@
         <DCCReference Include="..\..\panda.Intfs.pas"/>
         <DCCReference Include="..\..\panda.Math.pas"/>
         <DCCReference Include="..\..\pandalib.pas"/>
-        <DCCReference Include="panda.Tests.vecArithmetic.pas"/>
+        <DCCReference Include="panda.Tests.cvArithmetic.pas"/>
         <DCCReference Include="..\..\panda.consts.pas"/>
         <DCCReference Include="..\panda.Tests.NDATestCase.pas"/>
         <DCCReference Include="..\..\Utils\panda.Utils.StopWatch.pas"/>
@@ -163,6 +190,14 @@
         <DCCReference Include="..\..\panda.Conv.pas"/>
         <DCCReference Include="panda.Tests.Conv.pas"/>
         <DCCReference Include="..\..\panda.BLASInit.pas"/>
+        <DCCReference Include="..\..\panda.MAT4io.pas"/>
+        <DCCReference Include="panda.Tests.MAT4io.pas"/>
+        <DCCReference Include="..\..\panda.Nums.pas"/>
+        <DCCReference Include="panda.Tests.Nums.pas"/>
+        <DCCReference Include="panda.Tests.MPNums.pas"/>
+        <DCCReference Include="..\..\panda.MPNums.pas"/>
+        <DCCReference Include="..\..\panda.Poly.pas"/>
+        <DCCReference Include="panda.Tests.Poly.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -172,6 +207,10 @@
         </BuildConfiguration>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
+            <CfgParent>Base</CfgParent>
+        </BuildConfiguration>
+        <BuildConfiguration Include="PurePascal">
+            <Key>Cfg_3</Key>
             <CfgParent>Base</CfgParent>
         </BuildConfiguration>
     </ItemGroup>
@@ -184,8 +223,8 @@
                     <Source Name="MainSource">PandaTests.dpr</Source>
                 </Source>
                 <Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\dcloffice2k290.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
-                    <Excluded_Packages Name="$(BDSBIN)\dclofficexp290.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dcloffice2k370.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dclofficexp370.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
                 </Excluded_Packages>
             </Delphi.Personality>
             <Deployment Version="5">

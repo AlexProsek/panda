@@ -2,29 +2,19 @@ unit panda.cvArithmetic;
 
 interface
 
+uses
+    panda.Nums
+  ;
+
 //{$define NoASM}
 
 {$I AsmDefs.inc}
-
-type
-  PUInt8 = ^UInt8;
-  PUInt16 = ^UInt16;
-
-  TDblCmplx = record
-    Re, Im: Double;
-    procedure Init(const aRe, aIm: Double);
-  end;
-  PDblCmplx = ^TDblCmplx;
-
-const
-  MAX_UINT8   = 255;
-  MAX_UINT16  = 65535;
-  MAX_NAT_INT = High(NativeInt);
 
 procedure VecAdd(pA, pB, pRes: PSingle; aCount: NativeInt); overload;
 procedure VecAdd(pA, pB, pRes: PDouble; aCount: NativeInt); overload;
 procedure VecAdd(pA: PSingle; B: Single; pRes: PSingle; aCount: NativeInt); overload;
 procedure VecAdd(pA: PDouble; const B: Double; pRes: PDouble; aCount: NativeInt); overload;
+procedure VecAdd(pA: PCmplx128; const B: TCmplx128; pRes: PCmplx128; aCount: NativeInt); overload;
 
 // pA^ <- pA^ + pB^
 procedure VecAddInPlace(pA, pB: PDouble; aAStep, aBStep, aCount: NativeInt); overload;
@@ -45,11 +35,12 @@ procedure VecNeg(pA, pRes: PSingle; aCount: NativeInt); overload;
 
 procedure VecMul(pA, pB, pRes: PSingle; aCount: NativeInt); overload;
 procedure VecMul(pA, pB, pRes: PDouble; aCount: NativeInt); overload;
-procedure VecMul(pA, pB, pRes: PDblCmplx; aCount: NativeInt); overload;
+procedure VecMul(pA, pB, pRes: PCmplx128; aCount: NativeInt); overload;
 procedure VecMul(pA: PSingle; B: Single; pRes: PSingle; aCount: NativeInt); overload;
 procedure VecMul(pA: PDouble; const B: Double; pRes: PDouble; aCount: NativeInt); overload;
+procedure VecMul(pA: PCmplx128; const B: TCmplx128; pRes: PCmplx128; aCount: NativeInt); overload;
 
-procedure VecDiv(pA, pB, pRes: PDblCmplx; aCount: NativeInt); overload;
+procedure VecDiv(pA, pB, pRes: PCmplx128; aCount: NativeInt); overload;
 
 procedure VecAddWithSat(pA, pB, pRes: PUInt8; aCount: NativeInt); overload;
 procedure VecAddWithSat(pA, pB, pRes: PUInt16; aCount: NativeInt); overload;
@@ -86,10 +77,11 @@ procedure dcopy(pX, pY: PDouble; aCount, XStep, YStep: NativeInt);
 /// <remarks> <c> Y <- a * X + Y </c> </remarks>
 procedure axpy(const a: Double; pX, pY: PDouble; aCount: NativeInt); overload;
 procedure axpy(const a: Single; pX, pY: PSingle; aCount: NativeInt); overload;
-procedure axpy(const a: TDblCmplx; pX, pY: PDblCmplx; aCount: NativeInt); overload;
+procedure axpy(const a: TCmplx128; pX, pY: PCmplx128; aCount: NativeInt); overload;
 
 procedure dot(pX, pY: PSingle; aCount: NativeInt; out aRes: Single); overload;
 procedure dot(pX, pY: PDouble; aCount: NativeInt; out aRes: Double); overload;
+procedure dot(pX, pY: PCmplx128; aCount: NativeInt; out aRes: TCmplx128); overload;
 
 function sdot(aN: NativeInt; pX: PByte; aXInc: NativeInt; pY: PByte; aYInc: NativeInt): Single;
 function ddot(aN: NativeInt; pX: PByte; aXInc: NativeInt; pY: PByte; aYInc: NativeInt): Double;
@@ -116,25 +108,9 @@ uses
   , SysUtils
   ;
 
-{$undef RANGEON}
-{$ifopt R+}
-  {$define RANGEON}
-{$endif}
-
-{$undef OVERFLOWON}
-{$ifopt Q+}
-  {$define OVERFLOWON}
-{$endif}
-
 procedure RaiseLengthOutOfRange;
 begin
   raise EArgumentOutOfRangeException.Create('Length is less than zero');
-end;
-
-procedure TDblCmplx.Init(const aRe, aIm: Double);
-begin
-  Re := aRe;
-  Im := aIm;
 end;
 
 procedure _dup_I8_xmm0(value: UInt8);
@@ -489,6 +465,38 @@ begin
   pEnd := PByte(pA) + aCount * SizeOf(Double);
   while PByte(pA) < pEnd do begin
     pRes^  := pA^ + B;
+    Inc(pRes);
+    Inc(pA);
+  end;
+end;
+{$endif}
+
+procedure VecAdd(pA: PCmplx128; const B: TCmplx128; pRes: PCmplx128; aCount: NativeInt);
+{$if defined(ASMx64)}
+//RCX <- pA, RDX <- pB, R8 <- pRes, R9 <- aCount
+asm
+  test r9, r9
+  jz @end
+  movupd xmm1, [rdx]
+@L:
+  movupd xmm0, [rcx]
+  addpd xmm0, xmm1
+  movupd [r8], xmm0
+  add rcx, 16
+  add r8, 16
+  dec r9
+  jnz @L
+@end:
+end;
+{$else}
+var pEnd: PByte;
+begin
+  pEnd := PByte(pA) + aCount * SizeOf(TCmplx128);
+  while PByte(pA) < pEnd do begin
+    with pRes^ do begin
+      Re := pA^.Re + B.Re;
+      Im := pA^.Im + B.Im;
+    end;
     Inc(pRes);
     Inc(pA);
   end;
@@ -1071,7 +1079,7 @@ begin
 end;
 {$endif}
 
-procedure VecMul(pA, pB, pRes: PDblCmplx; aCount: NativeInt);
+procedure VecMul(pA, pB, pRes: PCmplx128; aCount: NativeInt);
 {$if defined(ASMx86)}
 asm
   //EAX <- pA, EDX <- pB, ECX <- pRes, [EBP + 8] <- aCount
@@ -1121,7 +1129,7 @@ end;
 {$else}
 var pEnd: PByte;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(TDblCmplx);
+  pEnd := PByte(pA) + aCount * SizeOf(TCmplx128);
   while PByte(pA) < pEnd do begin
     with pRes^ do begin
       Re := pA^.Re * pB^.Re - pA^.Im * pB^.Im;
@@ -1250,7 +1258,65 @@ begin
 end;
 {$endif}
 
-procedure VecDiv(pA, pB, pRes: PDblCmplx; aCount: NativeInt);
+procedure VecMul(pA: PCmplx128; const B: TCmplx128; pRes: PCmplx128; aCount: NativeInt);
+{$if defined(ASMx86)}
+// EAX <- pA, EDX <- @B, ECX <- pRes, [EBP + 8] <- aCount
+asm
+  movupd xmm2, [edx]        // xmm2 <- (br, bi)
+  mov edx, ecx              // edx <- pRes
+  mov ecx, [ebp + 8]        // ecx <- aCount
+  test ecx, ecx
+  jz @end
+  pshufd xmm3, xmm2, $4e    // xmm3 <- (bi, br)
+@L:
+  movddup xmm0, [eax]       // xmm0 <- (ar, ar)
+  movddup xmm1, [eax + 8]   // xmm1 <- (ai, ai)
+  mulpd xmm0, xmm2          // xmm0 <- (ar*br, ar*bi)
+  mulpd xmm1, xmm3          // xmm1 <- (ai*bi, ai*br)
+  addsubpd xmm0, xmm1       // xmm0 <- (ai*br-ar*bi, ar*br+ai*bi)
+  movupd [edx], xmm0
+  add eax, 16
+  add edx, 16
+  dec ecx
+  jnz @L
+@end:
+end;
+{$elseif defined(ASMx64)}
+// RCX <- pA, RDX <- @B, R8 <- pRes, R9 <- aCount
+asm
+  test r9, r9
+  jz @end
+  movupd xmm2, [rdx]        // xmm2 <- (br, bi)
+  pshufd xmm3, xmm2, $4e    // xmm3 <- (bi, br)
+@L:
+  movddup xmm0, [rcx]       // xmm0 <- (ar, ar)
+  movddup xmm1, [rcx + 8]   // xmm1 <- (ai, ai)
+  mulpd xmm0, xmm2          // xmm0 <- (ar*br, ar*bi)
+  mulpd xmm1, xmm3          // xmm1 <- (ai*bi, ai*br)
+  addsubpd xmm0, xmm1       // xmm0 <- (ai*br-ar*bi, ar*br+ai*bi)
+  movupd [r8], xmm0
+  add rcx, 16
+  add r8, 16
+  dec r9
+  jnz @L
+@end:
+end;
+{$else}
+var pEnd: PByte;
+begin
+  pEnd := PByte(pA) + aCount * SizeOf(TCmplx128);
+  while PByte(pA) < pEnd do begin
+    with pRes^ do begin
+      Re := pA^.Re * B.Re - pA^.Im * B.Im;
+      Im := pA^.Re * B.Im + pA^.Im * B.Re;
+    end;
+    Inc(pRes);
+    Inc(pA);
+  end;
+end;
+{$endif}
+
+procedure VecDiv(pA, pB, pRes: PCmplx128; aCount: NativeInt);
 {$if defined(ASMx86)}
 asm
   //EAX <- pA, EDX <- pB, ECX <- pRes, [EBP + 8] <- aCount
@@ -1316,7 +1382,7 @@ end;
 var pEnd: PByte;
     denom: Double;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(TDblCmplx);
+  pEnd := PByte(pA) + aCount * SizeOf(TCmplx128);
   while PByte(pA) < pEnd do begin
     with pB^ do begin
       denom := Re * Re + Im * Im;
@@ -2650,7 +2716,7 @@ begin
 end;
 {$endif}
 
-procedure axpy(const a: TDblCmplx; pX, pY: PDblCmplx; aCount: NativeInt);
+procedure axpy(const a: TCmplx128; pX, pY: PCmplx128; aCount: NativeInt);
 {$if defined(ASMx86)}
 //EAX <- @a, EDX <- pX, ECX <- pY, [EBP + 8] <- aCount
 asm
@@ -2712,7 +2778,7 @@ end;
 {$else}
 var pEnd: PByte;
 begin
-  pEnd := PByte(pX) + aCount * SizeOf(TDblCmplx);
+  pEnd := PByte(pX) + aCount * SizeOf(TCmplx128);
 
   if (a.Re = 1) and (a.Im = 0) then begin
     while PByte(pX) < pEnd do begin
@@ -3027,6 +3093,70 @@ begin
   pEnd := PByte(pX) + aCount * SizeOf(Double);
   while PByte(pX) < pEnd do begin
     aRes := aRes + pX^ * pY^;
+    Inc(pX);
+    Inc(pY);
+  end;
+end;
+{$endif}
+
+procedure dot(pX, pY: PCmplx128; aCount: NativeInt; out aRes: TCmplx128);
+{$if defined(ASMx86)}
+//EAX <- pX, EDX <- pY, ECX <- aCount; [EBP + 8] <- aRes
+asm
+  xorpd xmm0, xmm0
+  test ecx, ecx
+  jns @L
+  call RaiseLengthOutOfRange
+@L:
+  movddup xmm2, [eax]     // xmm2 <- (ar, ar)
+  movddup xmm3, [eax + 8] // xmm3 <- (ai, ai)
+  movupd xmm1, [edx]      // xmm1 <- (br, bi)
+  mulpd xmm2, xmm1        // xmm2 <- (br*ar, bi*ar)
+  mulpd xmm3, xmm1        // xmm3 <- (br*ai, bi*ai)
+  pshufd xmm3, xmm3, $4e  // xmm3 <- (bi*ai, br*ai)
+  addsubpd xmm2, xmm3     // xmm2 <- a * b
+  addpd xmm0, xmm2
+  add eax, 16
+  add edx, 16
+  dec ecx
+  jnz @L
+
+  mov eax, [ebp + 8]
+  movupd [eax], xmm0
+end;
+{$elseif defined(ASMx64)}
+// RCX <- pX, RDX <- pY, R8 <- aCount, R9 <- @aRes
+asm
+  xorpd xmm0, xmm0
+  test r8, r8
+  jns @L
+  call RaiseLengthOutOfRange
+@L:
+  movddup xmm2, [rcx]     // xmm2 <- (ar, ar)
+  movddup xmm3, [rcx + 8] // xmm3 <- (ai, ai)
+  movupd xmm1, [rdx]      // xmm1 <- (br, bi)
+  mulpd xmm2, xmm1        // xmm2 <- (br*ar, bi*ar)
+  mulpd xmm3, xmm1        // xmm3 <- (br*ai, bi*ai)
+  pshufd xmm3, xmm3, $4e  // xmm3 <- (bi*ai, br*ai)
+  addsubpd xmm2, xmm3     // xmm2 <- a * b
+  addpd xmm0, xmm2
+  add rcx, 16
+  add rdx, 16
+  dec r8
+  jnz @L
+
+  movupd [r9], xmm0
+end;
+{$else}
+var pEnd: PByte;
+begin
+  aRes.Init(0, 0);
+  pEnd := PByte(pX) + aCount * SizeOf(TCmplx128);
+  while PByte(pX) < pEnd do begin
+    with aRes do begin
+      Re := Re + pX^.Re * pY^.Re - pX^.Im * pY^.Im;
+      Im := Im + pX^.Re * pY^.Im + pX^.Im * pY^.Re;
+    end;
     Inc(pX);
     Inc(pY);
   end;

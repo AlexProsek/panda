@@ -102,7 +102,7 @@ var shape: TNDAShape;
     tot: T;
 begin
   if aArr.NDim = 1 then begin
-    // todo: check aLvl (has to be 1)
+    Assert((aLvl = 0) or (aLvl = -1));
     aTotFunc(aArr, tot);
     Result := TNDScalar<T>.Create(tot);
     exit;

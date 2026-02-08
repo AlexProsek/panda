@@ -31,7 +31,7 @@ uses
   panda.Intfs in '..\..\panda.Intfs.pas',
   panda.Math in '..\..\panda.Math.pas',
   pandalib in '..\..\pandalib.pas',
-  panda.Tests.vecArithmetic in 'panda.Tests.vecArithmetic.pas',
+  panda.Tests.cvArithmetic in 'panda.Tests.cvArithmetic.pas',
   panda.consts in '..\..\panda.consts.pas',
   panda.Tests.NDATestCase in '..\panda.Tests.NDATestCase.pas',
   panda.Utils.StopWatch in '..\..\Utils\panda.Utils.StopWatch.pas',
@@ -41,7 +41,15 @@ uses
   panda.Tests.cvCvt in 'panda.Tests.cvCvt.pas',
   panda.Conv in '..\..\panda.Conv.pas',
   panda.Tests.Conv in 'panda.Tests.Conv.pas',
-  panda.BLASInit in '..\..\panda.BLASInit.pas';
+  panda.BLASInit in '..\..\panda.BLASInit.pas',
+  panda.MAT4io in '..\..\panda.MAT4io.pas',
+  panda.Tests.MAT4io in 'panda.Tests.MAT4io.pas',
+  panda.Nums in '..\..\panda.Nums.pas',
+  panda.Tests.Nums in 'panda.Tests.Nums.pas',
+  panda.Tests.MPNums in 'panda.Tests.MPNums.pas',
+  panda.MPNums in '..\..\panda.MPNums.pas',
+  panda.Poly in '..\..\panda.Poly.pas',
+  panda.Tests.Poly in 'panda.Tests.Poly.pas';
 
 {$R *.RES}
 

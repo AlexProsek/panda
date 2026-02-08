@@ -56,6 +56,23 @@
         <Cfg_2>true</Cfg_2>
         <Base>true</Base>
     </PropertyGroup>
+    <PropertyGroup Condition="'$(Config)'=='PurePascal' or '$(Cfg_4)'!=''">
+        <Cfg_4>true</Cfg_4>
+        <CfgParent>Base</CfgParent>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Cfg_4)'=='true') or '$(Cfg_4_Win32)'!=''">
+        <Cfg_4_Win32>true</Cfg_4_Win32>
+        <CfgParent>Cfg_4</CfgParent>
+        <Cfg_4>true</Cfg_4>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win64' and '$(Cfg_4)'=='true') or '$(Cfg_4_Win64)'!=''">
+        <Cfg_4_Win64>true</Cfg_4_Win64>
+        <CfgParent>Cfg_4</CfgParent>
+        <Cfg_4>true</Cfg_4>
+        <Base>true</Base>
+    </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
         <DCC_DcuOutput>.\$(Platform)\$(Config)</DCC_DcuOutput>
         <DCC_ExeOutput>.\$(Platform)\$(Config)</DCC_ExeOutput>
@@ -122,6 +139,16 @@
         <DCC_Define>_BLAS;AVX;$(DCC_Define)</DCC_Define>
         <VerInfo_Locale>1033</VerInfo_Locale>
     </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_4_Win32)'!=''">
+        <DCC_Define>RELEASE;NoASM;$(DCC_Define)</DCC_Define>
+        <VerInfo_Locale>1033</VerInfo_Locale>
+        <Manifest_File>(None)</Manifest_File>
+        <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_4_Win64)'!=''">
+        <VerInfo_Locale>1033</VerInfo_Locale>
+        <DCC_Define>RELEASE;NoASM;$(DCC_Define)</DCC_Define>
+    </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
@@ -130,7 +157,7 @@
         <DCCReference Include="..\panda.Tests.NDATestCase.pas"/>
         <DCCReference Include="..\..\panda.Intfs.pas"/>
         <DCCReference Include="..\..\pandalib.pas"/>
-        <DCCReference Include="panda.PTests.vecArithmetic.pas"/>
+        <DCCReference Include="panda.PTests.cvArithmetic.pas"/>
         <DCCReference Include="..\..\Utils\panda.Utils.StopWatch.pas"/>
         <DCCReference Include="panda.PTests.cvMath.pas"/>
         <DCCReference Include="panda.PTests.cvCvt.pas"/>
@@ -138,6 +165,9 @@
         <DCCReference Include="panda.PTests.Experiments.pas"/>
         <DCCReference Include="panda.PTests.Conv.pas"/>
         <DCCReference Include="..\..\panda.BLASInit.pas"/>
+        <DCCReference Include="panda.PTests.MPNums.pas"/>
+        <DCCReference Include="panda.PTests.Nums.pas"/>
+        <DCCReference Include="panda.PTests.Poly.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -147,6 +177,10 @@
         </BuildConfiguration>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
+            <CfgParent>Base</CfgParent>
+        </BuildConfiguration>
+        <BuildConfiguration Include="PurePascal">
+            <Key>Cfg_4</Key>
             <CfgParent>Base</CfgParent>
         </BuildConfiguration>
     </ItemGroup>
@@ -180,6 +214,12 @@
                     </Platform>
                 </DeployFile>
                 <DeployFile LocalName="Win32\Debug\PerformanceTests.exe" Configuration="Debug" Class="ProjectOutput"/>
+                <DeployFile LocalName="Win32\PurePascal\PerformanceTests.exe" Configuration="PurePascal" Class="ProjectOutput">
+                    <Platform Name="Win32">
+                        <RemoteName>PerformanceTests.exe</RemoteName>
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
                 <DeployFile LocalName="Win32\Release\PerformanceTests.exe" Configuration="Release" Class="ProjectOutput"/>
                 <DeployFile LocalName="Win64\Debug\PerformanceTests.exe" Configuration="Debug" Class="ProjectOutput"/>
                 <DeployFile LocalName="Win64\Release\PerformanceTests.exe" Configuration="Release" Class="ProjectOutput"/>

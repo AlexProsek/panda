@@ -11,6 +11,7 @@ uses
   , SysUtils
   , Math
   , Generics.Collections
+  , panda.Nums
   , panda.Intfs
   , panda.Consts
   , panda.vCvt
@@ -1237,7 +1238,7 @@ var pEnd: PByte;
 begin
   pEnd := aSrc + aCount * aStep;
   while aSrc < pEnd do begin
-    PDblCmplx(aDst)^ := PDblCmplx(aSrc)^;
+    PCmplx128(aDst)^ := PCmplx128(aSrc)^;
     Inc(aSrc, aStep);
     Inc(aDst, 16);
   end;
@@ -2423,8 +2424,8 @@ begin
     Inc(J);
   end;
   if Assigned(aIdxPerm) then begin
-    // todo
-
+    for I := 0 to High(axes) do
+      axes[I] := aIdxPerm[axes[I]];
   end;
 
   fSliceEntry := TSliceView.Create(aArr, axes);
