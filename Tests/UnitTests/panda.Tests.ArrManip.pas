@@ -21,7 +21,10 @@ type
     procedure Flatten2DStrides;
 
     procedure Transpose2D;
-    procedure Transpose3D;
+    procedure Transpose3D_210;
+    procedure Transpose3D_201;
+    procedure Transpose3D_102;
+    procedure Transpose3D_120;
 
     procedure Flip1D;
     procedure Flip2D_A0;
@@ -135,7 +138,7 @@ begin
       CheckEquals(1 + I + 3*J, m[I, J]);
 end;
 
-procedure TArrManipTests.Transpose3D;
+procedure TArrManipTests.Transpose3D_210;
 var a: INDArray<Integer>;
     ai: TNDAItems<Integer>;
 begin
@@ -157,6 +160,80 @@ begin
   CheckEquals(10, ai[[1, 1, 1]]);
   CheckEquals(6,  ai[[1, 2, 0]]);
   CheckEquals(12, ai[[1, 2, 1]]);
+end;
+
+procedure TArrManipTests.Transpose3D_201;
+var a: INDArray<Integer>;
+    ai: TNDAItems<Integer>;
+begin
+  a := iRng2NDA([2, 3, 2]);
+  a := TNDAMan.Transpose<Integer>(a, [2, 0, 1]);
+
+  CheckEquals([2, 2, 3], a.Shape);
+  ai := a;
+  CheckEquals(1,  ai[[0, 0, 0]]);
+  CheckEquals(3,  ai[[0, 0, 1]]);
+  CheckEquals(5,  ai[[0, 0, 2]]);
+  CheckEquals(7,  ai[[0, 1, 0]]);
+  CheckEquals(9,  ai[[0, 1, 1]]);
+  CheckEquals(11, ai[[0, 1, 2]]);
+
+  CheckEquals(2,  ai[[1, 0, 0]]);
+  CheckEquals(4,  ai[[1, 0, 1]]);
+  CheckEquals(6,  ai[[1, 0, 2]]);
+  CheckEquals(8,  ai[[1, 1, 0]]);
+  CheckEquals(10, ai[[1, 1, 1]]);
+  CheckEquals(12, ai[[1, 1, 2]]);
+end;
+
+procedure TArrManipTests.Transpose3D_102;
+var a: INDArray<Integer>;
+    ai: TNDAItems<Integer>;
+begin
+  a := iRng2NDA([2, 3, 2]);
+  a := TNDAMan.Transpose<Integer>(a, [1, 0, 2]);
+
+  CheckEquals([3, 2, 2], a.Shape);
+  ai := a;
+  CheckEquals(1,  ai[[0, 0, 0]]);
+  CheckEquals(2,  ai[[0, 0, 1]]);
+  CheckEquals(7,  ai[[0, 1, 0]]);
+  CheckEquals(8,  ai[[0, 1, 1]]);
+
+  CheckEquals(3,  ai[[1, 0, 0]]);
+  CheckEquals(4,  ai[[1, 0, 1]]);
+  CheckEquals(9,  ai[[1, 1, 0]]);
+  CheckEquals(10, ai[[1, 1, 1]]);
+
+  CheckEquals(5,  ai[[2, 0, 0]]);
+  CheckEquals(6,  ai[[2, 0, 1]]);
+  CheckEquals(11, ai[[2, 1, 0]]);
+  CheckEquals(12, ai[[2, 1, 1]]);
+end;
+
+procedure TArrManipTests.Transpose3D_120;
+var a: INDArray<Integer>;
+    ai: TNDAItems<Integer>;
+begin
+  a := iRng2NDA([2, 3, 2]);
+  a := TNDAMan.Transpose<Integer>(a, [1, 2, 0]);
+
+  CheckEquals([3, 2, 2], a.Shape);
+  ai := a;
+  CheckEquals(1,  ai[[0, 0, 0]]);
+  CheckEquals(7,  ai[[0, 0, 1]]);
+  CheckEquals(2,  ai[[0, 1, 0]]);
+  CheckEquals(8,  ai[[0, 1, 1]]);
+
+  CheckEquals(3,  ai[[1, 0, 0]]);
+  CheckEquals(9,  ai[[1, 0, 1]]);
+  CheckEquals(4,  ai[[1, 1, 0]]);
+  CheckEquals(10, ai[[1, 1, 1]]);
+
+  CheckEquals(5,  ai[[2, 0, 0]]);
+  CheckEquals(11, ai[[2, 0, 1]]);
+  CheckEquals(6,  ai[[2, 1, 0]]);
+  CheckEquals(12, ai[[2, 1, 1]]);
 end;
 
 procedure TArrManipTests.Flip1D;

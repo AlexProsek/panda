@@ -71,6 +71,8 @@ type
     /// </summary>
     function Substitute(const aQ: TPolyF64): TPolyF64;
     function Derivative: TPolyF64;
+    /// <summary>Evaluate <c>aP^n</c>.</summary>
+    function Power(N: Cardinal): TPolyF64;
     class function GCD(const aP, aQ: TPolyF64; const aZeroTol: Double = cEpsF64): TPolyF64; static;
 
     property Coeff[I: NativeInt]: Double read GetCoeff write SetCoeff;
@@ -127,6 +129,8 @@ type
     /// <summary>Create a polynomial <c>X</c>.</summary>
     class function PolyX: TPolyC128; inline; static;
     function HasRealCoeffs(const aEps: Double = 0): Boolean;
+    function GetCoeffsRealPart: TArray<Double>;
+    function GetCoeffsImagPart: TArray<Double>;
 
     /// <summary>Divide a polynomial <c>aP</c> by a polynomial <c>aQ</c>.</summary>
     /// <param name="aQu">Quotient of the division <c>aP/aQ</c></param>
@@ -185,6 +189,7 @@ type
     class operator Divide(const aP: TPolyC256; const aV: TCmplx256): TPolyC256; inline;
     class operator Negative(const aP: TPolyC256): TPolyC256; inline;
     class operator Explicit(const aV: TCmplx256): TPolyC256; inline;
+    class operator Explicit(const aP: TPolyF64): TPolyC256;
     class operator Explicit(const aP: TPolyC128): TPolyC256;
     class operator Explicit(const aP: TPolyC256): TPolyC128;
 
@@ -565,7 +570,10 @@ end;
 
 class operator TPolyF64.Add(const aP: TPolyF64; const aV: Double): TPolyF64;
 begin
-  Result.fCoeffs := PolyAdd(aP.fCoeffs, aV);
+  if aV <> 0 then
+    Result.fCoeffs := PolyAdd(aP.fCoeffs, aV)
+  else
+    Result := aP;
 end;
 
 class operator TPolyF64.Subtract(const aP, aQ: TPolyF64): TPolyF64;
@@ -585,7 +593,10 @@ end;
 
 class operator TPolyF64.Multiply(const aV: Double; const aP: TPolyF64): TPolyF64;
 begin
-  Result.fCoeffs := PolyMul(aP.fCoeffs, aV);
+  if aV <> 1 then
+    Result.fCoeffs := PolyMul(aP.fCoeffs, aV)
+  else
+    Result := aP;
 end;
 
 class operator TPolyF64.IntDivide(const aP, aQ: TPolyF64): TPolyF64;
@@ -602,7 +613,10 @@ end;
 
 class operator TPolyF64.Divide(const aP: TPolyF64; const aV: Double): TPolyF64;
 begin
-  Result.fCoeffs := PolyMul(aP.fCoeffs, 1/aV);
+  if aV <> 1 then
+    Result.fCoeffs := PolyMul(aP.fCoeffs, 1/aV)
+  else
+    Result := aP;
 end;
 
 class operator TPolyF64.Negative(const aP: TPolyF64): TPolyF64;
@@ -748,6 +762,21 @@ begin
   for k := 1 to Length(res) do
     res[k - 1] := k * fCoeffs[k];
   Result.Init(res);
+end;
+
+function TPolyF64.Power(N: Cardinal): TPolyF64;
+var q: TPolyF64;
+begin
+  Result := PolyOne;
+  if n = 0 then exit;
+  if n = 1 then exit(Clone);
+  q := Self;
+  while True do begin
+    if (n and 1) <> 0 then Result := q * Result;
+    n := n shr 1;
+    if n = 0 then break;
+    q := q * q;
+  end;
 end;
 
 class function TPolyF64.GCD(const aP, aQ: TPolyF64; const aZeroTol: Double): TPolyF64;
@@ -1057,6 +1086,20 @@ begin
   for I := 0 to High(fCoeffs) do
     if not System.Math.IsZero(fCoeffs[I].Im, aEps) then exit(False);
   Result := True;
+end;
+
+function TPolyC128.GetCoeffsRealPart: TArray<Double>;
+var I: Integer;
+begin
+  SetLength(Result, Length(fCoeffs));
+  for I := 0 to High(Result) do Result[I] := fCoeffs[I].Re;
+end;
+
+function TPolyC128.GetCoeffsImagPart: TArray<Double>;
+var I: Integer;
+begin
+  SetLength(Result, Length(fCoeffs));
+  for I := 0 to High(Result) do Result[I] := fCoeffs[I].Im;
 end;
 
 class procedure TPolyC128.GetQuotientRemainder(const aP, aQ: TPolyC128;
@@ -1380,6 +1423,16 @@ end;
 class operator TPolyC256.Explicit(const aV: TCmplx256): TPolyC256;
 begin
   Result.Init([aV]);
+end;
+
+class operator TPolyC256.Explicit(const aP: TPolyF64): TPolyC256;
+var coeffs: TArray<TCmplx256>;
+    I: NativeInt;
+begin
+  SetLength(coeffs, Length(aP.fCoeffs));
+  for I := 0 to High(coeffs) do
+    coeffs[I].Init(aP.fCoeffs[I], 0);
+  Result.Init(coeffs);
 end;
 
 class operator TPolyC256.Explicit(const aP: TPolyC128): TPolyC256;

@@ -29,6 +29,7 @@ type
   published
     procedure PolyEval;
     procedure PolyAddition;
+    procedure PolyAddConst;
     procedure PolySubtraction;
     procedure PolyMultiplication;
     procedure PolyMulByOrd0;
@@ -182,6 +183,14 @@ begin
   b.Init([-1, -2]);
   c := a + b;
   CheckEquals([0], c.CoeffList);
+end;
+
+procedure TPolyF64Tests.PolyAddConst;
+var x, p: TPolyF64;
+begin
+  x := TPolyF64.PolyX;
+  p := x + 2;
+  CheckEquals([2, 1], p.CoeffList);
 end;
 
 procedure TPolyF64Tests.PolySubtraction;

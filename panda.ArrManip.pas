@@ -5,6 +5,7 @@ interface
 uses
     panda.Intfs
   , panda.Arrays
+  , System.TypInfo
   ;
 
 type
@@ -15,6 +16,8 @@ type
     INV_CAST              = -3;
   protected
     class function FlippedAxesIdx(aDim: Integer; const aAxes: array of Integer): INDIndexSeq; static;
+    class procedure _MatCpy<T>(const aSrc, aDst: TMatSpec); static;
+    class procedure _Tr<T>(const aSrc, aDst: INDArray<T>; const aAxes: TArray<Integer>); static;
   public
     class function GetPart(const aArr: INDArray; const aIdx: INDIndexSeq): INDArray; static;
     class function SetPart(const aArr: INDArray; const aIdx: INDIndexSeq; const aValue: INDArray): Integer; static;
@@ -38,7 +41,6 @@ implementation
 
 uses
     panda.DynArrayUtils
-  , System.TypInfo
   ;
 
 {$region 'TNDAMan'}
@@ -121,34 +123,84 @@ begin
   Copy<T>(aArr, Result.Data);
 end;
 
+class procedure TNDAMan._MatCpy<T>(const aSrc, aDst: TMatSpec);
+var pSrc, pDst, pSrcRow, pDstRow: PByte;
+    pEnd, pRowEnd: PByte;
+    rCnt, cCnt: NativeInt;
+    srcRStep, srcCStep, dstRStep, dstCStep, srcRWidth: NativeInt;
+begin
+  rCnt := aSrc.NRows;
+  cCnt := aSrc.NCols;
+  srcRStep := aSrc.RStep;
+  srcCStep := aSrc.CStep;
+  dstRStep := aDst.RStep;
+  dstCStep := aDst.CStep;
+  pSrcRow := aSrc.Data;
+  pDstRow := aDst.Data;
+  srcRWidth := cCnt * srcCStep;
+  pEnd := pSrcRow + rCnt * srcRStep;
+  while pSrcRow <> pEnd do begin
+    pSrc := pSrcRow;
+    pDst := pDstRow;
+    pRowEnd := pSrc + srcRWidth;
+    while pSrc <> pRowEnd do begin
+      TNDA<T>.PT(pDst)^ := TNDA<T>.PT(pSrc)^;
+      Inc(pSrc, srcCStep);
+      Inc(pDst, dstCStep);
+    end;
+    Inc(pSrcRow, srcRStep);
+    Inc(pDstRow, dstRStep);
+  end;
+end;
+
+class procedure TNDAMan._Tr<T>(const aSrc, aDst: INDArray<T>; const aAxes: TArray<Integer>);
+var itSrc, itDst: TNDASliceIt;
+    srcMat, dstMat: TMatSpec;
+    nDim: Integer;
+begin
+  nDim := aSrc.NDim;
+  if nDim < 2 then begin
+    TNDAUt.Fill<T>(aDst, aSrc);
+    exit;
+  end;
+
+  if nDim = 2 then begin
+    GetMatSpec(aSrc, srcMat);
+    GetMatSpec(aDst, dstMat);
+    SwapMatAxes(dstMat);
+    _MatCpy<T>(srcMat, dstMat);
+    exit;
+  end;
+
+  itSrc := TNDASliceIt.Create(aSrc, 0, -3, aAxes);
+  itDst := TNDASliceIt.Create(aDst, 0, -3);
+  try
+    GetMatSpec(itSrc.CurrentSlice, srcMat);
+    GetMatSpec(itDst.CurrentSlice, dstMat);
+    while itSrc.MoveNext and itDst.MoveNext do begin
+      srcMat.Data := itSrc.Current;
+      dstMat.Data := itDst.Current;
+      _MatCpy<T>(srcMat, dstMat);
+    end;
+  finally
+    itSrc.Free;
+    itDst.Free;
+  end;
+end;
+
 class function TNDAMan.Transpose<T>(const aArr: INDArray<T>): INDArray<T>;
 begin
   Result := Transpose<T>(aArr, TDynAUt.Range_I32(aArr.NDim - 1, 0, -1));
 end;
 
 class function TNDAMan.Transpose<T>(const aArr: INDArray<T>; const aAxes: TArray<Integer>): INDArray<T>;
-var shape: TArray<NativeInt>;
-    it: TNDAIt;
-    p: TNDA<T>.PT;
 begin
-  shape := Permute<NativeInt>(aArr.Shape, aAxes);
-  Result := TNDABuffer<T>.Create(shape);
-  p := TNDA<T>.PT(Result.Data);
-  it := TNDAIt.Create(aArr, 0, -1, aAxes);
-  try
-    while it.MoveNext do begin
-      p^ := TNDA<T>.PT(it.Current)^;
-      Inc(p);
-    end;
-  finally
-    it.Free;
-  end;
+  Result := TNDABuffer<T>.Create(Permute<NativeInt>(aArr.Shape, aAxes));
+  _Tr<T>(aArr, Result, aAxes);
 end;
 
 class procedure TNDAMan.Transpose<T>(const aSrc, aDst: INDArray<T>; const aAxes: TArray<Integer>);
 var shape: TArray<NativeInt>;
-    itSrc, itDst: TNDAIt;
-    p: TNDA<T>.PT;
 const sErrMsg = 'Transpose error: output array shape doesn''t match.';
 begin
   if aSrc.NDim <> aDst.NDim then
@@ -157,28 +209,7 @@ begin
   if not SameQ(shape, aDst.Shape) then
     raise ENDAShapeError.Create(sErrMsg);
 
-  if CContiguousQ(aDst) then begin
-    p := TNDA<T>.PT(aDst.Data);
-    itSrc := TNDAIt.Create(aSrc, 0, -1, aAxes);
-    try
-      while itSrc.MoveNext do begin
-        p^ := TNDA<T>.PT(itSrc.Current)^;
-        Inc(p);
-      end;
-    finally
-      itSrc.Free;
-    end;
-  end else begin
-    itSrc := TNDAIt.Create(aSrc, 0, -1, aAxes);
-    itDst := TNDAIt.Create(aDst);
-    try
-      while itSrc.MoveNext and itDst.MoveNext do
-        TNDA<T>.PT(itDst.Current)^ := TNDA<T>.PT(itSrc.Current)^;
-    finally
-      itSrc.Free;
-      itDst.Free;
-    end;
-  end;
+  _Tr<T>(aSrc, aDst, aAxes);
 end;
 
 class function TNDAMan.FlippedAxesIdx(aDim: Integer; const aAxes: array of Integer): INDIndexSeq;

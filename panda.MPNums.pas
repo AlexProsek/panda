@@ -237,6 +237,7 @@ type
     function Reciprocal: TCmplx256; inline;
     function IsReal: Boolean; overload; inline;
     function IsReal(const aEps: TReal128): Boolean; overload; inline;
+    function IsExactZero: Boolean; inline;
     function IsZero: Boolean; overload; inline;
     function IsZero(const aEps: TReal128): Boolean; overload; inline;
     function Abs: TReal128;
@@ -2686,7 +2687,7 @@ end;
 
 function TReal128.IsZero: Boolean;
 begin
-  Result := IsZero(0);
+  Result := IsZero(cZeroF128);
 end;
 
 function TReal128.IsZero(const aEps: TReal128): Boolean;
@@ -2880,6 +2881,11 @@ end;
 function TCmplx256.IsReal(const aEps: TReal128): Boolean;
 begin
   Result := Im.IsZero(aEps);
+end;
+
+function TCmplx256.IsExactZero: Boolean;
+begin
+  Result := Re.IsExactZero and Im.IsExactZero;
 end;
 
 function TCmplx256.IsZero: Boolean;

@@ -239,13 +239,15 @@ type
     fArray: INDArray;
     fOffset: NativeInt;
   public
-    constructor Create(const aArray: INDArray; const aIdx: INDIndexSeq);
+    constructor Create(const aArray: INDArray; const aIdx: INDIndexSeq;
+      const aAxesPerm: TArray<Integer> = nil);
     function GetItemType: PTypeInfo; override;
     function Data: PByte; override;
     function ItemSize: Integer; override;
     class procedure GetViewProps(const aArray: INDArray; const aIdx: INDIndexSeq;
       out aShape, aStrides: TArray<NativeInt>;
-      out aOffset: NativeInt; out aFlags: Cardinal);
+      out aOffset: NativeInt; out aFlags: Cardinal;
+      const aAxesPerm: TArray<Integer> = nil);
   end;
 
   TNDArrayView<T> = class(TNDA<T>)
@@ -355,7 +357,8 @@ type
       fData: PByte;
       procedure SetData(aData: PByte);
     public
-      constructor Create(const aArray: INDArray; const aAxes: TArray<Integer>); overload;
+      constructor Create(const aArray: INDArray; const aAxes: TArray<Integer>;
+        const aAxesPerm: TArray<Integer> = nil); overload;
       function Data: PByte; override;
     end;
 
@@ -2016,15 +2019,17 @@ end;
 
 {$region 'TNDArrayView'}
 
-constructor TNDArrayView.Create(const aArray: INDArray; const aIdx: INDIndexSeq);
+constructor TNDArrayView.Create(const aArray: INDArray; const aIdx: INDIndexSeq;
+  const aAxesPerm: TArray<Integer>);
 begin
   fArray := aArray;
-  GetViewProps(fArray, aIdx, fShape, fStrides, fOffset, fFlags);
+  GetViewProps(fArray, aIdx, fShape, fStrides, fOffset, fFlags, aAxesPerm);
 end;
 
 class procedure TNDArrayView.GetViewProps(const aArray: INDArray;
   const aIdx: INDIndexSeq; out aShape, aStrides: TArray<NativeInt>;
-  out aOffset: NativeInt; out aFlags: Cardinal);
+  out aOffset: NativeInt; out aFlags: Cardinal;
+  const aAxesPerm: TArray<Integer>);
 var I, J, dim, nDim: Integer;
     spanIdx: INDSpanIndex;
     arrShape, arrStrides: TArray<NativeInt>;
@@ -2038,6 +2043,10 @@ begin
 
   arrShape := aArray.Shape;
   arrStrides := aArray.Strides;
+  if Assigned(aAxesPerm) then begin
+    arrShape := TNDAUt.Permute<NativeInt>(arrShape, aAxesPerm);
+    arrStrides := TNDAUt.Permute<NativeInt>(arrStrides, aAxesPerm);
+  end;
   bSpan := False;
   SetLength(aShape, nDim);
   SetLength(aStrides, nDim);
@@ -2382,14 +2391,14 @@ end;
 {$region 'TNDASliceIt.TSliceView'}
 
 constructor TNDASliceIt.TSliceView.Create(const aArray: INDArray;
-  const aAxes: TArray<Integer>);
+  const aAxes: TArray<Integer>; const aAxesPerm: TArray<Integer>);
 var idx: INDIndexSeq;
     I: Integer;
 begin
   idx := NDIIntSeq(aArray.NDim);
   for I := 0 to High(aAxes) do
     idx[aAxes[I]] := NDIAll();
-  Create(aArray, idx);
+  Create(aArray, idx, aAxesPerm);
   fData := fArray.Data;
 end;
 
@@ -2423,12 +2432,8 @@ begin
     axes[J] := I;
     Inc(J);
   end;
-  if Assigned(aIdxPerm) then begin
-    for I := 0 to High(axes) do
-      axes[I] := aIdxPerm[axes[I]];
-  end;
 
-  fSliceEntry := TSliceView.Create(aArr, axes);
+  fSliceEntry := TSliceView.Create(aArr, axes, aIdxPerm);
   fSlice := fSliceEntry;
 end;
 

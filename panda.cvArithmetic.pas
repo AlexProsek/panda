@@ -2772,7 +2772,88 @@ asm
   movupd xmm0, [eax]
   addpd xmm0, xmm1
   movupd [eax], xmm0
+@end:
+end;
+{$elseif defined(ASMx64)}
+{$CODEALIGN 16}
+// RCX <- @a, RDX <- pX, R8 <- pY, R9 <- aCount
+asm
+{$ifdef AVX}
+  vbroadcastsd ymm3, [rcx]     // ymm3 <- (ar, ar, ar, ar)
+  vbroadcastsd ymm4, [rcx + 8] // ymm4 <- (ai, ai, ai, ai)
+{$else}
+  movddup xmm3, [rcx] // xmm3 <- (ar, ar)
+  movddup xmm4, [rcx + 8] // xmm4 <- (ai, ai)
+{$endif}
+  mov rcx, r9
+  shr rcx, 1
+  cmp rcx, 0
+  jz @rest
+{$ifdef AVX}
+@L:
+  vmovups ymm0, [rdx] // ymm0 <- (xr[i], xi[i], xr[i+1], xi[i+1])
+  vmovaps ymm1, ymm3
+  vmovaps ymm2, ymm4
+  vmulpd ymm1, ymm1, ymm0
+  vmulpd ymm2, ymm2, ymm0
+  vshufpd ymm2, ymm2, ymm2, 5
+  vaddsubpd ymm1, ymm1, ymm2
+  vmovupd ymm0, [r8]
+  vaddpd ymm0, ymm0, ymm1
+  vmovupd [r8], ymm0
+  add rdx, 32
+  add r8, 32
+  dec rcx
+  jnz @L
+{$else}
+@L:
+  movupd xmm0, [rdx]  // xmm0 <- (xr, xi)
+  movapd xmm1, xmm3
+  movapd xmm2, xmm4
+  mulpd xmm1, xmm0   // xmm1 <- (xr*ar, xi*ar)
+  mulpd xmm2, xmm0   // xmm2 <- (xr*ai, xi*ai)
+  shufpd xmm2, xmm2, 1 // xmm3 <- (xi*ai, xr*ai)
+  addsubpd xmm1, xmm2 // xmm1 <- a * x
+  movupd xmm0, [r8]  // xmm0 <- y
+  addpd xmm0, xmm1    // xmm0 <- y + a * x
+  movupd [r8], xmm0  // y <- y + a * y
+  add rdx, 16
+  add r8, 16
 
+  movupd xmm0, [rdx]
+  movapd xmm1, xmm3
+  movapd xmm2, xmm4
+  mulpd xmm1, xmm0
+  mulpd xmm2, xmm0
+  shufpd xmm2, xmm2, 1
+  addsubpd xmm1, xmm2
+  movupd xmm0, [r8]
+  addpd xmm0, xmm1
+  movupd [r8], xmm0
+  add rdx, 16
+  add r8, 16
+
+  dec rcx
+  jnz @L
+{$endif}
+
+@rest:
+{$ifdef AVX}
+  vzeroupper
+{$endif}
+  and r9, 1
+  jz @end
+
+  movupd xmm0, [rdx]
+  movapd xmm1, xmm3
+  movapd xmm2, xmm4
+  mulpd xmm1, xmm0
+  mulpd xmm2, xmm0
+  shufpd xmm2, xmm2, 1
+  addsubpd xmm1, xmm2
+  movupd xmm0, [r8]
+  addpd xmm0, xmm1
+  movupd [r8], xmm0
 @end:
 end;
 {$else}

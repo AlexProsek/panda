@@ -133,6 +133,17 @@ type
     property Base: INDArray<T> read fArr;
   end;
 
+  // TMatSpec describes a rectangular 2D array
+  TMatSpec = record
+    Data: PByte;
+    ElType: PTypeInfo;
+    ElSize: Integer;
+    NRows: NativeInt;
+    NCols: NativeInt;
+    RStep: NativeInt;
+    CStep: NativeInt;
+  end;
+
   // In place procedure types ( X <- F(X, Y) or Y <- F(X, Y) )
   TIPProcVS<T> = procedure (N: NativeInt; X: PByte; IncX: NativeInt; const Y: T);
   TIPProcVV = procedure (N: NativeInt; X: PByte; IncX: NativeInt; Y: PByte; IncY: NativeInt);
@@ -158,7 +169,36 @@ type
   function ContiguousQ(const aArr: INDArray): Boolean; inline;
   function WriteableQ(const aArr: INDArray): Boolean; inline;
 
+  procedure GetMatSpec(const aArr: INDArray; out aSpec: TMatSpec);
+  procedure SwapMatAxes(var aSpec: TMatSpec);
+
 implementation
+
+procedure GetMatSpec(const aArr: INDArray; out aSpec: TMatSpec);
+var s: TArray<NativeInt>;
+begin
+  Assert(aArr.NDim = 2);
+  with aSpec do begin
+    Data := aArr.Data;
+    ElType := aArr.GetItemType;
+    ElSize := aArr.ItemSize;
+    s := aArr.Shape;
+    NRows := s[0];
+    NCols := s[1];
+    s := aArr.Strides;
+    RStep := s[0];
+    CStep := s[1];
+  end;
+end;
+
+procedure SwapMatAxes(var aSpec: TMatSpec);
+var tmp: NativeInt;
+begin
+  with aSpec do begin
+    tmp := NRows; NRows := NCols; NCols := tmp;
+    tmp := RStep; RStep := CStep; CStep := tmp;
+  end;
+end;
 
 function SameQ(aT1, aT2: PTypeInfo): Boolean;
 var td1, td2: PTypeData;

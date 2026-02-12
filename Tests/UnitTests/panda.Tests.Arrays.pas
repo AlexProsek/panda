@@ -125,6 +125,9 @@ type
     procedure Array2DRows;
     procedure Array2DCols;
     procedure Array3D_SliceAxes01;
+    procedure Array3D_SliceAxes21;
+    procedure Array3D_SliceAxes20;
+    procedure Array3D_SliceAxes10;
   end;
 
   TNDASliceItChainTests = class(TNDATestCase)
@@ -1469,6 +1472,85 @@ begin
     CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(it.CurrentSlice, m));
     CheckEquals([2, 4, 6],   m[0]);
     CheckEquals([8, 10, 12], m[1]);
+
+    CheckFalse(it.MoveNext);
+  finally
+    it.Free;
+  end;
+end;
+
+procedure TNDASliceItTests.Array3D_SliceAxes21;
+var a: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+    it: TNDASliceIt;
+begin
+  a := iRng2NDA([2, 3, 2]);
+  it := TNDASliceIt.Create(a, 0, 0, [0, 2, 1]);
+  try
+    CheckTrue(it.MoveNext);
+    CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(it.CurrentSlice, m));
+    CheckEquals([1, 3, 5], m[0]);
+    CheckEquals([2, 4, 6], m[1]);
+
+    CheckTrue(it.MoveNext);
+    CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(it.CurrentSlice, m));
+    CheckEquals([7, 9,  11], m[0]);
+    CheckEquals([8, 10, 12], m[1]);
+
+    CheckFalse(it.MoveNext);
+  finally
+    it.Free;
+  end;
+end;
+
+procedure TNDASliceItTests.Array3D_SliceAxes20;
+var a: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+    it: TNDASliceIt;
+begin
+  a := iRng2NDA([2, 3, 2]);
+  it := TNDASliceIt.Create(a, 0, 0, [1, 2, 0]);
+  try
+    CheckTrue(it.MoveNext);
+    CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(it.CurrentSlice, m));
+    CheckEquals([1, 7], m[0]);
+    CheckEquals([2, 8], m[1]);
+
+    CheckTrue(it.MoveNext);
+    CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(it.CurrentSlice, m));
+    CheckEquals([3, 9],  m[0]);
+    CheckEquals([4, 10], m[1]);
+
+    CheckTrue(it.MoveNext);
+    CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(it.CurrentSlice, m));
+    CheckEquals([5, 11], m[0]);
+    CheckEquals([6, 12], m[1]);
+
+    CheckFalse(it.MoveNext);
+  finally
+    it.Free;
+  end;
+end;
+
+procedure TNDASliceItTests.Array3D_SliceAxes10;
+var a: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+    it: TNDASliceIt;
+begin
+  a := iRng2NDA([2, 3, 2]);
+  it := TNDASliceIt.Create(a, 0, 0, [2, 1, 0]);
+  try
+    CheckTrue(it.MoveNext);
+    CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(it.CurrentSlice, m));
+    CheckEquals([1, 7],  m[0]);
+    CheckEquals([3, 9],  m[1]);
+    CheckEquals([5, 11], m[2]);
+
+    CheckTrue(it.MoveNext);
+    CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(it.CurrentSlice, m));
+    CheckEquals([2, 8],  m[0]);
+    CheckEquals([4, 10], m[1]);
+    Checkequals([6, 12], m[2]);
 
     CheckFalse(it.MoveNext);
   finally
