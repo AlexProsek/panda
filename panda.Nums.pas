@@ -43,10 +43,13 @@ type
     class function ImUnit: TCmplx128; static;
     class function ReUnit: TCmplx128; static;
     class operator Add(const A, B: TCmplx128): TCmplx128; inline;
+    class operator Add(const A: Double; const B: TCmplx128): TCmplx128; inline;
     class operator Subtract(const A, B: TCmplx128): TCmplx128; inline;
     class operator Negative(const A: TCmplx128): TCmplx128; inline;
     class operator Multiply(const A, B: TCmplx128): TCmplx128; inline;
+    class operator Multiply(const A: Double; const B: TCmplx128): TCmplx128; inline;
     class operator Divide(const A, B: TCmplx128): TCmplx128;{$ifdef NoASM}inline;{$endif}
+    class operator Divide(const A: TCmplx128; const B: Double): TCmplx128; inline;
     class operator Equal(const A, B: TCmplx128): Boolean; inline;
     class operator NotEqual(const A, B: TCmplx128): Boolean; inline;
   end;
@@ -68,6 +71,12 @@ const
 const
   cEpsF32 = 2.3841857910156250e-7;  // Power(2, -22)
   cEpsF64 = 2.2204460492503131e-16; // Power(2, -52)
+  
+  cAbsMaskF32: UInt64 = $7FFFFFFF;
+  cAbsMaskF64: UInt64 = $7FFFFFFFFFFFFFFF;
+
+  cZeroC64:  TCmplx64  = (Re: 0; Im: 0);
+  cZeroC128: TCmplx128 = (Re: 0; Im: 0);
 
   function Cmplx(const aRe, aIm: Double): TCmplx128; inline;
 
@@ -321,6 +330,12 @@ begin
   Result.Im := A.Im + B.Im;
 end;
 
+class operator TCmplx128.Add(const A: Double; const B: TCmplx128): TCmplx128;
+begin
+  Result.Re := A + B.Re;
+  Result.Im := B.Im;
+end;
+
 class operator TCmplx128.Subtract(const A, B: TCmplx128): TCmplx128;
 begin
   Result.Re := A.Re - B.Re;
@@ -337,6 +352,12 @@ class operator TCmplx128.Multiply(const A, B: TCmplx128): TCmplx128;
 begin
   Result.Re := A.Re * B.Re - A.Im * B.Im;
   Result.Im := A.Im * B.Re + A.Re * B.Im;
+end;
+
+class operator TCmplx128.Multiply(const A: Double; const B: TCmplx128): TCmplx128;
+begin
+  Result.Re := A * B.Re;
+  Result.Im := A * B.Im;
 end;
 
 class operator TCmplx128.Divide(const A, B: TCmplx128): TCmplx128;
@@ -386,6 +407,12 @@ begin
   Result.Im := (A.Im * B.Re - A.Re * B.Im) / absB;
 end;
 {$endif}
+
+class operator TCmplx128.Divide(const A: TCmplx128; const B: Double): TCmplx128;
+begin
+  Result.Re := A.Re / B;
+  Result.Im := A.Im / B;
+end;
 
 class operator TCmplx128.Equal(const A, B: TCmplx128): Boolean;
 begin

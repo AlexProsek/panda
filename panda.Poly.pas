@@ -806,14 +806,14 @@ procedure TPolyC128.Init(const aCoeffs: array of TCmplx128);
 var len: NativeInt;
 begin
   len := Length(aCoeffs);
-  Assert(aCoeffs[len - 1] <> 0);
+  Assert(aCoeffs[len - 1] <> cZeroC128);
   SetLength(fCoeffs, len);
   Move(aCoeffs[0], fCoeffs[0], len * SizeOf(TCmplx128));
 end;
 
 procedure TPolyC128.Init(const aCoeffs: TArray<TCmplx128>);
 begin
-  Assert(aCoeffs[High(aCoeffs)] <> 0);
+  Assert(aCoeffs[High(aCoeffs)] <> cZeroC128);
   fCoeffs := aCoeffs;
 end;
 
@@ -839,7 +839,7 @@ end;
 function TPolyC128.GetCoeff(I: NativeInt): TCmplx128;
 begin
   if InRange(I, 0, High(fCoeffs)) then Result := fCoeffs[I]
-  else Result := 0;
+  else Result := cZeroC128;
 end;
 
 procedure TPolyC128.SetCoeff(I: NativeInt; const aValue: TCmplx128);
@@ -938,7 +938,7 @@ begin
 
   SetLength(Result, lenP + lenQ - 1);
   for I := 0 to lenP + lenQ - 2 do begin
-    tmp := 0;
+    tmp := cZeroC128;
     lo := Max(0, I - lenQ + 1);
     hi := Min(I, lenP - 1);
     for J := lo to hi do

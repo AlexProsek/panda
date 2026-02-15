@@ -18,6 +18,7 @@ type
   protected
     class function iEqCmp(pA, pB: PByte; aAStep, aBStep, aCount: NativeInt; aTol: Integer): Boolean; static;
     class function sEqCmp(pA, pB: PByte; aAStep, aBStep, aCount: NativeInt; aTol: Single): Boolean; static;
+    class function dEqCmp(pA, pB: PByte; aAStep, aBStep, aCount: NativeInt; aTol: Double): Boolean; static;
   public
     class function AllClose<T>(const aA: INDArray<T>; const aB: T; aCmp: TNDAEqComparer<T>; const aTol: T): Boolean; overload; static;
     class function AllClose<T>(const aA, aB: INDArray<T>; aCmp: TNDAEqComparer<T>; const aTol: T): Boolean; overload; static;
@@ -152,6 +153,8 @@ type
   function ndaAllClose(const aA, aB: INDArray<Integer>; aTol: Integer = 0): Boolean;  overload;
   function ndaAllClose(const aA, aB: INDArray<Single>; aTol: Single = 1e-5): Boolean; overload;
   function ndaAllClose(const aA: INDArray<Single>; aB: Single; aTol: Single = 1e-5): Boolean; overload;
+  function ndaAllClose(const aA, aB: INDArray<Double>; aTol: Double = cEpsF64): Boolean; overload;
+  function ndaAllClose(const aA: INDArray<Double>; aB: Double; aTol: Double = cEpsF64): Boolean; overload;
 
   function ndaAdd(const aArrays: array of INDArray; var aRes: INDArray): Boolean; overload;
   function ndaAdd(const aArrays: array of INDArray<Integer>): INDArray<Integer>; overload;
@@ -234,6 +237,39 @@ begin
   pEnd := pA + aAStep * aCount;
   while pA < pEnd do begin
     if Abs(PSingle(pA)^ - PSingle(pB)^) > aTol then exit(False);
+    Inc(pA, aAStep);
+    Inc(pB, aBStep);
+  end;
+  Result := True;
+end;
+
+class function TNDAArith.dEqCmp(pA, pB: PByte; aAStep, aBStep, aCount: NativeInt; aTol: Double): Boolean;
+var pEnd: PByte;
+    s: Double;
+begin
+  if aAStep = 0 then begin
+    s := PDouble(pA)^;
+    pEnd := pB + aBStep * aCount;
+    while pB < pEnd do begin
+      if Abs(PDouble(pB)^ - s) > aTol then exit(False);
+      Inc(pB, aBStep);
+    end;
+    exit(True);
+  end;
+
+  if aBStep = 0 then begin
+    s := PDouble(pB)^;
+    pEnd := pA + aAStep * aCount;
+    while pA < pEnd do begin
+      if Abs(PDouble(pA)^ - s) > aTol then exit(False);
+      Inc(pA, aAStep);
+    end;
+    exit(True);
+  end;
+
+  pEnd := pA + aAStep * aCount;
+  while pA < pEnd do begin
+    if Abs(PDouble(pA)^ - PDouble(pB)^) > aTol then exit(False);
     Inc(pA, aAStep);
     Inc(pB, aBStep);
   end;
@@ -1604,6 +1640,16 @@ end;
 function ndaAllClose(const aA: INDArray<Single>; aB: Single; aTol: Single): Boolean;
 begin
   Result := TNDAArith.AllClose<Single>(aA, aB, TNDAArith.sEqCmp, aTol);
+end;
+
+function ndaAllClose(const aA, aB: INDArray<Double>; aTol: Double = cEpsF64): Boolean;
+begin
+  Result := TNDAArith.AllClose<Double>(aA, aB, TNDAArith.dEqCmp, aTol);
+end;
+
+function ndaAllClose(const aA: INDArray<Double>; aB: Double; aTol: Double): Boolean;
+begin
+  Result := TNDAArith.AllClose<Double>(aA, aB, TNDAArith.dEqCmp, aTol);
 end;
 
 {$endregion}

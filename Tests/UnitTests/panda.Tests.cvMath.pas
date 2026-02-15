@@ -24,6 +24,12 @@ type
     procedure Total2_Double;
     procedure Total4_Double;
     procedure Total6_Double;
+
+    procedure AbsMax0_Double;
+    procedure AbsMax1_Double;
+    procedure AbsMax2_Double;
+    procedure AbsMax4_Double;
+    procedure AbsMax10_Double;
   end;
 
 implementation
@@ -109,6 +115,53 @@ begin
   x := TArray<Double>.Create(1, 2, 3, 4, 5, 6);
   res := cvTotal(PDouble(x), Length(x));
   CheckEquals(21, res);
+end;
+
+procedure TTestVecMath.AbsMax0_Double;
+var res: Double;
+begin
+  ExpectedException := EArgumentOutOfRangeException;
+  cvAbsMax(PDouble(nil), 0, res);
+end;
+
+procedure TTestVecMath.AbsMax1_Double;
+var x: TArray<Double>;
+    res: Double;
+begin
+  x := TArray<Double>.Create(-1);
+  cvAbsMax(PDouble(x), Length(x), res);
+  CheckEquals(1, res);
+end;
+
+procedure TTestVecMath.AbsMax2_Double;
+var x: TArray<Double>;
+    res: Double;
+begin
+  x := TArray<Double>.Create(-1, 2);
+  cvAbsMax(PDouble(x), Length(x), res);
+  CheckEquals(2, res);
+end;
+
+procedure TTestVecMath.AbsMax4_Double;
+var x: TArray<Double>;
+    res: Double;
+begin
+  x := TArray<Double>.Create(-1, 2, -4, 3);
+  cvAbsMax(PDouble(x), Length(x), res);
+  CheckEquals(4, res);
+end;
+
+procedure TTestVecMath.AbsMax10_Double;
+var x: TArray<Double>;
+    res: Double;
+begin
+  x := TArray<Double>.Create(-1, -5, 6, 4, 3, -7, 4, 5, -3, 1);
+  cvAbsMax(PDouble(x), Length(x), res);
+  CheckEquals(7, res);
+
+  x := TArray<Double>.Create(-1, -5, 6, 4, 3, -7, 4, 5, -9, 1);
+  cvAbsMax(PDouble(x), Length(x), res);
+  CheckEquals(9, res);
 end;
 
 {$endregion}

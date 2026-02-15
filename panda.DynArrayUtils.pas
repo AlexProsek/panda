@@ -25,7 +25,7 @@ type
     PT = ^T;
   private
     fCmp: IComparer<T>;
-    procedure Merge(pL, pR, pRes: PT; aLCnt, aRCnt: Integer);
+    procedure Merge(pL, pR, pRes: PT; aLCnt, aRCnt: NativeInt);
   public
     constructor Create(const aComparer: IComparer<T>);
     function Sort(const aData: TArray<T>): TArray<T>;
@@ -146,295 +146,306 @@ type
     class procedure CheckArrays(Source, Destination: Pointer;
       SourceIndex, SourceLength, DestIndex, DestLength, Count: NativeInt); static;
   public
-  class function Concat<T>(const A, B: TArray<T>): TArray<T>; overload; static;
-{$ifndef FPC}
-  class function Concat<T>(const aArrays: array of TArray<T>): TArray<T>; overload; static;
-{$endif}
-  class function Clone<T>(const A: TArray<T>): TArray<T>; overload; static;
-{$ifndef FPC}
-  class function Clone<T>(const A: TArray<TArray<T>>): TArray<TArray<T>>; overload; static;
-  class function Clone<T>(const A: TArray<TArray<TArray<T>>>): TArray<TArray<TArray<T>>>; overload; static;
-{$endif}
-  /// <remarks>replaces the faulty function <c>TArray.Copy</c></remarks>
-  class procedure Copy<T>(const Source, Destination: array of T; SourceIndex, DestIndex, Count: NativeInt); static;
-  /// <summary>
-  ///   Finds index <c>I</c> in a data array such that <c>data[I]</c> is the greatest smaller value than
-  ///   <c>Value</c>. This method uses binary search algorithm so it's supposed
-  ///   that the input data are successively sorted.
-  /// </summary>
-  /// <param name="Value"> value which is found in the data array</param>
-  /// <param name="StartPos"> searching will beginning from this index</param>
-  /// <returns> <c>True</c> if value was found</returns>
-  /// <remarks> Example:
-  ///   <code>
-  ///     <para>data := TArray&lt;Double&gt;.Create(0, 1, 2, 3, 4, 5);</para>
-  ///     <para>TSearchUtils.SearchPos&lt;Double&gt;(data, TComparer&lt;Double&gt;.Default, 4.55, out);</para>
-  ///   </code>
-  /// </remarks>
-  class function SearchPos<T>(const data: array of T; const Value: T; out Pos: NativeInt;
-    Comparer: IComparer<T> = nil; StartPos: NativeInt = 0; EndPos: NativeInt = -1): Boolean; overload; static;
-  class function SearchPos(const data: array of Double; const Value: Double; out Pos: NativeInt;
-    StartPos: NativeInt = 0; EndPos: NativeInt = -1) : boolean; overload; static;
-  class function BinarySearch(const Values: array of Double; const Item: Double;
-    out FoundIndex: Integer; Index, Count: Integer): Boolean; overload; static;
-  class function BinarySearch(const Values: array of Double; const Item: Double;
-    out FoundIndex: Integer): Boolean; overload; static;
-  class procedure QuickSort(var Values: array of Double; L, R: Integer); static;
-  /// <summary>
-  ///   Finds index <c>I</c> in a data array such that <c>data[I]</c> is the greathest smaller value than
-  ///   <c>Value</c>. This method goes through data item by item until required index is reached.
-  /// </summary>
-  /// <remarks>
-  ///   <para>
-  ///     This method can be better than <c>SearchPos</c> when I can go through close to all elements.
-  ///   </para>
-  /// </remarks>
-  class function SearchPosSuccessively<T>(const data: array of T; const Comparer: IComparer<T>; const Value: T;
-    out Pos: Integer; StartPos: Integer = 0; EndPos: Integer = -1) : boolean; static;
-  /// <summary>
-  ///   Serializes 2D array into the 1D array.
-  /// </summary>
-  class function Flatten<T>(const data: TArray<TArray<T>>): TArray<T>; static;
-  /// <summary>
-  ///    Partitions one dimensional array into nonoverlapping lists of arrays of length <c>aRowSize</c>.
-  ///  </summary>
-  /// <param name="Arr"> Original one-dimensional array </param>
-  /// <param name="RowSize"> Number of elements in the row (it's equal to columns count)</param>
-  /// <returns> two-dimensional array </returns>
-  /// <remarks> This function doesn't work with managed types (<c>Move</c> is used)</remarks>
-  class function Partition<T>(const Arr: TArray<T>; aRowSize: Integer; aOffset: Integer = 0): TArray<TArray<T>>; static;
-  /// <summary>
-  ///   Reverses the order of the elements in array.
-  /// </summary>
-  class function Reverse<T>(const Arr: TArray<T>): TArray<T>; static;
-  class procedure ReverseInPlace<T>(var Arr: TArray<T>); static;
-  class function Transpose<T>(const OriginalArray: TArray<TArray<T>>): TArray<TArray<T>>; static;
-  class function Table<T>(const aFunc: TFnc<Double, T>; aX0, aX1, aXStep: Double): TArray<T>; overload; static;
-  class function Table<T>(const aFunc: TFnc<Double, Double, T>;
-    aX0, aX1, aXStep, aY0, aY1, aYStep: Double): TArray<TArray<T>>; overload; static;
-  class function ElementsCount<T>(const aData: TArray<TArray<T>>): Integer; static;
-  /// <summary>
-  ///   Copy contens of original Array to the new array
-  /// </summary>
-  /// <param name = "data"> Orginal Array</param>
-  /// <param name = "IndexFrom1/IndexFrom2"> Index of Original Array, where will begin copy Array </param>
-  /// <param name = "Length1/Length2"> Length of copy Array </param>
-  /// <remarks> If Length of copy Array is bigger then Original, other </remarks>
-  /// <remarks> Don't use Original Array with zero length. </remarks>
-  /// <returns> New Array </returns>
-  class function SubArray<T>(const data: TArray<TArray<T>>;
-      const IndexFrom1, IndexFrom2, Length1, Length2: Integer): TArray<TArray<T>>; overload; static;
-  class function SubArray<T>(const aData: TArray<T>; aFrom, aTo: Integer): TArray<T>; overload; static;
-  /// <summary>
-  ///  Cycles the elements in array to the right.
-  /// </summary>
-  /// <param name="aData"> Array, which will be rotated. </param>
-  /// <param name="RotateBy"> Number of how much be rotated. </param>
-  /// <remarks> Don't use for managed types (<c>Move</c> function is used). </remarks>
-  /// <remarks> Don't use negative <c>RotateBy</c> and use function RotateLeft. </remarks>
-  /// <returns> Rotated Array. </returns>
-  class function RotateRight<T>(const aData: TArray<T>; RotateBy: Integer): TArray<T>; static;
-  /// <summary>
-  ///   Cycles the elements in array to the left.
-  /// </summary>
-  /// <param name="aData"> Array which will be rotated. </param>
-  /// <param name="RotateBy"> Number of how much be rotated. </param>
-  /// <remarks> Don't use for managed types (<c>Move</c> function is used). </remarks>
-  /// <remarks> Don't use negative <c>RotateBy</c> and use function <c>RotateRight</c>. </remarks>
-  /// <returns> Rotated Array. </returns>
-  class function RotateLeft<T>(const aData: TArray<T>; RotateBy: Integer): TArray<T>; static;
-  class procedure MergeSort<T>(aData: TArray<T>; aComparer: IComparer<T> = nil); static;
-  /// <summary>
-  ///   Creates heap on the <c>aData</c> input.
-  /// </summary>
-  /// <param name="aData">
-  ///   Input data which will be reordered into the heap structure (algorithm works in place!!)
-  /// </param>
-  /// <param name="aOrdering">determines wheather maximum or minimum will be on the top</param>
-  /// <param name="aComparer">
-  ///   Users comparer. Note that the default comparers (for basic types) are much faster.
-  ///   You can obtain them with <c>TComparer&lt;T&gt;.Default</c> method
-  /// </param>
-  class procedure MakeHeap<T>(aData: TArray<T>; aComparer: IComparer<T> = nil;
-    aCount: NativeInt = -1; aAscendingOrder: Boolean = True); static;
-  /// <summary>
-  ///   Sorts the elements in Heap.
-  /// </summary>
-  /// <param name="aData">
-  ///    Input data. It's suposed that it is heap (heap can be created by <c>BuildHeap</c> method).
-  /// </param>
-  /// <param name="aOrderingType">
-  ///   Determines an ordering of the heap. Ordering can be <c>otAscending</c> or
-  ///   <c>otDescending</c>.
-  /// </param>
-  /// <param name="aComparer">comparer defined by user</param>
-  class procedure HeapSort<T>(aData: TArray<T>; aComparer: IComparer<T> = nil;
-    aAscendingOrder: Boolean = True); static;
-  /// <summary>
-  ///   Remove top (i.e. the smallest or the biggest) item from the heap
-  ///   (heap structure will be preserved).
-  /// </summary>
-  /// <param name="aData">
-  ///    Input data. It's suposed that it is heap (heap can be created by <c>BuildHeap</c> method).
-  /// </param>
-  /// <param name="aCount">
-  ///    Number of the items in the heap. It can be different from the length of the input data.
-  /// </param>
-  /// <param name="aOrderingType">
-  ///   Determines an ordering of the heap. Ordering can be <c>otAscending</c> or
-  ///   <c>otDescending</c>.
-  /// </param>
-  /// <param name="aComparer">comparer defined by user</param>
-  class function HeapPop<T>(aData: TArray<T>; aComparer: IComparer<T> = nil;
-    aCount: NativeInt = -1; aAscendingOrder: Boolean = True): T; static;
-  /// <summary> Adds item to the heap</summary>
-  /// <param name="aData">
-  ///    Input data. It's suposed that it is heap (heap can be created by <c>BuildHeap</c> method).
-  /// </param>
-  /// <param name="aCount">
-  ///    Number of the items in the heap. It has to be less than length of the input data
-  ///    (otherwise there is not free space for new item).
-  /// </param>
-  /// <param name="aValue">
-  ///   new item which should be added into the heap.
-  /// </param>
-  /// <param name="aOrderingType">
-  ///   Determines an ordering of the heap. Ordering can be <c>otAscending</c> or
-  ///   <c>otDescending</c>. Implicitly is suposed that heap ordering is ascending.
-  /// </param>
-  /// <param name="aComparer">comparer defined by user</param>
-  class procedure HeapPush<T>(var aData: TArray<T>; const aValue: T; aComparer: IComparer<T> = nil;
-    aCount: NativeInt = -1; aAscendingOrder: Boolean = True); static;
-  /// <summary>
-  ///   Removes specified item from the heap.
-  /// </summary>
-  /// <remarks>
-  ///   This method has <c>O(N)</c> complexity.
-  /// </remarks>
-  class function HeapRemove<T>(aData: TArray<T>; const aValue: T; aComparer: IComparer<T> = nil;
-    aCount: NativeInt = -1; aAscendingOrder: Boolean = True): Boolean; static;
-{$ifndef FPC}
-  /// <summary>
-  ///   Creates string representation of the <c>arr</c> as Mathematica list
-  /// </summary>
-  class function ToMListString<T>(const arr: TArray<T>): String; overload; static;
-  class function ToMListString<T>(const arr: TArray<T>; const aFmt: TFormatSettings): String; overload; static;
-  class function ToMListString<T>(const arr: TArray<TArray<T>>): String; overload; static;
-  class function ToMListString<T>(const arr: TArray<TArray<T>>; const aFmt: TFormatSettings): String; overload; static;
-  class procedure ExportMListString<T>(const aFileName: String; const aArr: TArray<T>); overload; static;
-  class procedure ExportMListString<T>(const aFileName: String; const aArr: TArray<TArray<T>>); overload; static;
-{$endif}
-  /// <summary>
-  ///   <para><c>Take(array, indices: array of Integer)</c> takes items form <c>array</c> that are
-  ///     contained in <c>indices</c>.</para>
-  ///   <para><c>Take(array, N)</c> gives the first <c>N</c> elements of the <c>array</c>.</para>
-  ///   <para><c>Take(array, -N)</c> gives the last <c>N</c> elements of the <c>array</c>.</para>
-  /// </summary>
-  class function Take<T>(const aData: TArray<T>; const aIndices: TIndices): TArray<T>; overload; static;
-  class function Take<T>(const aData: TArray<T>; N: NativeInt): TArray<T>; overload; static;
-  /// <summary>
-  ///   <para><c>Drop(array, indices: array of Integer)</c> drops items from <c>array</c> that are
-  ///   contained in <c>indices</c>.</para>
-  ///   <para><c>Drop(array, N)</c> gives <c>array</c> with its first <c>N</c> element dropped.</para>
-  ///   <para><c>Drop(array, -N)</c> gives <c>array</c> with its last <c>N</c> elements dropped.</para>
-  /// </summary>
-  class function Drop<T>(const aData: TArray<T>; const idxs: TIndices): TArray<T>; overload; static;
-  class function Drop<T>(const aData: TArray<T>; N: NativeInt): TArray<T>; overload; static;
-  /// <summary>
-  ///   <param><c>Insert(list, elem, n)</c> inserts <c>elem</c> at position <c>n</c> in <c>list</c></param>.
-  /// </summary>
-  class function Insert<T>(const aData: TArray<T>; const aItem: T; aIdx: Integer): TArray<T>; overload; static;
-  class function InsertList<T>(const aData: TArray<T>; const aItems: array of T; const aIdxs: array of Integer): TArray<T>; overload; static;
-  class function Select<T>(const aData: TArray<T>; const aPredicate: TPredicateFunc<T>): TArray<T>; static;
-  /// <summary>
-  ///   Gives a list of the positions at which objects satisfy condition <c>aPredicate</c>.
-  ///  </summary>
-  class function Position<T>(const aData: TArray<T>; const aPredicate: TPredicateFunc<T>): TArray<Integer>; static;
-  /// <summary>
-  ///   Gives the position of the first element in <c>aData</c> that is equal to <c>aItem</c>. If no such element is found
-  ///   then function returns -1.
-  /// </summary>
-  class function FirstPosition<T>(const aData: TArray<T>; const aItem: T; aComparer: IEqualityComparer<T> = nil): Integer; static;
-  /// <summary>
-  ///   Return a permutation vector <c>I</c> that puts <c>v[I]</c> in sorted order.
-  /// </summary>
-  /// <remarks>
-  ///   The permutation si quaranteed to be stable even if the sorting alogrith is unstable, meaning that
-  ///   inidices of equal elements appear in ascending order.
-  /// </remarks>
-  class function SortPerm<T>(const aData: TArray<T>; aComparer: IComparer<T> = nil): TArray<Integer>; overload; static;
-{$ifndef FPC}
-  class function SortPerm<T>(const aData: TArray<T>; const aComparer: TComparison<T>): TArray<Integer>; overload; static;
-{$endif}
-  class procedure SortIndexedValues<T>(var aValues: TArray<TIndexedValue<T>>; aComparer: IComparer<T> = nil); static;
-  class procedure SortIndexedValuesByIndex<T>(var aValues: TArray<TIndexedValue<T>>); static;
-  /// <summary>
-  ///   Maps a function <c>aFnc</c> on each element from input array <c>aData</c>.
-  ///   At i-th position in output array is stored result by function <c>aFnc</c> which
-  ///   was called with i-th element from input array <c>aData</c> as parameter.
-  /// </summary>
-  class function Map<TIn, TOut>(const aData: TArray<TIn>; const aFnc: TFnc<TIn, TOut>): TArray<TOut>; overload; static;
-  class function Map2D<Tin, TOut>(const aData: TArray<TArray<TIn>>; const aFnc: TFnc<TIn, TOut>): TArray<TArray<TOut>>; overload; static;
-  class function Map<T>(const aData: TArray<T>; const aFnc: TFnc<T, T>): TArray<T>; overload; static;
-  class function Map2D<T>(const aData: TArray<TArray<T>>; const aFnc: TFnc<T, T>): TArray<TArray<T>>; overload; static;
-  class function MapIndexed<TIn, TOut>(const aDAta: TArray<TIn>;
-    const aFnc: TFnc<TIn, Integer, TOut>): TArray<TOut>; static;
-  /// <sumamry>
-  ///   Gives array <c>aData</c> with element <c>aValue</c> appended.
-  /// </summary>
-  class function Append<T>(const aData: TArray<T>; const aValue: T): TArray<T>; static;
-  class function Prepend<T>(const aData: TArray<T>; const aValue: T): TArray<T>; static;
-  class function AppendList<T>(const aData: TArray<T>; const aValues: array of T): TArray<T>; static;
-  class function PrependList<T>(const aData: TArray<T>; const aValues: array of T): TArray<T>; static;
-  /// <summary>
-  ///   Determines whether array <c>aData</c> contains specified value.
-  /// </summary>
-  class function MemberQ<T>(const aData: TArray<T>; const aValue: T;
-    const aComparer: IComparer<T> = nil): Boolean; static;
-  class function FindMin<T>(const aData: TArray<T>; const aComparer: IComparer<T> = nil): T; static;
-  class function FindMinPos<T>(const aData: TArray<T>; aComparer: IComparer<T> = nil): Integer; static;
-  class function FindMax<T>(const aData: TArray<T>; const aComparer: IComparer<T> = nil): T; static;
-  class function FindMaxPos<T>(const aData: TArray<T>; aComparer: IComparer<T> = nil): Integer; static;
-  class procedure FindMinMax<T>(const aData: TArray<T>; var aMin, aMax: T; aComparer: IComparer<T> = nil); static;
-  class function FindFirstPos<T>(const aData: TArray<T>; aPred: TPredicateFunc<T>): Integer; overload; static;
-  class function FindFirstPos<T>(const aData: TArray<T>; const aValue: T; aComparer: IComparer<T> = nil): NativeInt; overload; static;
-  class function Where<T>(const aData: TArray<T>; const aPredicate: TPredicateFunc<T>): TArray<Integer>; overload; static;
-  class function Where<T>(const aData: TArray<TArray<T>>; const aPredicate: TPredicateFunc<T>): TArray<TArrayIndex2D>; overload; static;
-  class function Median<T>(const aData: TArray<T>; aComparer: IComparer<T> = nil): T; static;
-//{$ifndef FPC}
-  /// <summary>
-  ///  gathers into sublists each set of elements in list that gives the same value when <c>aFnc</c> is applied.
-  /// </summary>
-  class function GatherBy<T, U>(const aData: TArray<T>; const aFnc: TFnc<T, U>; aComparer: IComparer<U> = nil): TArray<TArray<T>>; overload; static;
-  class function GatherBy<T>(const aData: TArray<T>; aComparer: IComparer<T> = nil): TArray<TArray<T>>; overload; static;
-//{$endif}
-  class function SplitBy<T>(const aData: TArray<T>; aComparer: IComparer<T> = nil): TArray<TArray<T>>; static;
-  /// <summary>
-  ///   Applies <c>aFnc</c> to size <c>aWin</c> windows in the specified <c>aData</c>.
-  /// </summary>
-  class function MovingMap<T, U>(const aData: TArray<T>; const aFnc: TFnc<TArray<T>, U>; aWin: Integer): TArray<U>; static;
-  class function Riffle<T>(const A, B: TArray<T>): TArray<T>; static;
-  class function ToArray<T>(const aData: array of T): TArray<T>; static;
-  class function ConstantArray<T>(const aValue: T; aCount: Integer): TArray<T>; static;
-  class function ItemCount<T>(const aArray: TArray<TArray<T>>): NativeInt; static;
-  class function MaxLength<T>(const aArray: TArray<TArray<T>>): NativeInt; static;
-  // predicates
-  class function PositiveQ(const aArray: array of Integer): Boolean; static;
+    class function Concat<T>(const A, B: TArray<T>): TArray<T>; overload; static;
+  {$ifndef FPC}
+    class function Concat<T>(const aArrays: array of TArray<T>): TArray<T>; overload; static;
+  {$endif}
+    class function Clone<T>(const A: TArray<T>): TArray<T>; overload; static;
+  {$ifndef FPC}
+    class function Clone<T>(const A: TArray<TArray<T>>): TArray<TArray<T>>; overload; static;
+    class function Clone<T>(const A: TArray<TArray<TArray<T>>>): TArray<TArray<TArray<T>>>; overload; static;
+  {$endif}
+    /// <remarks>replaces the faulty function <c>TArray.Copy</c></remarks>
+    class procedure Copy<T>(const Source, Destination: array of T; SourceIndex, DestIndex, Count: NativeInt); static;
+    /// <summary>
+    ///   Finds index <c>I</c> in a data array such that <c>data[I]</c> is the greatest smaller value than
+    ///   <c>Value</c>. This method uses binary search algorithm so it's supposed
+    ///   that the input data are successively sorted.
+    /// </summary>
+    /// <param name="Value"> value which is found in the data array</param>
+    /// <param name="StartPos"> searching will beginning from this index</param>
+    /// <returns> <c>True</c> if value was found</returns>
+    /// <remarks> Example:
+    ///   <code>
+    ///     <para>data := TArray&lt;Double&gt;.Create(0, 1, 2, 3, 4, 5);</para>
+    ///     <para>TSearchUtils.SearchPos&lt;Double&gt;(data, TComparer&lt;Double&gt;.Default, 4.55, out);</para>
+    ///   </code>
+    /// </remarks>
+    class function SearchPos<T>(const data: array of T; const Value: T; out Pos: NativeInt;
+      Comparer: IComparer<T> = nil; StartPos: NativeInt = 0; EndPos: NativeInt = -1): Boolean; overload; static;
+    class function SearchPos(const data: array of Double; const Value: Double; out Pos: NativeInt;
+      StartPos: NativeInt = 0; EndPos: NativeInt = -1) : boolean; overload; static;
+    class function BinarySearch(const Values: array of Double; const Item: Double;
+      out FoundIndex: NativeInt; Index, Count: NativeInt): Boolean; overload; static;
+    class function BinarySearch(const Values: array of Double; const Item: Double;
+      out FoundIndex: NativeInt): Boolean; overload; static;
+    class procedure QuickSort(var Values: array of Double; L, R: NativeInt); static;
+    /// <summary>
+    ///   Finds index <c>I</c> in a data array such that <c>data[I]</c> is the greathest smaller value than
+    ///   <c>Value</c>. This method goes through data item by item until required index is reached.
+    /// </summary>
+    /// <remarks>
+    ///   <para>
+    ///     This method can be better than <c>SearchPos</c> when I can go through close to all elements.
+    ///   </para>
+    /// </remarks>
+    class function SearchPosSuccessively<T>(const data: array of T; const Comparer: IComparer<T>; const Value: T;
+      out Pos: NativeInt; StartPos: NativeInt = 0; EndPos: NativeInt = -1) : boolean; static;
+    /// <summary>
+    ///   Serializes 2D array into the 1D array.
+    /// </summary>
+    class function Flatten<T>(const data: TArray<TArray<T>>): TArray<T>; static;
+    /// <summary>
+    ///    Partitions one dimensional array into nonoverlapping lists of arrays of length <c>aRowSize</c>.
+    ///  </summary>
+    /// <param name="Arr"> Original one-dimensional array </param>
+    /// <param name="RowSize"> Number of elements in the row (it's equal to columns count)</param>
+    /// <returns> two-dimensional array </returns>
+    /// <remarks> This function doesn't work with managed types (<c>Move</c> is used)</remarks>
+    class function Partition<T>(const Arr: TArray<T>; aRowSize: NativeInt; aOffset: NativeInt = 0): TArray<TArray<T>>; static;
+    /// <summary>
+    ///   Reverses the order of the elements in array.
+    /// </summary>
+    class function Reverse<T>(const Arr: TArray<T>): TArray<T>; static;
+    class procedure ReverseInPlace<T>(var Arr: TArray<T>); static;
+    class procedure SwapItems<T>(aData: TArray<T>; aIdx1, aIdx2: NativeInt); static; inline;
+    class procedure SwapRows<T>(const aData: TArray<TArray<T>>; aIdx1, aIdx2: NativeInt); static; inline;
+    class function Table<T>(const aFunc: TFnc<Double, T>; aX0, aX1, aXStep: Double): TArray<T>; overload; static;
+    class function Table<T>(const aFunc: TFnc<Double, Double, T>;
+      aX0, aX1, aXStep, aY0, aY1, aYStep: Double): TArray<TArray<T>>; overload; static;
+    class function ElementsCount<T>(const aData: TArray<TArray<T>>): NativeInt; static;
+    /// <summary>
+    ///   Copy contens of original Array to the new array
+    /// </summary>
+    /// <param name = "data"> Orginal Array</param>
+    /// <param name = "IndexFrom1/IndexFrom2"> Index of Original Array, where will begin copy Array </param>
+    /// <param name = "Length1/Length2"> Length of copy Array </param>
+    /// <remarks> If Length of copy Array is bigger then Original, other </remarks>
+    /// <remarks> Don't use Original Array with zero length. </remarks>
+    /// <returns> New Array </returns>
+    class function SubArray<T>(const data: TArray<TArray<T>>;
+        const IndexFrom1, IndexFrom2, Length1, Length2: NativeInt): TArray<TArray<T>>; overload; static;
+    class function SubArray<T>(const aData: TArray<T>; aFrom, aTo: NativeInt): TArray<T>; overload; static;
+    /// <summary>
+    ///  Cycles the elements in array to the right.
+    /// </summary>
+    /// <param name="aData"> Array, which will be rotated. </param>
+    /// <param name="RotateBy"> Number of how much be rotated. </param>
+    /// <remarks> Don't use for managed types (<c>Move</c> function is used). </remarks>
+    /// <remarks> Don't use negative <c>RotateBy</c> and use function RotateLeft. </remarks>
+    /// <returns> Rotated Array. </returns>
+    class function RotateRight<T>(const aData: TArray<T>; RotateBy: NativeInt): TArray<T>; static;
+    /// <summary>
+    ///   Cycles the elements in array to the left.
+    /// </summary>
+    /// <param name="aData"> Array which will be rotated. </param>
+    /// <param name="RotateBy"> Number of how much be rotated. </param>
+    /// <remarks> Don't use for managed types (<c>Move</c> function is used). </remarks>
+    /// <remarks> Don't use negative <c>RotateBy</c> and use function <c>RotateRight</c>. </remarks>
+    /// <returns> Rotated Array. </returns>
+    class function RotateLeft<T>(const aData: TArray<T>; RotateBy: NativeInt): TArray<T>; static;
+    class procedure MergeSort<T>(aData: TArray<T>; aComparer: IComparer<T> = nil); static;
+    /// <summary>
+    ///   Creates heap on the <c>aData</c> input.
+    /// </summary>
+    /// <param name="aData">
+    ///   Input data which will be reordered into the heap structure (algorithm works in place!!)
+    /// </param>
+    /// <param name="aOrdering">determines wheather maximum or minimum will be on the top</param>
+    /// <param name="aComparer">
+    ///   Users comparer. Note that the default comparers (for basic types) are much faster.
+    ///   You can obtain them with <c>TComparer&lt;T&gt;.Default</c> method
+    /// </param>
+    class procedure MakeHeap<T>(aData: TArray<T>; aComparer: IComparer<T> = nil;
+      aCount: NativeInt = -1; aAscendingOrder: Boolean = True); static;
+    /// <summary>
+    ///   Sorts the elements in Heap.
+    /// </summary>
+    /// <param name="aData">
+    ///    Input data. It's suposed that it is heap (heap can be created by <c>BuildHeap</c> method).
+    /// </param>
+    /// <param name="aOrderingType">
+    ///   Determines an ordering of the heap. Ordering can be <c>otAscending</c> or
+    ///   <c>otDescending</c>.
+    /// </param>
+    /// <param name="aComparer">comparer defined by user</param>
+    class procedure HeapSort<T>(aData: TArray<T>; aComparer: IComparer<T> = nil;
+      aAscendingOrder: Boolean = True); static;
+    /// <summary>
+    ///   Remove top (i.e. the smallest or the biggest) item from the heap
+    ///   (heap structure will be preserved).
+    /// </summary>
+    /// <param name="aData">
+    ///    Input data. It's suposed that it is heap (heap can be created by <c>BuildHeap</c> method).
+    /// </param>
+    /// <param name="aCount">
+    ///    Number of the items in the heap. It can be different from the length of the input data.
+    /// </param>
+    /// <param name="aOrderingType">
+    ///   Determines an ordering of the heap. Ordering can be <c>otAscending</c> or
+    ///   <c>otDescending</c>.
+    /// </param>
+    /// <param name="aComparer">comparer defined by user</param>
+    class function HeapPop<T>(aData: TArray<T>; aComparer: IComparer<T> = nil;
+      aCount: NativeInt = -1; aAscendingOrder: Boolean = True): T; static;
+    /// <summary> Adds item to the heap</summary>
+    /// <param name="aData">
+    ///    Input data. It's suposed that it is heap (heap can be created by <c>BuildHeap</c> method).
+    /// </param>
+    /// <param name="aCount">
+    ///    Number of the items in the heap. It has to be less than length of the input data
+    ///    (otherwise there is not free space for new item).
+    /// </param>
+    /// <param name="aValue">
+    ///   new item which should be added into the heap.
+    /// </param>
+    /// <param name="aOrderingType">
+    ///   Determines an ordering of the heap. Ordering can be <c>otAscending</c> or
+    ///   <c>otDescending</c>. Implicitly is suposed that heap ordering is ascending.
+    /// </param>
+    /// <param name="aComparer">comparer defined by user</param>
+    class procedure HeapPush<T>(var aData: TArray<T>; const aValue: T; aComparer: IComparer<T> = nil;
+      aCount: NativeInt = -1; aAscendingOrder: Boolean = True); static;
+    /// <summary>
+    ///   Removes specified item from the heap.
+    /// </summary>
+    /// <remarks>
+    ///   This method has <c>O(N)</c> complexity.
+    /// </remarks>
+    class function HeapRemove<T>(aData: TArray<T>; const aValue: T; aComparer: IComparer<T> = nil;
+      aCount: NativeInt = -1; aAscendingOrder: Boolean = True): Boolean; static;
+  {$ifndef FPC}
+    /// <summary>
+    ///   Creates string representation of the <c>arr</c> as Mathematica list
+    /// </summary>
+    class function ToMListString<T>(const arr: TArray<T>): String; overload; static;
+    class function ToMListString<T>(const arr: TArray<T>; const aFmt: TFormatSettings): String; overload; static;
+    class function ToMListString<T>(const arr: TArray<TArray<T>>): String; overload; static;
+    class function ToMListString<T>(const arr: TArray<TArray<T>>; const aFmt: TFormatSettings): String; overload; static;
+    class procedure ExportMListString<T>(const aFileName: String; const aArr: TArray<T>); overload; static;
+    class procedure ExportMListString<T>(const aFileName: String; const aArr: TArray<TArray<T>>); overload; static;
+  {$endif}
+    /// <summary>
+    ///   <para><c>Take(array, indices: array of Integer)</c> takes items form <c>array</c> that are
+    ///     contained in <c>indices</c>.</para>
+    ///   <para><c>Take(array, N)</c> gives the first <c>N</c> elements of the <c>array</c>.</para>
+    ///   <para><c>Take(array, -N)</c> gives the last <c>N</c> elements of the <c>array</c>.</para>
+    /// </summary>
+    class function Take<T>(const aData: TArray<T>; const aIndices: TIndices): TArray<T>; overload; static;
+    class function Take<T>(const aData: TArray<T>; N: NativeInt): TArray<T>; overload; static;
+    /// <summary>
+    ///   <para><c>Drop(array, indices: array of Integer)</c> drops items from <c>array</c> that are
+    ///   contained in <c>indices</c>.</para>
+    ///   <para><c>Drop(array, N)</c> gives <c>array</c> with its first <c>N</c> element dropped.</para>
+    ///   <para><c>Drop(array, -N)</c> gives <c>array</c> with its last <c>N</c> elements dropped.</para>
+    /// </summary>
+    class function Drop<T>(const aData: TArray<T>; const idxs: TIndices): TArray<T>; overload; static;
+    class function Drop<T>(const aData: TArray<T>; N: NativeInt): TArray<T>; overload; static;
+    /// <summary>
+    ///   <param><c>Insert(list, elem, n)</c> inserts <c>elem</c> at position <c>n</c> in <c>list</c></param>.
+    /// </summary>
+    class function Insert<T>(const aData: TArray<T>; const aItem: T; aIdx: NativeInt): TArray<T>; overload; static;
+    class function InsertList<T>(const aData: TArray<T>; const aItems: array of T; const aIdxs: array of NativeInt): TArray<T>; overload; static;
+    class function Select<T>(const aData: TArray<T>; const aPredicate: TPredicateFunc<T>): TArray<T>; static;
+    /// <summary>
+    ///   Gives a list of the positions at which objects satisfy condition <c>aPredicate</c>.
+    ///  </summary>
+    class function Position<T>(const aData: TArray<T>; const aPredicate: TPredicateFunc<T>): TArray<NativeInt>; static;
+    /// <summary>
+    ///   Gives the position of the first element in <c>aData</c> that is equal to <c>aItem</c>. If no such element is found
+    ///   then function returns -1.
+    /// </summary>
+    class function FirstPosition<T>(const aData: TArray<T>; const aItem: T; aComparer: IEqualityComparer<T> = nil): NativeInt; static;
+    /// <summary>
+    ///   Return a permutation vector <c>I</c> that puts <c>v[I]</c> in sorted order.
+    /// </summary>
+    /// <remarks>
+    ///   The permutation si quaranteed to be stable even if the sorting alogrith is unstable, meaning that
+    ///   inidices of equal elements appear in ascending order.
+    /// </remarks>
+    class function SortPerm<T>(const aData: TArray<T>; aComparer: IComparer<T> = nil): TArray<NativeInt>; overload; static;
+  {$ifndef FPC}
+    class function SortPerm<T>(const aData: TArray<T>; const aComparer: TComparison<T>): TArray<NativeInt>; overload; static; inline;
+  {$endif}
+    class procedure SortIndexedValues<T>(var aValues: TArray<TIndexedValue<T>>; aComparer: IComparer<T> = nil); static;
+    class procedure SortIndexedValuesByIndex<T>(var aValues: TArray<TIndexedValue<T>>); static;
+    /// <summary>
+    ///   Maps a function <c>aFnc</c> on each element from input array <c>aData</c>.
+    ///   At i-th position in output array is stored result by function <c>aFnc</c> which
+    ///   was called with i-th element from input array <c>aData</c> as parameter.
+    /// </summary>
+    class function Map<TIn, TOut>(const aData: TArray<TIn>; const aFnc: TFnc<TIn, TOut>): TArray<TOut>; overload; static;
+    class function Map2D<Tin, TOut>(const aData: TArray<TArray<TIn>>; const aFnc: TFnc<TIn, TOut>): TArray<TArray<TOut>>; overload; static;
+    class function Map<T>(const aData: TArray<T>; const aFnc: TFnc<T, T>): TArray<T>; overload; static;
+    class function Map2D<T>(const aData: TArray<TArray<T>>; const aFnc: TFnc<T, T>): TArray<TArray<T>>; overload; static;
+    class function MapIndexed<TIn, TOut>(const aDAta: TArray<TIn>;
+      const aFnc: TFnc<TIn, Integer, TOut>): TArray<TOut>; static;
+    /// <sumamry>
+    ///   Gives array <c>aData</c> with element <c>aValue</c> appended.
+    /// </summary>
+    class function Append<T>(const aData: TArray<T>; const aValue: T): TArray<T>; static;
+    class function Prepend<T>(const aData: TArray<T>; const aValue: T): TArray<T>; static;
+    class function AppendList<T>(const aData: TArray<T>; const aValues: array of T): TArray<T>; static;
+    class function PrependList<T>(const aData: TArray<T>; const aValues: array of T): TArray<T>; static;
+    /// <summary>
+    ///   Determines whether array <c>aData</c> contains specified value.
+    /// </summary>
+    class function MemberQ<T>(const aData: TArray<T>; const aValue: T;
+      const aComparer: IComparer<T> = nil): Boolean; static;
+    class function FindMin<T>(const aData: TArray<T>; const aComparer: IComparer<T> = nil): T; static;
+    class function FindMinPos<T>(const aData: TArray<T>; aComparer: IComparer<T> = nil): Integer; static;
+    class function FindMax<T>(const aData: TArray<T>; const aComparer: IComparer<T> = nil): T; static;
+    class function FindMaxPos<T>(const aData: TArray<T>; aComparer: IComparer<T> = nil): Integer; static;
+    class procedure FindMinMax<T>(const aData: TArray<T>; var aMin, aMax: T; aComparer: IComparer<T> = nil); static;
+    class function FindFirstPos<T>(const aData: TArray<T>; aPred: TPredicateFunc<T>): Integer; overload; static;
+    class function FindFirstPos<T>(const aData: TArray<T>; const aValue: T; aComparer: IComparer<T> = nil): NativeInt; overload; static;
+    class function Where<T>(const aData: TArray<T>; const aPredicate: TPredicateFunc<T>): TArray<Integer>; overload; static;
+    class function Where<T>(const aData: TArray<TArray<T>>; const aPredicate: TPredicateFunc<T>): TArray<TArrayIndex2D>; overload; static;
+    class function Median<T>(const aData: TArray<T>; aComparer: IComparer<T> = nil): T; static;
+  //{$ifndef FPC}
+    /// <summary>
+    ///  gathers into sublists each set of elements in list that gives the same value when <c>aFnc</c> is applied.
+    /// </summary>
+    class function GatherBy<T, U>(const aData: TArray<T>; const aFnc: TFnc<T, U>; aComparer: IComparer<U> = nil): TArray<TArray<T>>; overload; static;
+    class function GatherBy<T>(const aData: TArray<T>; aComparer: IComparer<T> = nil): TArray<TArray<T>>; overload; static;
+  //{$endif}
+    class function SplitBy<T>(const aData: TArray<T>; aComparer: IComparer<T> = nil): TArray<TArray<T>>; static;
+    /// <summary>
+    ///   Applies <c>aFnc</c> to size <c>aWin</c> windows in the specified <c>aData</c>.
+    /// </summary>
+    class function MovingMap<T, U>(const aData: TArray<T>; const aFnc: TFnc<TArray<T>, U>; aWin: NativeInt): TArray<U>; static;
+    class function Riffle<T>(const A, B: TArray<T>): TArray<T>; static;
+    class function ToArray<T>(const aData: array of T): TArray<T>; static;
+    class function ConstantArray<T>(const aValue: T; aCount: NativeInt): TArray<T>; static;
+    class function ItemCount<T>(const aArray: TArray<TArray<T>>): NativeInt; static;
+    class function MaxLength<T>(const aArray: TArray<TArray<T>>): NativeInt; static;
+    // predicates
+    class function PositiveQ(const aArray: array of Integer): Boolean; static;
 
-  // conversions
-  class function Int2NInt(const aArray: array of Integer): TArray<NativeInt>; static;
+    // conversions
+    class function Int2NInt(const aArray: array of Integer): TArray<NativeInt>; static;
 
-  class function Range(const aLo, aHi: NativeInt; const aStep: NativeInt = 1): TArray<NativeInt>; overload; static;
-  class function Range_I32(aLo, aHi: Integer; aStep: Integer = 1): TArray<Integer>; static;
-  class function Range(const aLo, aHi: Double; const aStep: Double = 1): TArray<Double>; overload; static;
-  class function Range_F32(const aLo, aHi: Single; const aStep: Single = 1): TArray<Single>; static;
+    class function Range(const aLo, aHi: NativeInt; const aStep: NativeInt = 1): TArray<NativeInt>; overload; static;
+    class function Range_I32(aLo, aHi: Integer; aStep: Integer = 1): TArray<Integer>; static;
+    class function Range(const aLo, aHi: Double; const aStep: Double = 1): TArray<Double>; overload; static;
+    class function Range_F32(const aLo, aHi: Single; const aStep: Single = 1): TArray<Single>; static;
 
-{$ifndef FPC}
-  // string array utils
-  class function ToUpper(const aArray: array of String): TArray<String>; static;
-  class function ToLower(const aArray: array of String): TArray<String>; static;
-{$endif}
-end;
+  {$ifndef FPC}
+    // string array utils
+    class function ToUpper(const aArray: array of String): TArray<String>; static;
+    class function ToLower(const aArray: array of String): TArray<String>; static;
+  {$endif}
+
+    // matrices utils
+    class function MatrixQ<T>(const A: TArray<TArray<T>>): Boolean; overload; static;
+    class function SquareMatrixQ<T>(const A: TArray<TArray<T>>): Boolean; overload; static;
+    class function LowerTriangularize<T>(const A: TArray<TArray<T>>; aSubDiagIdx: NativeInt = 0): TArray<TArray<T>>; static;
+    class function UpperTriangularize<T>(const A: TArray<TArray<T>>; aSubDiagIdx: NativeInt = 0): TArray<TArray<T>>; static;
+    class procedure SetDiagonal<T>(const A: TArray<TArray<T>>; const aValue: T); overload; static;
+    class procedure SetDiagonal<T>(const A: TArray<TArray<T>>; const aValues: TArray<T>); overload; static;
+    class function Transpose<T>(const A: TArray<TArray<T>>): TArray<TArray<T>>; static;
+    class function Augment<T>(const A, B: TArray<TArray<T>>): TArray<TArray<T>>; static;
+  end;
 
 {$ifndef FPC}
 
@@ -457,7 +468,7 @@ begin
     fCmp := TComparer<T>.Default;
 end;
 
-procedure TMergeSort<T>.Merge(pL, pR, pRes: PT; aLCnt, aRCnt: Integer);
+procedure TMergeSort<T>.Merge(pL, pR, pRes: PT; aLCnt, aRCnt: NativeInt);
 var pLEnd, pREnd: PByte;
 begin
   pLEnd := PByte(pL) + aLCnt * SizeOf(T);
@@ -487,7 +498,7 @@ begin
 end;
 
 function TMergeSort<T>.Sort(const aData: TArray<T>): TArray<T>;
-var I, J, mid, aCount: Integer;
+var I, J, mid, aCount: NativeInt;
     l, r, lres, rres: TArray<T>;
 begin
   aCount := Length(aData);
@@ -760,7 +771,7 @@ begin
 end;
 
 class function TDynAUt.Concat<T>(const A, B: TArray<T>): TArray<T>;
-var I, l1, l2: Integer;
+var I, l1, l2: NativeInt;
 begin
   Result := nil;
   l1 := Length(A);
@@ -776,7 +787,7 @@ end;
 {$ifndef FPC}
 
 class function TDynAUt.Concat<T>(const aArrays: array of TArray<T>): TArray<T>;
-var I, top, len: Integer;
+var I, top, len: NativeInt;
 begin
   len := 0;
   for I := 0 to High(aArrays) do
@@ -802,7 +813,7 @@ end;
 {$ifndef FPC}
 
 class function TDynAUt.Clone<T>(const A: TArray<TArray<T>>): TArray<TArray<T>>;
-var I, len: Integer;
+var I, len: NativeInt;
 begin
   len := Length(A);
   SetLength(Result, len);
@@ -811,7 +822,7 @@ begin
 end;
 
 class function TDynAUt.Clone<T>(const A: TArray<TArray<TArray<T>>>): TArray<TArray<TArray<T>>>;
-var I, len: Integer;
+var I, len: NativeInt;
 begin
   len := Length(A);
   SetLength(Result, len);
@@ -890,7 +901,7 @@ end;
 
 class function TDynAUt.SearchPos(const data: array of Double; const Value: Double;
   out Pos: NativeInt; StartPos, EndPos: NativeInt): Boolean;
-var I, J, K : Integer;
+var I, J, K : NativeInt;
     LoLo, HiHi, MidLo, MidHi: Double;
 begin
   if EndPos >= 0 then
@@ -931,8 +942,8 @@ begin
 end;
 
 class function TDynAUt.BinarySearch(const Values: array of Double; const Item: Double;
-  out FoundIndex: Integer; Index, Count: Integer): Boolean;
-var L, H, mid: Integer;
+  out FoundIndex: NativeInt; Index, Count: NativeInt): Boolean;
+var L, H, mid: NativeInt;
 begin
   if (Index < Low(Values)) or ((Index > High(Values)) and (Count > 0))
     or (Index + Count - 1 > High(Values)) or (Count < 0)
@@ -963,13 +974,13 @@ begin
 end;
 
 class function TDynAUt.BinarySearch(const Values: array of Double; const Item: Double;
-  out FoundIndex: Integer): Boolean;
+  out FoundIndex: NativeInt): Boolean;
 begin
   Result := BinarySearch(Values, Item, FoundIndex, Low(Values), Length(Values));
 end;
 
-class procedure TDynAUt.QuickSort(var Values: array of Double; L, R: Integer);
-var I, J: Integer;
+class procedure TDynAUt.QuickSort(var Values: array of Double; L, R: NativeInt);
+var I, J: NativeInt;
     pivot, temp: Double;
 begin
   if (Length(Values) = 0) or ((R - L) <= 0) then
@@ -1002,8 +1013,8 @@ begin
 end;
 
 class function TDynAUt.SearchPosSuccessively<T>(const data: array of T; const Comparer: IComparer<T>; const Value: T;
-  out Pos: Integer; StartPos: Integer = 0; EndPos: Integer = -1) : boolean;
-var I, loRes, hiRes: Integer;
+  out Pos: NativeInt; StartPos: NativeInt = 0; EndPos: NativeInt = -1) : boolean;
+var I, loRes, hiRes: NativeInt;
 begin
   Result := False;
   if StartPos < 0 then StartPos := 0;
@@ -1030,8 +1041,8 @@ begin
 end;
 
 class function TDynAUt.Flatten<T>(const data: TArray<TArray<T>>) : TArray<T>;
-var cBytes : TArray<Integer>;
-    I, J, K, Count: Integer;
+var cBytes : TArray<NativeInt>;
+    I, J, K, Count: NativeInt;
     iTmp: NativeInt;
     p : PByte;
 begin
@@ -1068,9 +1079,9 @@ begin
 end;
 
 class function TDynAUt.Partition<T>(const Arr: TArray<T>;
-  aRowSize: Integer; aOffset: Integer): TArray<TArray<T>>;
-var I, cRowBytes, cSkipBytes, rowCount, restCount, len: Integer;
-    tmpLen, tmpRowSize: Integer;
+  aRowSize: NativeInt; aOffset: NativeInt): TArray<TArray<T>>;
+var I, cRowBytes, cSkipBytes, rowCount, restCount, len: NativeInt;
+    tmpLen, tmpRowSize: NativeInt;
     pSrc: PByte;
 begin
   Result := nil;
@@ -1106,7 +1117,7 @@ begin
 end;
 
 class function TDynAUt.Reverse<T>(const Arr: TArray<T>): TArray<T>;
-var I, J, Hi: Integer;
+var I, J, Hi: NativeInt;
 begin
   Result := nil;
   SetLength(Result, Length(Arr));
@@ -1119,7 +1130,7 @@ begin
 end;
 
 class procedure TDynAUt.ReverseInPlace<T>(var Arr: TArray<T>);
-var I, J, Hi: Integer;
+var I, J, Hi: NativeInt;
     tmp: T;
 begin
   Hi := High(arr);
@@ -1133,22 +1144,24 @@ begin
   end;
 end;
 
-class function TDynAUt.Transpose<T>(const OriginalArray : TArray<TArray<T>>): TArray<TArray<T>>;
-var I, J : Integer;
+class procedure TDynAUt.SwapItems<T>(aData: TArray<T>; aIdx1, aIdx2: NativeInt);
+var tmp: T;
 begin
-  if Length(OriginalArray) = 0 then exit;
+  tmp := aData[aIdx1];
+  aData[aIdx1] := aData[aIdx2];
+  aData[aIdx2] := tmp;
+end;
 
-  Result := nil;
-  SetLength(Result, Length(OriginalArray[0]));
-  for I := 0 to High(Result) do begin
-    SetLength(Result[I], Length(OriginalArray));
-    for J := 0 to High(OriginalArray) do
-      Result[I][J] := OriginalArray[J][I];
-  end;
+class procedure TDynAUt.SwapRows<T>(const aData: TArray<TArray<T>>; aIdx1, aIdx2: NativeInt);
+var tmp: TArray<T>;
+begin
+  tmp := aData[aIdx1];
+  aData[aIdx1] := aData[aIdx2];
+  aData[aIdx2] := tmp;
 end;
 
 class function TDynAUt.Table<T>(const aFunc: TFnc<Double, T>; aX0, aX1, aXStep: Double): TArray<T>;
-var I, count: Integer;
+var I, count: NativeInt;
 begin
   Assert(aXStep <> 0);
   if aXStep > 0 then begin
@@ -1166,7 +1179,7 @@ end;
 
 class function TDynAUt.Table<T>(const aFunc: TFnc<Double, Double, T>;
   aX0, aX1, aXStep, aY0, aY1, aYStep: Double): TArray<TArray<T>>;
-var I, J, xCount, yCount: Integer;
+var I, J, xCount, yCount: NativeInt;
 begin
   Assert((aXStep <> 0) and (aYStep <> 0));
   if aXStep > 0 then begin
@@ -1191,8 +1204,8 @@ begin
   end;
 end;
 
-class function TDynAUt.ElementsCount<T>(const aData: TArray<TArray<T>>): Integer;
-var I: Integer;
+class function TDynAUt.ElementsCount<T>(const aData: TArray<TArray<T>>): NativeInt;
+var I: NativeInt;
 begin
   Result := 0;
   for I := 0 to High(aData) do
@@ -1200,8 +1213,8 @@ begin
 end;
 
 class function TDynAUt.SubArray<T>(const data: TArray<TArray<T>>;
-  const IndexFrom1, IndexFrom2, Length1, Length2: Integer) : TArray<TArray<T>>;
-var I, J, L1, L2: Integer;
+  const IndexFrom1, IndexFrom2, Length1, Length2: NativeInt) : TArray<TArray<T>>;
+var I, J, L1, L2: NativeInt;
 begin
   Result := nil;
   SetLength(Result, Length1, Length2);
@@ -1215,8 +1228,8 @@ begin
 end;
 
 class function TDynAUt.SubArray<T>(const aData: TArray<T>; aFrom,
-  aTo: Integer): TArray<T>;
-var I, J: Integer;
+  aTo: NativeInt): TArray<T>;
+var I, J: NativeInt;
 begin
   Result := nil;
   EnsureRange(aFrom, 0, High(aData));
@@ -1233,8 +1246,8 @@ begin
     Move(aData[aFrom], Result[0], Length(Result) * SizeOf(T));
 end;
 
-class function TDynAUt.RotateRight<T>(const aData: TArray<T>; RotateBy: Integer): TArray<T>;
-var iTmp: Integer;
+class function TDynAUt.RotateRight<T>(const aData: TArray<T>; RotateBy: NativeInt): TArray<T>;
+var iTmp: NativeInt;
 begin
   iTmp := Length(aData);
   if iTmp = 0 then exit(nil);
@@ -1250,8 +1263,8 @@ begin
   end;
 end;
 
-class function TDynAUt.RotateLeft<T>(const aData: TArray<T>; RotateBy: Integer): TArray<T>;
-var iTmp: Integer;
+class function TDynAUt.RotateLeft<T>(const aData: TArray<T>; RotateBy: NativeInt): TArray<T>;
+var iTmp: NativeInt;
 begin
   iTmp := Length(aData);
   if iTmp = 0 then exit(nil);
@@ -1353,7 +1366,7 @@ end;
 
 class procedure TDynAUt.HeapSort<T>(aData: TArray<T>; aComparer: IComparer<T>;
   aAscendingOrder: Boolean);
-var I, parentIdx, childIdx, heapSize: Integer;
+var I, parentIdx, childIdx, heapSize: NativeInt;
     val: T;
 begin
   if not Assigned(aData) then exit;
@@ -1514,7 +1527,7 @@ end;
 
 class function TDynAUt.HeapRemove<T>(aData: TArray<T>; const aValue: T;
   aComparer: IComparer<T>; aCount: NativeInt; aAscendingOrder: Boolean): Boolean;
-var I, idx, parentIdx, childIdx: Integer;
+var I, idx, parentIdx, childIdx: NativeInt;
     val: T;
 begin
   if aCount < 0 then aCount := Length(aData);
@@ -1640,7 +1653,7 @@ begin
   end;
 end;
 
-class function TDynAUt.Insert<T>(const aData: TArray<T>; const aItem: T; aIdx: Integer): TArray<T>;
+class function TDynAUt.Insert<T>(const aData: TArray<T>; const aItem: T; aIdx: NativeInt): TArray<T>;
 begin
   Result := nil;
   Assert(InRange(aIdx, 0, Length(aData)));
@@ -1650,9 +1663,9 @@ begin
   Copy<T>(aData, Result, aIdx, aIdx + 1, Length(aData) - aIdx);
 end;
 
-class function TDynAUt.InsertList<T>(const aData: TArray<T>; const aItems: array of T; const aIdxs: array of Integer): TArray<T>;
+class function TDynAUt.InsertList<T>(const aData: TArray<T>; const aItems: array of T; const aIdxs: array of NativeInt): TArray<T>;
 var newItems: TArray<TIndexedValue<T>>;
-    I, count, lastIdx, srcIdx, dstIdx, seqCnt: Integer;
+    I, count, lastIdx, srcIdx, dstIdx, seqCnt: NativeInt;
 begin
   count := Length(aItems);
   Assert(count = Length(aIdxs));
@@ -1691,7 +1704,7 @@ begin
 end;
 
 class function TDynAUt.Select<T>(const aData: TArray<T>; const aPredicate: TPredicateFunc<T>): TArray<T>;
-var I, top, len: Integer;
+var I, top, len: NativeInt;
     val: T;
 begin
   Result := nil;
@@ -1708,8 +1721,8 @@ begin
   SetLength(Result, top);
 end;
 
-class function TDynAUt.Position<T>(const aData: TArray<T>; const aPredicate: TPredicateFunc<T>): TArray<Integer>;
-var I, top, count: Integer;
+class function TDynAUt.Position<T>(const aData: TArray<T>; const aPredicate: TPredicateFunc<T>): TArray<NativeInt>;
+var I, top, count: NativeInt;
 begin
   Result := nil;
   count := Length(aData);
@@ -1723,8 +1736,8 @@ begin
   SetLength(Result, top);
 end;
 
-class function TDynAUt.FirstPosition<T>(const aData: TArray<T>; const aItem: T; aComparer: IEqualityComparer<T>): Integer;
-var I: Integer;
+class function TDynAUt.FirstPosition<T>(const aData: TArray<T>; const aItem: T; aComparer: IEqualityComparer<T>): NativeInt;
+var I: NativeInt;
 begin
   if not Assigned(aComparer) then aComparer := TEqualityComparer<T>.Default;
   for I := 0 to High(aData) do
@@ -1732,8 +1745,8 @@ begin
   Result := -1;
 end;
 
-class function TDynAUt.SortPerm<T>(const aData: TArray<T>; aComparer: IComparer<T>): TArray<Integer>;
-var I, count: Integer;
+class function TDynAUt.SortPerm<T>(const aData: TArray<T>; aComparer: IComparer<T>): TArray<NativeInt>;
+var I, count: NativeInt;
 begin
   if not Assigned(aComparer) then aComparer := TComparer<T>.Default;
 
@@ -1745,9 +1758,9 @@ begin
 {$ifdef FPC}
   // todo
 {$else}
-  TArray.Sort<Integer>(Result,
-    TComparer<Integer>.Construct(
-      function (const aL, aR: Integer): Integer
+  TArray.Sort<NativeInt>(Result,
+    TComparer<NativeInt>.Construct(
+      function (const aL, aR: NativeInt): Integer
       begin
         Result := aComparer.Compare(aData[aL], aData[aR]);
         if Result = 0 then
@@ -1760,7 +1773,7 @@ end;
 
 {$ifndef FPC}
 
-class function TDynAUt.SortPerm<T>(const aData: TArray<T>; const aComparer: TComparison<T>): TArray<Integer>;
+class function TDynAUt.SortPerm<T>(const aData: TArray<T>; const aComparer: TComparison<T>): TArray<NativeInt>;
 begin
   Result := SortPerm<T>(aData, TComparer<T>.Construct(aComparer));
 end;
@@ -2161,7 +2174,7 @@ begin
 end;
 
 class function TDynAUt.MovingMap<T, U>(const aData: TArray<T>; const aFnc: TFnc<TArray<T>, U>;
-  aWin: Integer): TArray<U>;
+  aWin: NativeInt): TArray<U>;
 var win: TArray<T>;
     I, J, K: Integer;
 begin
@@ -2323,7 +2336,7 @@ begin
     Result[I] := aData[I];
 end;
 
-class function TDynAUt.ConstantArray<T>(const aValue: T; aCount: Integer): TArray<T>;
+class function TDynAUt.ConstantArray<T>(const aValue: T; aCount: NativeInt): TArray<T>;
 var I: Integer;
 begin
   Assert(aCount > 0);
@@ -2551,6 +2564,109 @@ begin
 end;
 
 {$endregion}
+
+{$region 'matrices utils'}
+
+class function TDynAUt.MatrixQ<T>(const A: TArray<TArray<T>>): Boolean;
+var I, sz: NativeInt;
+begin
+  if (Length(A) = 0) or (Length(A[0]) = 0) then exit(False);
+  sz := Length(A[0]);
+  for I := 1 to High(A) do
+    if Length(A[I]) <> sz then exit(False);
+  Result := True;
+end;
+
+class function TDynAUt.SquareMatrixQ<T>(const A: TArray<TArray<T>>): Boolean;
+begin
+  Result := MatrixQ<T>(A) and (Length(A) = Length(A[0]));
+end;
+
+class function TDynAUt.LowerTriangularize<T>(const A: TArray<TArray<T>>;
+  aSubDiagIdx: NativeInt): TArray<TArray<T>>;
+var I, J, rCnt, cCnt, hi: NativeInt;
+    rA, rRes: TArray<T>;
+begin
+  Assert(MatrixQ<T>(A));
+  rCnt := Length(A);
+  cCnt := Length(A[0]);
+  SetLength(Result, rCnt, cCnt);
+  for I := 0 to rCnt - 1 do begin
+    rA := A[I];
+    rRes := Result[I];
+    hi := Min(I + aSubDiagIdx, cCnt - 1);
+    for J := 0 to hi do
+      rRes[J] := rA[J];
+  end;
+end;
+
+class function TDynAUt.UpperTriangularize<T>(const A: TArray<TArray<T>>;
+  aSubDiagIdx: NativeInt): TArray<TArray<T>>;
+var I, J, rCnt, cCnt, lo: NativeInt;
+    rA, rRes: TArray<T>;
+begin
+  Assert(MatrixQ<T>(A));
+  rCnt := Length(A);
+  cCnt := Length(A[0]);
+  SetLength(Result, rCnt, cCnt);
+  for I := 0 to rCnt - 1 do begin
+    rA := A[I];
+    rRes := Result[I];
+    lo := Max(0, I + aSubDiagIdx);
+    for J := lo to cCnt - 1 do
+      rRes[J] := rA[J];
+  end;
+end;
+
+class procedure TDynAUt.SetDiagonal<T>(const A: TArray<TArray<T>>; const aValue: T);
+var I, count: NativeInt;
+begin
+  Assert(MatrixQ<T>(A));
+  count := Min(Length(A), Length(A[0]));
+  for I := 0 to count - 1 do
+    A[I, I] := aValue;
+end;
+
+class procedure TDynAUt.SetDiagonal<T>(const A: TArray<TArray<T>>; const aValues: TArray<T>);
+var I, count: NativeInt;
+begin
+  Assert(MatrixQ<T>(A));
+  count := Min(Length(A), Length(A[0]));
+  count := Min(count, Length(aValues));
+  for I := 0 to count - 1 do
+    A[I, I] := aValues[I];
+end;
+
+class function TDynAUt.Transpose<T>(const A: TArray<TArray<T>>): TArray<TArray<T>>;
+var I, J, rCnt, cCnt: NativeInt;
+begin
+  Assert(MatrixQ<T>(A));
+  rCnt := Length(A);
+  cCnt := Length(A[0]);
+  SetLength(Result, cCnt, rCnt);
+  for I := 0 to rCnt - 1 do begin
+    for J := 0 to cCnt - 1 do
+      Result[J, I] := A[I, J];
+  end;
+end;
+
+class function TDynAUt.Augment<T>(const A, B: TArray<TArray<T>>): TArray<TArray<T>>;
+var I, rCnt, cCntA, cCntB: NativeInt;
+begin
+  Assert(MatrixQ<T>(A) and MatrixQ<T>(B));
+  rCnt := Length(A);
+  Assert(rCnt = Length(B));
+  cCntA := Length(A[0]);
+  cCntB := Length(B[0]);
+  SetLength(Result, rCnt, cCntA + cCntB);
+  for I := 0 to rCnt - 1 do begin
+    Copy<T>(A[I], Result[I], 0, 0, cCntA);
+    Copy<T>(B[I], Result[I], 0, cCntA, cCntB);
+  end;
+end;
+
+{$endregion}
+
 
 {$endif}
 

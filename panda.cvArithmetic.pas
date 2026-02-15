@@ -98,6 +98,25 @@ function Norm(const X: TArray<Double>; p: Double = 2): Double; overload;
 function Norm(pX: PSingle; aCount: NativeInt; p: Single = 2): Single; overload;
 function Norm(const X: TArray<Single>; p: Single = 2): Single; overload;
 
+
+{$region 'exception helpers'}
+
+// If exceptions are called from x64 assembler function
+// then it is necessary to adjust stack by sub rsp, 40 (32 bytes shadow space
+// and 8 bytes to stack alignement because of the return address).
+// example:
+//
+//  test rcx, rcx
+//  jns @begin
+//  sub rsp, 40
+//  call RaiseException
+//  @begin:
+//  ...
+
+procedure RaiseNegativeLength;
+procedure RaiseNotPositiveLength;
+
+{$endregion}
 var
   cUnrollThreshold: NativeInt = 10000;
 
@@ -108,9 +127,14 @@ uses
   , SysUtils
   ;
 
-procedure RaiseLengthOutOfRange;
+procedure RaiseNegativeLength;
 begin
-  raise EArgumentOutOfRangeException.Create('Length is less than zero');
+  raise EArgumentOutOfRangeException.Create('Length is less than zero.');
+end;
+
+procedure RaiseNotPositiveLength;
+begin
+  raise EArgumentOutOfRangeException.Create('Length is not positive.');
 end;
 
 procedure _dup_I8_xmm0(value: UInt8);
@@ -2887,10 +2911,9 @@ procedure dot(pX, pY: PSingle; aCount: NativeInt; out aRes: Single);
 {$if defined(ASMx86)}
 asm
   test ecx, ecx
-  jns @Begin
-  call RaiseLengthOutOfRange
-
-@Begin:
+  jns @begin
+  call RaiseNegativeLength
+@begin:
   push edi
   push esi
 
@@ -2997,8 +3020,8 @@ end;
 asm
   test r8, r8
   jns @begin
-  call RaiseLengthOutOfRange
-
+  sub rsp, 40
+  call RaiseNegativeLength
 @begin:
   push rsi
   push rdi
@@ -3091,8 +3114,7 @@ procedure dot(pX, pY: PDouble; aCount: NativeInt; out aRes: Double);
 asm
   test ecx, ecx
   jns @begin
-  call RaiseLengthOutOfRange
-
+  call RaiseNegativeLength
 @begin:
   push esi
   push edi
@@ -3135,8 +3157,8 @@ end;
 asm
   test r8, r8
   jns @begin
-  call RaiseLengthOutOfRange
-
+  sub rsp, 40
+  call RaiseNegativeLength
 @begin:
   mov rax, rcx
   mov rcx, r8
@@ -3187,7 +3209,7 @@ asm
   xorpd xmm0, xmm0
   test ecx, ecx
   jns @L
-  call RaiseLengthOutOfRange
+  call RaiseNegativeLength
 @L:
   movddup xmm2, [eax]     // xmm2 <- (ar, ar)
   movddup xmm3, [eax + 8] // xmm3 <- (ai, ai)
@@ -3211,7 +3233,8 @@ asm
   xorpd xmm0, xmm0
   test r8, r8
   jns @L
-  call RaiseLengthOutOfRange
+  sub rsp, 40
+  call RaiseNegativeLength
 @L:
   movddup xmm2, [rcx]     // xmm2 <- (ar, ar)
   movddup xmm3, [rcx + 8] // xmm3 <- (ai, ai)

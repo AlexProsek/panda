@@ -140,7 +140,7 @@ var I: Integer;
 begin
   CheckEquals(Length(aExpected), Length(aValue));
   for I := 0 to High(aExpected) do
-    CheckEquals(aExpected[I], aValue[I], aTol);
+    CheckEquals(Extended(aExpected[I]), Extended(aValue[I]), aTol);
 end;
 
 procedure TNDATestCase.CheckEquals(const aExpected: array of String; const aValue: array of String);
@@ -153,8 +153,8 @@ end;
 
 procedure TNDATestCase.CheckEquals(const aExpected, aValue: TCmplx128; const aTol: Double);
 begin
-  CheckEquals(aExpected.Re, aValue.Re, aTol);
-  CheckEquals(aExpected.Im, aValue.Im, aTol);
+  CheckEquals(Extended(aExpected.Re), Extended(aValue.Re), aTol);
+  CheckEquals(Extended(aExpected.Im), Extended(aValue.Im), aTol);
 end;
 
 function TNDATestCase.iRng2NDA(const aShape: array of NativeInt; aLo, aStep: Integer): INDArray<Integer>;
