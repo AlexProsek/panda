@@ -15,6 +15,12 @@ type
     stol = 1e-6;
     dtol = 1e-12;
   published
+    procedure TestCvtUI8F32_2;
+    procedure TestCvtUI8F32_4;
+    procedure TestCvtUI8F32_6;
+    procedure TestCvtF32UI8_2;
+    procedure TestCvtF32UI8_4;
+    procedure TestCvtF32UI8_6;
     procedure TestCvtI32F32_2;
     procedure TestCvtI32F32_4;
     procedure TestCvtI32F32_6;
@@ -37,6 +43,105 @@ type
 implementation
 
 {$region 'TCvtTests'}
+
+procedure TCvtTests.TestCvtUI8F32_2;
+var x: TArray<Byte>;
+    y: TArray<Single>;
+begin
+  x := TArray<Byte>.Create(1, 2);
+  y := TArray<Single>.Create(0, 0);
+
+  cvt(PByte(x), PSingle(y), Length(x));
+
+  CheckEquals(1, y[0], stol);
+  CheckEquals(2, y[1], stol);
+end;
+
+procedure TCvtTests.TestCvtUI8F32_4;
+var x: TArray<Byte>;
+    y: TArray<Single>;
+begin
+  x := TArray<Byte>.Create(1, 2, 3, 4);
+  y := TArray<Single>.Create(0, 0, 0, 0);
+
+  cvt(PByte(x), PSingle(y), Length(x));
+
+  CheckEquals(1, y[0], stol);
+  CheckEquals(2, y[1], stol);
+  CheckEquals(3, y[2], stol);
+  CheckEquals(4, y[3], stol);
+end;
+
+procedure TCvtTests.TestCvtUI8F32_6;
+var x: TArray<Byte>;
+    y: TArray<Single>;
+begin
+  x := TArray<Byte>.Create(1, 2, 3, 4, 5, 6);
+  y := TArray<Single>.Create(0, 0, 0, 0, 0, 0);
+
+  cvt(PByte(x), PSingle(y), Length(x));
+
+  CheckEquals(1, y[0], stol);
+  CheckEquals(2, y[1], stol);
+  CheckEquals(3, y[2], stol);
+  CheckEquals(4, y[3], stol);
+  CheckEquals(5, y[4], stol);
+  CheckEquals(6, y[5], stol);
+end;
+
+procedure TCvtTests.TestCvtF32UI8_2;
+var x: TArray<Single>;
+    y: TArray<Byte>;
+begin
+  x := TArray<Single>.Create(1, 2);
+  y := TArray<Byte>.Create(0, 0);
+
+  cvt(PSingle(x), PByte(y), Length(x));
+
+  CheckEquals(1, y[0]);
+  CheckEquals(2, y[1]);
+
+
+  x := TArray<Single>.Create(-1, 300);
+  y := TArray<Byte>.Create(0, 0);
+
+  cvt(PSingle(x), PByte(y), Length(x));
+
+  CheckEquals(0,   y[0]);
+  CheckEquals(255, y[1]);
+end;
+
+procedure TCvtTests.TestCvtF32UI8_4;
+var x: TArray<Single>;
+    y: TArray<Byte>;
+begin
+  x := TArray<Single>.Create(-1, 2, 300, 4);
+  y := TArray<Byte>.Create(0, 0, 0, 0);
+
+  cvt(PSingle(x), PByte(y), Length(x));
+
+  CheckEquals(0,   y[0]);
+  CheckEquals(2,   y[1]);
+  CheckEquals(255, y[2]);
+  CheckEquals(4,   y[3]);
+end;
+
+procedure TCvtTests.TestCvtF32UI8_6;
+var x: TArray<Single>;
+    y: TArray<Byte>;
+begin
+  x := TArray<Single>.Create(1, -2, 3, 400, 5, -1);
+  y := TArray<Byte>.Create(0, 0, 0, 0, 0, 0);
+
+  cvt(PSingle(x), PByte(y), Length(x));
+
+  CheckEquals(1,   y[0]);
+  CheckEquals(0,   y[1]);
+  CheckEquals(3,   y[2]);
+  CheckEquals(255, y[3]);
+  CheckEquals(5,   y[4]);
+  CheckEquals(0,   y[5]);
+end;
 
 procedure TCvtTests.TestCvtI32F32_2;
 var x: TArray<Integer>;

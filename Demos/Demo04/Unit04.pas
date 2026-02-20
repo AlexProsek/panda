@@ -89,13 +89,14 @@ begin
     dst := ndaCorrelate(k, src);
     dst := TNDAMan.Transpose<Single>(dst, [0, 2, 1]);
     dst := ndaCorrelate(k, dst);
-    dst := TNDAMan.Transpose<Single>(dst, [0, 2, 1]);
+    ch := TNDAUt.AsType<Byte>(dst);
+    ch := TNDAMan.Transpose<Byte>(ch, [2, 1, 0]);
   end else begin
     k := CreateKernel(2);
     dst := ndaCorrelate(k, src);
+    ch := TNDAUt.AsType<Byte>(dst);
+    ch := TNDAMan.Transpose<Byte>(ch, [1, 2, 0]);
   end;
-  ch := TNDAUt.AsType<Byte>(dst);
-  ch := TNDAMan.Transpose<Byte>(ch, [1, 2, 0]);
 
   sw.Stop;
   StatusBar1.Panels[0].Text := Format('Elapsed time: %f [ms]',

@@ -5,8 +5,11 @@ interface
 uses
     panda.Intfs
   , panda.Arrays
+  , panda.Nums
   , System.TypInfo
   ;
+
+{$I AsmDefs.inc}
 
 type
   TNDAMan = class(TNDAUt)
@@ -37,11 +40,167 @@ type
     class function FlipAll<T>(const aArr: INDArray<T>): INDArray<T>; static;
   end;
 
+{$region 'low-level functions'}
+
+// Returns True if a matrix has continuous rows
+function CRowsQ(const aMat: TMatSpec): Boolean; inline;
+// Returns True if a matrix has continuous columns
+function CColsQ(const aMat: TMatSpec): Boolean; inline;
+
+procedure Tr4x4_4B(pSrc, pDst: PByte; aSrcStep, aDstStep: NativeInt);
+procedure TrRxC_4B(pSrc, pDst: PByte; aSrcStep, aDstStep: NativeInt; R, C: NativeInt);
+procedure CTr_4B(pSrc, pDst: PByte; aSrcRCnt, aSrcCCnt, aSrcRStep, aDstRStep: NativeInt);
+
+{$endregion}
+
 implementation
 
 uses
     panda.DynArrayUtils
   ;
+
+{$region 'low-level functions'}
+
+function CRowsQ(const aMat: TMatSpec): Boolean;
+begin
+  Result := (aMat.ElSize = aMat.CStep);
+end;
+
+function CColsQ(const aMat: TMatSpec): Boolean;
+begin
+  Result := (aMat.ElSize = aMat.RStep);
+end;
+
+procedure Tr4x4_4B(pSrc, pDst: PByte; aSrcStep, aDstStep: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- pSrc, RDX <- pDst, R8 <- aSrcStep, R9 <- aDstStep
+asm
+  movupd xmm0, [rcx]
+  add rcx, r8
+  movupd xmm1, [rcx]
+  add rcx, r8
+  movupd xmm2, [rcx]
+  add rcx, r8
+  movupd xmm3, [rcx]
+
+  movaps  xmm4, xmm0
+  unpcklps xmm4, xmm1        // xmm4 = a0 b0 a1 b1
+
+  movaps  xmm5, xmm0
+  unpckhps xmm5, xmm1        // xmm5 = a2 b2 a3 b3
+
+  movaps  xmm0, xmm2
+  unpcklps xmm0, xmm3        // xmm0 = c0 d0 c1 d1
+
+  movaps  xmm1, xmm2
+  unpckhps xmm1, xmm3        // xmm1 = c2 d2 c3 d3
+
+  movaps  xmm2, xmm4
+  shufps  xmm2, xmm0, $44    // col0 = a0 b0 c0 d0
+
+  movaps  xmm3, xmm4
+  shufps  xmm3, xmm0, $EE    // col1 = a1 b1 c1 d1
+
+  movaps  xmm4, xmm5
+  shufps  xmm4, xmm1, $44    // col2 = a2 b2 c2 d2
+
+  movaps  xmm5, xmm5
+  shufps  xmm5, xmm1, $EE    // col3 = a3 b3 c3 d3
+
+  // xmm2, xmm3, xmm4, xmm5 = transposed rows
+  movupd [rdx], xmm2
+  add rdx, r9
+  movupd [rdx], xmm3
+  add rdx, r9
+  movupd [rdx], xmm4
+  add rdx, r9
+  movupd [rdx], xmm5
+end;
+{$else}
+begin
+  PSingle(pDst)^              := PSingle(pSrc)^;
+  PSingle(pDst + aDstStep)^   := PSingle(pSrc + cF32Sz)^;
+  PSingle(pDst + 2*aDstStep)^ := PSingle(pSrc + 2*cF32Sz)^;
+  pSingle(pDst + 3*aDstStep)^ := PSingle(pSrc + 3*cF32Sz)^;
+
+  Inc(pSrc, aSrcStep);
+  Inc(pDst, cF32Sz);
+
+  PSingle(pDst)^              := PSingle(pSrc)^;
+  PSingle(pDst + aDstStep)^   := PSingle(pSrc + cF32Sz)^;
+  PSingle(pDst + 2*aDstStep)^ := PSingle(pSrc + 2*cF32Sz)^;
+  pSingle(pDst + 3*aDstStep)^ := PSingle(pSrc + 3*cF32Sz)^;
+
+  Inc(pSrc, aSrcStep);
+  Inc(pDst, cF32Sz);
+
+  PSingle(pDst)^              := PSingle(pSrc)^;
+  PSingle(pDst + aDstStep)^   := PSingle(pSrc + cF32Sz)^;
+  PSingle(pDst + 2*aDstStep)^ := PSingle(pSrc + 2*cF32Sz)^;
+  pSingle(pDst + 3*aDstStep)^ := PSingle(pSrc + 3*cF32Sz)^;
+
+  Inc(pSrc, aSrcStep);
+  Inc(pDst, cF32Sz);
+
+  PSingle(pDst)^              := PSingle(pSrc)^;
+  PSingle(pDst + aDstStep)^   := PSingle(pSrc + cF32Sz)^;
+  PSingle(pDst + 2*aDstStep)^ := PSingle(pSrc + 2*cF32Sz)^;
+  pSingle(pDst + 3*aDstStep)^ := PSingle(pSrc + 3*cF32Sz)^;
+end;
+{$endif}
+
+procedure TrRxC_4B(pSrc, pDst: PByte; aSrcStep, aDstStep: NativeInt; R, C: NativeInt);
+var I: NativeInt;
+    pEnd: PByte;
+begin
+  pEnd := pSrc + R * aSrcStep;
+  while pSrc < pEnd do begin
+    for I := 0 to C - 1 do
+      PSingle(pDst + I*aDstStep)^ := PSingle(pSrc + I*cF32Sz)^;
+    Inc(pSrc, aSrcStep);
+    Inc(pDst, cF32Sz);
+  end;
+end;
+
+procedure CTr_4B(pSrc, pDst: PByte; aSrcRCnt, aSrcCCnt, aSrcRStep, aDstRStep: NativeInt);
+var pEnd, pSrcBlock, pDstBlock, pRowEnd: PByte;
+    srcRWb: NativeInt;
+    RRest, CRest: NativeInt;
+const cBlockSz = 4;
+begin
+  srcRWb := ((aSrcCCnt shr 2) shl 2) * cF32Sz;
+  CRest := aSrcCCnt and (cBlockSz - 1);
+  RRest := aSrcRcnt and (cBlockSz - 1);
+  pEnd := pSrc + ((aSrcRCnt shr 2) shl 2) * aSrcRStep;
+  while pSrc < pEnd do begin
+    pRowEnd := pSrc + srcRWb;
+    pSrcBlock := pSrc;
+    pDstBlock := pDst;
+    while pSrcBlock < pRowEnd do begin
+      Tr4x4_4B(pSrcBlock, pDstBlock, aSrcRStep, aDstRStep);
+      Inc(pDstBlock, 4 * aDstRStep);
+      Inc(pSrcBlock, 16);
+    end;
+    // remaining right block transposition
+    if CRest > 0 then
+      TrRxC_4B(pSrcBlock, pDstBlock, aSrcRStep, aDstRStep, 4, CRest);
+    Inc(pSrc, 4 * aSrcRStep);
+    Inc(pDst, 16);
+  end;
+  // remaining bottom blocks transposition
+  if RRest > 0 then begin
+    pRowEnd := pSrc + srcRWb;
+    while pSrc < pRowEnd do begin
+      TrRxC_4B(pSrc, pDst, aSrcRStep, aDstRStep, RRest, 4);
+      Inc(pDst, 4 * aDstRStep);
+      Inc(pSrc, 16);
+    end;
+    // right-bottom corner transposition
+    TrRxC_4B(pSrc, pDst, aSrcRStep, aDstRStep, RRest, CRest);
+  end;
+end;
+
+{$endregion}
 
 {$region 'TNDAMan'}
 
@@ -167,8 +326,19 @@ begin
   if nDim = 2 then begin
     GetMatSpec(aSrc, srcMat);
     GetMatSpec(aDst, dstMat);
-    SwapMatAxes(dstMat);
-    _MatCpy<T>(srcMat, dstMat);
+    if CRowsQ(srcMat) and CRowsQ(dstMat) then begin
+      case srcMat.ElSize of
+        cF32Sz: CTr_4B(srcMat.data, dstMat.Data, srcMat.NRows, srcMat.NCols,
+          srcMat.RStep, dstMat.RStep
+        );
+      else
+        SwapMatAxes(dstMat);
+        _MatCpy<T>(srcMat, dstMat);
+      end;
+    end else begin
+      SwapMatAxes(dstMat);
+      _MatCpy<T>(srcMat, dstMat);
+    end;
     exit;
   end;
 
@@ -177,10 +347,30 @@ begin
   try
     GetMatSpec(itSrc.CurrentSlice, srcMat);
     GetMatSpec(itDst.CurrentSlice, dstMat);
-    while itSrc.MoveNext and itDst.MoveNext do begin
-      srcMat.Data := itSrc.Current;
-      dstMat.Data := itDst.Current;
-      _MatCpy<T>(srcMat, dstMat);
+    if CColsQ(srcMat) and CRowsQ(dstMat) then begin
+      case srcMat.ElSize of
+        cF32Sz: begin
+          while itSrc.MoveNext and itDst.MoveNext do begin
+            CTr_4B(itSrc.Current, itDst.Current,
+              // swap source axes back because they are swapped by iterator
+              srcMat.NCols, srcMat.NRows,
+              srcMat.CStep, dstMat.RStep
+            );
+          end;
+        end;
+      else
+        while itSrc.MoveNext and itDst.MoveNext do begin
+          srcMat.Data := itSrc.Current;
+          dstMat.Data := itDst.Current;
+          _MatCpy<T>(srcMat, dstMat);
+        end;
+      end;
+    end else begin
+      while itSrc.MoveNext and itDst.MoveNext do begin
+        srcMat.Data := itSrc.Current;
+        dstMat.Data := itDst.Current;
+        _MatCpy<T>(srcMat, dstMat);
+      end;
     end;
   finally
     itSrc.Free;

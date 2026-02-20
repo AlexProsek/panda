@@ -113,12 +113,23 @@ type
     procedure TestVecNeg_Single_3;
     procedure TestVecNeg_Single_8;
     procedure TestVecNeg_Single_9;
+    procedure TestVecNeg_Double_3;
+    procedure TestVecNeg_Double_8;
+    procedure TestVecNeg_Double_9;
+    procedure TestVecAbs_Single_3;
+    procedure TestVecAbs_Single_8;
     procedure TestVecAnd_3;
     procedure TestVecAnd_4;
     procedure TestVecAnd_5;
     procedure TestVecAnd_16;
     procedure TestVecAnd_17;
     procedure TestVecOr_4;
+    procedure TestSQDiffs_Double_3;
+    procedure TestSQDiffs_Double_4;
+    procedure TestSQDiffs_Double_9;
+    procedure TestSQDiffs_Single_3;
+    procedure TestSQDiffs_Single_4;
+    procedure TestSQDiffs_Single_9;
   end;
 
 implementation
@@ -1377,7 +1388,7 @@ procedure TTestVectorMath.TestVecNeg_Single_3;
 var x, y: TArray<Single>;
     I: Integer;
 begin
-  x := TArray<Single>.Create(1, 2, 3);
+  x := TArray<Single>.Create(1, -2, 3);
   SetLength(y, Length(x));
   VecNeg(PSingle(x), PSingle(y), Length(x));
   for I := 0 to High(x) do
@@ -1388,7 +1399,7 @@ procedure TTestVectorMath.TestVecNeg_Single_8;
 var x, y: TArray<Single>;
     I: Integer;
 begin
-  x := TArray<Single>.Create(1, 2, 3, 4, 5, 6, 7, 8);
+  x := TArray<Single>.Create(1, -2, 3, 4, -5, 6, -7, 8);
   SetLength(y, Length(x));
   VecNeg(PSingle(x), PSingle(y), Length(x));
   for I := 0 to High(x) do
@@ -1399,11 +1410,66 @@ procedure TTestVectorMath.TestVecNeg_Single_9;
 var x, y: TArray<Single>;
     I: Integer;
 begin
-  x := TArray<Single>.Create(1, 2, 3, 4, 5, 6, 7, 8, 9);
+  x := TArray<Single>.Create(1, -2, 3, 4, -5, 6, -7, 8, 9);
   SetLength(y, Length(x));
   VecNeg(PSingle(x), PSingle(y), Length(x));
   for I := 0 to High(x) do
     CheckEquals(-x[I], y[I], 1e-6);
+end;
+
+procedure TTestVectorMath.TestVecNeg_Double_3;
+var x, y: TArray<Double>;
+    I: Integer;
+begin
+  x := TArray<Double>.Create(1, -2, 3);
+  SetLength(y, Length(x));
+  VecNeg(PDouble(x), PDouble(y), Length(x));
+  for I := 0 to High(x) do
+    CheckEquals(-x[I], y[I], dtol);
+end;
+
+procedure TTestVectorMath.TestVecNeg_Double_8;
+var x, y: TArray<Double>;
+    I: Integer;
+begin
+  x := TArray<Double>.Create(1, -2, 3, 4, -5, 6, -7, 8);
+  SetLength(y, Length(x));
+  VecNeg(PDouble(x), PDouble(y), Length(x));
+  for I := 0 to High(x) do
+    CheckEquals(-x[I], y[I], dtol);
+end;
+
+procedure TTestVectorMath.TestVecNeg_Double_9;
+var x, y: TArray<Double>;
+    I: Integer;
+begin
+  x := TArray<Double>.Create(1, -2, 3, 4, -5, 6, -7, 8, 9);
+  SetLength(y, Length(x));
+  VecNeg(PDouble(x), PDouble(y), Length(x));
+  for I := 0 to High(x) do
+    CheckEquals(-x[I], y[I], dtol);
+end;
+
+procedure TTestVectorMath.TestVecAbs_Single_3;
+var x, y: TArray<Single>;
+    I: Integer;
+begin
+  x := TArray<Single>.Create(1, -2, 3);
+  SetLength(y, Length(x));
+  VecAbs(PSingle(x), PSingle(y), Length(x));
+  for I := 0 to High(x) do
+    CheckEquals(Abs(x[I]), y[I], dtol);
+end;
+
+procedure TTestVectorMath.TestVecAbs_Single_8;
+var x, y: TArray<Single>;
+    I: Integer;
+begin
+  x := TArray<Single>.Create(1, -2, 3, 4, -5, 6, -7, 8);
+  SetLength(y, Length(x));
+  VecAbs(PSingle(x), PSingle(y), Length(x));
+  for I := 0 to High(x) do
+    CheckEquals(Abs(x[I]), y[I], 1e-6);
 end;
 
 procedure TTestVectorMath.TestVecAnd_3;
@@ -1476,6 +1542,78 @@ begin
   VecOr(PByte(x), PByte(y), PByte(res), Length(x));
   for I := 0 to High(res) do
     CheckEquals(x[I] or y[I], res[I]);
+end;
+
+procedure TTestVectorMath.TestSQDiffs_Double_3;
+var x, y, res: TArray<Double>;
+    I: Integer;
+begin
+  x := TArray<Double>.Create(2, 4, 8);
+  y := TArray<Double>.Create(1, 2, 4);
+  SetLength(res, Length(x));
+  SQDiffs(PDouble(x), PDouble(y), PDouble(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(Sqr(x[I] - y[I]), res[I], dtol);
+end;
+
+procedure TTestVectorMath.TestSQDiffs_Double_4;
+var x, y, res: TArray<Double>;
+    I: Integer;
+begin
+  x := TArray<Double>.Create(2, 4, 8, -3);
+  y := TArray<Double>.Create(1, 2, 4,  5);
+  SetLength(res, Length(x));
+  SQDiffs(PDouble(x), PDouble(y), PDouble(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(Sqr(x[I] - y[I]), res[I], dtol);
+end;
+
+procedure TTestVectorMath.TestSQDiffs_Double_9;
+var x, y, res: TArray<Double>;
+    I: Integer;
+begin
+  x := TArray<Double>.Create(2, 4, 8, -3, 3, 2, -5,  4, 8);
+  y := TArray<Double>.Create(1, 2, 4,  5, 1, 6, -7, -2, 0);
+  SetLength(res, Length(x));
+  SQDiffs(PDouble(x), PDouble(y), PDouble(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(Sqr(x[I] - y[I]), res[I], dtol);
+end;
+
+procedure TTestVectorMath.TestSQDiffs_Single_3;
+var x, y, res: TArray<Single>;
+    I: Integer;
+begin
+  x := TArray<Single>.Create(2, 4, 8);
+  y := TArray<Single>.Create(1, 2, 4);
+  SetLength(res, Length(x));
+  SQDiffs(PSingle(x), PSingle(y), PSingle(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(Sqr(x[I] - y[I]), res[I], stol);
+end;
+
+procedure TTestVectorMath.TestSQDiffs_Single_4;
+var x, y, res: TArray<Single>;
+    I: Integer;
+begin
+  x := TArray<Single>.Create(2, 4, 8, -3);
+  y := TArray<Single>.Create(1, 2, 4,  5);
+  SetLength(res, Length(x));
+  SQDiffs(PSingle(x), PSingle(y), PSingle(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(Sqr(x[I] - y[I]), res[I], dtol);
+end;
+
+procedure TTestVectorMath.TestSQDiffs_Single_9;
+var x, y, res: TArray<Single>;
+    I: Integer;
+begin
+  x := TArray<Single>.Create(2, 4, 8, -3, 3, 2, -5,  4, 8);
+  y := TArray<Single>.Create(1, 2, 4,  5, 1, 6, -7, -2, 0);
+  SetLength(res, Length(x));
+  SQDiffs(PSingle(x), PSingle(y), PSingle(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(Sqr(x[I] - y[I]), res[I], dtol);
 end;
 
 {$endregion}

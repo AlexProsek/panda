@@ -391,6 +391,53 @@ end;
 {$endif}
 
 procedure cvMinMax(pData: PDouble; aCount: NativeInt; var aMin, aMax: Double);
+{$if defined(ASMx64)}
+{$CODEALIGN 16}
+// RCX <- pData, RDX <- aCount, R8 <- @aMin, R9 <- @aMax
+asm
+{$ifdef DEBUG}
+  cmp rdx, 0
+  jg @begin
+  sub rsp, 40
+  call RaiseNotPositiveLength
+@begin:
+{$endif}
+  movddup xmm0, [rcx] // xmm0 <- pData[0] as min
+  movapd xmm1, xmm0   // xmm1 <- pData[0] as max
+  mov rax, rdx
+  shr rdx, 2
+  jz @rest
+@L:
+  movupd xmm2, [rcx]
+  minpd xmm0, xmm2
+  maxpd xmm1, xmm2
+  add rcx, 16
+  movupd xmm2, [rcx]
+  minpd xmm0, xmm2
+  maxpd xmm1, xmm2
+  add rcx, 16
+  dec rdx
+  jnz @L
+
+  movhlps xmm2, xmm0
+  minsd xmm0, xmm2
+  movhlps xmm2, xmm1
+  maxsd xmm1, xmm2
+@rest:
+  and rax, 3
+  jz @end
+@Lrest:
+  movq xmm2, [rcx]
+  minsd xmm0, xmm2
+  maxsd xmm1, xmm2
+  add rcx, 8
+  dec rax
+  jnz @Lrest
+@end:
+  movq [r8], xmm0
+  movq [r9], xmm1
+end;
+{$else}
 var pEnd: PByte;
     v: Double;
 begin
@@ -409,6 +456,7 @@ begin
     Inc(pData);
   end;
 end;
+{$endif}
 
 {$endregion}
 

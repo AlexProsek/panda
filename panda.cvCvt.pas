@@ -4,6 +4,8 @@ interface
 
 {$I AsmDefs.inc}
 
+procedure cvt(pSrc: PByte; pDst: PSingle; aCount: NativeInt); overload;
+procedure cvt(pSrc: PSingle; pDst: PByte; aCount: NativeInt); overload;
 procedure cvt(pSrc: PInteger; pDst: PSingle; aCount: NativeInt); overload;
 procedure cvt(pSrc: PSingle; pDst: PDouble; aCount: NativeInt); overload;
 procedure cvt(pSrc: PDouble; pDst: PSingle; aCount: NativeInt); overload;
@@ -215,6 +217,111 @@ begin
     Inc(pDst, 4);
     PCardinal(pDst)^ := (swap(i1) shl 16) or (swap(i1 shr 16));
     Inc(pDst, 4);
+  end;
+end;
+{$endif}
+
+procedure cvt(pSrc: PByte; pDst: PSingle; aCount: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- pSrc, RDX <- pDst, R8 <- aCount
+asm
+  xorps xmm0, xmm0
+      //load Color into xmm6
+  mov rax, r8
+  shr rax, 2
+  jz @rest
+@L:
+  movd xmm1, [rcx]
+  punpcklbw xmm1, xmm0 // byte -> word
+  punpcklbw xmm1, xmm0 // word -> integer
+  cvtdq2ps xmm1, xmm1  // integer -> single
+  movups [rdx], xmm1
+  add rcx, 4
+  add rdx, 16
+  dec rax
+  jnz @L
+@rest:
+  and r8, 3
+  jz @end
+  xor rax, rax
+@Lrest:
+  mov al, [rcx]
+  movd xmm0, eax
+  cvtdq2ps xmm0, xmm0
+  movss [rdx], xmm0
+  add rcx, 1
+  add rdx, 4
+  dec r8
+  jnz @Lrest
+@end:
+end;
+{$else}
+var pEnd: PByte;
+begin
+  pEnd := pSrc + aCount;
+  while pSrc < pEnd do begin
+    pDst^ := pSrc^;
+    Inc(pSrc);
+    Inc(pDst);
+  end;
+end;
+{$endif}
+
+procedure cvt(pSrc: PSingle; pDst: PByte; aCount: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- pSrc, RDX <- pDst, R8 <- aCount
+const cMax: Single = 255;
+asm
+  xorps xmm0, xmm0
+  movss xmm1, cMax
+  shufps xmm1, xmm1, 0   // xmm1 <- (255, 255, 255, 255)
+  mov rax, r8
+  shr rax, 2
+  jz @rest
+@L:
+  movups xmm2, [rcx]
+  maxps xmm2, xmm0
+  minps xmm2, xmm1
+  cvtps2dq xmm2, xmm2
+  packssdw xmm2, xmm0 // dwords -> words
+  packuswb xmm2, xmm0 // words -> bytes
+  movd [rdx], xmm2
+  add rcx, 16
+  add rdx, 4
+  dec rax
+  jnz @L
+@rest:
+  and r8, 3
+  jz @end
+@Lrest:
+  movd xmm2, [rcx]
+  maxss xmm2, xmm0
+  minss xmm2, xmm1
+  cvtps2dq xmm2, xmm2
+  movd eax, xmm2
+  mov [rdx], al
+  add rcx, 4
+  add rdx, 1
+  dec r8
+  jnz @Lrest
+@end:
+end;
+{$else}
+var pEnd: PByte;
+    s: NativeInt;
+begin
+  pEnd := pDst + aCount;
+  while pDst < pEnd do begin
+    s := Round(pSrc^);
+    if s < 0 then
+      pDst^ := 0
+    else
+    if s > 255 then
+      pDst^ := 255
+    else
+      pDst^ := s;
+    Inc(pSrc);
+    Inc(pDst);
   end;
 end;
 {$endif}

@@ -46,7 +46,12 @@ type
     procedure TestSCopy_Single;
     procedure TestSCopy_Double;
     procedure VecNeg_Single;
+    procedure VecNeg_Double;
+    procedure VecAbs_Single;
+    procedure VecAbs_Double;
     procedure Diff_Single;
+    procedure SQDiffs_Single;
+    procedure SQDiffs_Double;
     procedure DiffWithStep_Single;
   end;
 
@@ -587,6 +592,42 @@ begin
   SWStop;
 end;
 
+procedure TVecMathPerformance.VecNeg_Double;
+var x, y: TArray<Double>;
+const N = 10000000;
+begin
+  SetLength(x, N);
+  SetLength(y, N);
+
+  SWStart;
+  VecNeg(PDouble(x), PDouble(y), Length(x));
+  SWStop;
+end;
+
+procedure TVecMathPerformance.VecAbs_Single;
+var x, y: TArray<Single>;
+const N = 10000000;
+begin
+  SetLength(x, N);
+  SetLength(y, N);
+
+  SWStart;
+  VecAbs(PSingle(x), PSingle(y), Length(x));
+  SWStop;
+end;
+
+procedure TVecMathPerformance.VecAbs_Double;
+var x, y: TArray<Double>;
+const N = 10000000;
+begin
+  SetLength(x, N);
+  SetLength(y, N);
+
+  SWStart;
+  VecAbs(PDouble(x), PDouble(y), Length(x));
+  SWStop;
+end;
+
 procedure TVecMathPerformance.Diff_Single;
 var x, y: TArray<Single>;
 const N = 10000000;
@@ -596,6 +637,30 @@ begin
 
   SWStart;
   Differences(PSingle(x), PSingle(y), Length(x));
+  SWStop;
+end;
+
+procedure TVecMathPerformance.SQDiffs_Single;
+var x, y: TArray<Single>;
+const N = 10000000;
+begin
+  SetLength(x, N);
+  SetLength(y, N);
+
+  SWStart;
+  SQDiffs(PSingle(x), PSingle(y), PSingle(y), Length(x));
+  SWStop;
+end;
+
+procedure TVecMathPerformance.SQDiffs_Double;
+var x, y: TArray<Double>;
+const N = 10000000;
+begin
+  SetLength(x, N);
+  SetLength(y, N);
+
+  SWStart;
+  SQDiffs(PDouble(x), PDouble(y), PDouble(y), Length(x));
   SWStop;
 end;
 

@@ -74,6 +74,8 @@ const
   
   cAbsMaskF32: UInt64 = $7FFFFFFF;
   cAbsMaskF64: UInt64 = $7FFFFFFFFFFFFFFF;
+  cSgnMaskF32: UInt64 = $80000000;
+  cSgnMaskF64: UInt64 = $8000000000000000;
 
   cZeroC64:  TCmplx64  = (Re: 0; Im: 0);
   cZeroC128: TCmplx128 = (Re: 0; Im: 0);

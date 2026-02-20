@@ -11,6 +11,16 @@ uses
   ;
 
 type
+  TArrManipLowLvlTests = class(TNDATestCase)
+  published
+    procedure BlockTr4x4_4B;
+    procedure BlockTr8x8_4B;
+    procedure BlockTr4x6_4B;
+    procedure BlockTr6x4_4B;
+    procedure BlockTr6x5_4B;
+    procedure BlockTr10x10_4B;
+  end;
+
   TArrManipTests = class(TNDATestCase)
   published
     procedure SetPartWithCast;
@@ -37,6 +47,116 @@ implementation
 uses
     panda.DynArrayUtils
   ;
+
+{$region 'TArrManipLowLvlTests'}
+
+procedure TArrManipLowLvlTests.BlockTr4x4_4B;
+var a, b: array [0..3, 0..3] of Single;
+    I, J: Integer;
+begin
+  for I := 0 to 3 do
+    for J := 0 to 3 do begin
+      a[I, J] := 3*I + J;
+      b[J, I] := 0;
+    end;
+
+  Tr4x4_4B(@a, @b, 16, 16);
+
+  for I := 0 to 3 do
+    for J := 0 to 3 do
+      CheckEquals(a[I, J], b[J, I]);
+end;
+
+procedure TArrManipLowLvlTests.BlockTr8x8_4B;
+var a, b: array [0..7, 0..7] of Single;
+    I, J: Integer;
+begin
+  for I := 0 to 7 do
+    for J := 0 to 7 do begin
+      a[I, J] := 7*I + J;
+      b[J, I] := 0;
+    end;
+
+  CTr_4B(@a, @b, 8, 8, 32, 32);
+
+  for I := 0 to 7 do
+    for J := 0 to 7 do
+      CheckEquals(a[I, J], b[J, I]);
+end;
+
+procedure TArrManipLowLvlTests.BlockTr4x6_4B;
+var a: array [0..3, 0..5] of Single;
+    b: array [0..5, 0..3] of Single;
+    I, J: Integer;
+begin
+  for I := 0 to 3 do
+    for J := 0 to 5 do begin
+      a[I, J] := 6*I + J;
+      b[J, I] := 0;
+    end;
+
+  CTr_4B(@a, @b, 4, 6, 24, 16);
+
+  for I := 0 to 3 do
+    for J := 0 to 5 do
+      CheckEquals(a[I, J], b[J, I]);
+end;
+
+procedure TArrManipLowLvlTests.BlockTr6x4_4B;
+var a: array [0..5, 0..3] of Single;
+    b: array [0..3, 0..5] of Single;
+    I, J: Integer;
+begin
+  for I := 0 to 5 do
+    for J := 0 to 3 do begin
+      a[I, J] := 4*I + J;
+      b[J, I] := 0;
+    end;
+
+  CTr_4B(@a, @b, 6, 4, 16, 24);
+
+  for I := 0 to 5 do
+    for J := 0 to 3 do
+      CheckEquals(a[I, J], b[J, I]);
+end;
+
+procedure TArrManipLowLvlTests.BlockTr6x5_4B;
+var a: array [0..5, 0..4] of Single;
+    b: array [0..4, 0..5] of Single;
+    I, J: Integer;
+begin
+  for I := 0 to 5 do
+    for J := 0 to 4 do begin
+      a[I, J] := 5*I + J;
+      b[J, I] := 0;
+    end;
+
+  CTr_4B(@a, @b, 6, 5, 20, 24);
+
+  for I := 0 to 5 do
+    for J := 0 to 4 do
+      CheckEquals(a[I, J], b[J, I]);
+end;
+
+procedure TArrManipLowLvlTests.BlockTr10x10_4B;
+var a: array [0..9, 0..9] of Single;
+    b: array [0..9, 0..9] of Single;
+    I, J: Integer;
+begin
+  for I := 0 to 9 do
+    for J := 0 to 9 do begin
+      a[I, J] := 10*I + J;
+      b[J, I] := 0;
+    end;
+
+  CTr_4B(@a, @b, 10, 10, 40, 40);
+
+  for I := 0 to 9 do
+    for J := 0 to 9 do
+      CheckEquals(a[I, J], b[J, I]);
+end;
+
+{$endregion}
 
 {$region 'TArrManipTests'}
 
@@ -308,6 +428,7 @@ end;
 
 initialization
 
+  RegisterTest(TArrManipLowLvlTests.Suite);
   RegisterTest(TArrManipTests.Suite);
 
 end.
