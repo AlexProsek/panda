@@ -40,6 +40,13 @@ type
     procedure Flip2D_A0;
     procedure Flip2D_A1;
     procedure Flip2D_A0A1;
+
+    procedure Concat1D;
+    procedure Concat2D_A0;
+    procedure Concat2D_A1;
+    procedure Concat2Dx3_A0;
+    procedure Concat2Dx3_A1;
+    procedure Concat_SingleArr;
   end;
 
 implementation
@@ -422,6 +429,98 @@ begin
   CheckEquals([9, 8, 7], m[0]);
   CheckEquals([6, 5, 4], m[1]);
   CheckEquals([3, 2, 1], m[2]);
+end;
+
+procedure TArrManipTests.Concat1D;
+var a, b, c: INDArray<Integer>;
+    v: TArray<Integer>;
+    I: Integer;
+begin
+  a := TNDAUt.AsArray<Integer>([1, 2, 3]);
+  b := TNDAUt.AsArray<Integer>([4, 5, 6]);
+
+  c := TNDAMan.Concat<Integer>([a, b]);
+
+  CheckTrue(TNDAUt.TryAsDynArray<Integer>(c, v));
+  CheckEquals(6, Length(v));
+  for I := 0 to High(v) do
+    CheckEquals(I + 1, v[I]);
+end;
+
+procedure TArrManipTests.Concat2D_A0;
+var a, b, c: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3]]);
+  b := TNDAUt.AsArray<Integer>([[4, 5, 6]]);
+
+  c := TNDAMan.Concat<Integer>([a, b]);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(c, m));
+  CheckEquals(2, Length(m));
+  CheckEquals([1, 2, 3], m[0]);
+  CheckEquals([4, 5, 6], m[1]);
+end;
+
+procedure TArrManipTests.Concat2D_A1;
+var a, b, c: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6]]);
+  b := TNDAUt.AsArray<Integer>([[7], [8]]);
+
+  c := TNDAMan.Concat<Integer>([a, b], 1);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(c, m));
+  CheckEquals(2, Length(m));
+  CheckEquals([1, 2, 3, 7], m[0]);
+  CheckEquals([4, 5, 6, 8], m[1]);
+end;
+
+procedure TArrManipTests.Concat2Dx3_A0;
+var a, b, c: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6]]);
+  b := TNDAUt.AsArray<Integer>([[7, 8, 9]]);
+  c := TNDAUt.AsArray<Integer>([[10, 11, 12]]);
+
+  c := TNDAMan.Concat<Integer>([a, b, c]);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(c, m));
+  CheckEquals(4, Length(m));
+  CheckEquals([ 1,  2,  3], m[0]);
+  CheckEquals([ 4,  5,  6], m[1]);
+  CheckEquals([ 7,  8,  9], m[2]);
+  CheckEquals([10, 11, 12], m[3]);
+end;
+
+procedure TArrManipTests.Concat2Dx3_A1;
+var a, b, c: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6]]);
+  b := TNDAUt.AsArray<Integer>([[7], [8]]);
+  c := TNDAUt.AsArray<Integer>([[10, 11], [12, 13]]);
+
+  c := TNDAMan.Concat<Integer>([a, b, c], 1);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(c, m));
+  CheckEquals(2, Length(m));
+  CheckEquals([1, 2, 3, 7, 10, 11], m[0]);
+  CheckEquals([4, 5, 6, 8, 12, 13], m[1]);
+end;
+
+procedure TArrManipTests.Concat_SingleArr;
+var a, b: INDArray<Integer>;
+    v: TArray<Integer>;
+begin
+  a := TNDAUt.AsArray<Integer>([1, 2, 3]);
+
+  b := TNDAMan.Concat<Integer>([a]);
+
+  CheckTrue(TNDAUt.TryAsDynArray<Integer>(b, v));
+  CheckEquals([1, 2, 3], v);
 end;
 
 {$endregion}

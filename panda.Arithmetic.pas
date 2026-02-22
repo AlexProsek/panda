@@ -351,7 +351,7 @@ begin
   end;
 
   // R <- L + R
-  pEnd := R + N * IncL;
+  pEnd := R + N * IncR;
   while R < pEnd do begin
     PInteger(R)^ := PInteger(L)^ + PInteger(R)^;
     Inc(L, IncL);
@@ -381,7 +381,7 @@ begin
   end;
 
   // R <- L - R
-  pEnd := R + N * IncL;
+  pEnd := R + N * IncR;
   while R < pEnd do begin
     PInteger(R)^ := PInteger(L)^ - PInteger(R)^;
     Inc(L, IncL);
@@ -431,7 +431,7 @@ begin
   end;
 
   // R <- L * R
-  pEnd := R + N * IncL;
+  pEnd := R + N * IncR;
   while R < pEnd do begin
     PInteger(R)^ := PInteger(L)^ * PInteger(R)^;
     Inc(L, IncL);
@@ -497,7 +497,7 @@ begin
   end;
 
   // R <- L + R
-  pEnd := R + N * IncL;
+  pEnd := R + N * IncR;
   while R < pEnd do begin
     PInt64(R)^ := PInt64(L)^ + PInt64(R)^;
     Inc(L, IncL);
@@ -527,7 +527,7 @@ begin
   end;
 
   // R <- L - R
-  pEnd := R + N * IncL;
+  pEnd := R + N * IncR;
   while R < pEnd do begin
     PInt64(R)^ := PInt64(L)^ - PInt64(R)^;
     Inc(L, IncL);
@@ -577,7 +577,7 @@ begin
   end;
 
   // R <- L * R
-  pEnd := R + N * IncL;
+  pEnd := R + N * IncR;
   while R < pEnd do begin
     PInt64(R)^ := PInt64(L)^ * PInt64(R)^;
     Inc(L, IncL);
@@ -668,7 +668,7 @@ begin
     exit;
   end;
 
-  pEnd := R + N * IncL;
+  pEnd := R + N * IncR;
   while R < pEnd do begin
     PSingle(R)^ := PSingle(L)^ + PSingle(R)^;
     Inc(L, IncL);
@@ -703,7 +703,7 @@ begin
   end;
 
   // R <- L - R
-  pEnd := R + N * IncL;
+  pEnd := R + N * IncR;
   if (IncL = cF32Sz) and (IncR = cF32Sz) then begin
     VecSub(PSingle(L), PSingle(R), PSingle(R), N);
     exit;
@@ -778,7 +778,7 @@ begin
     exit;
   end;
 
-  pEnd := R + N * IncL;
+  pEnd := R + N * IncR;
   while R < pEnd do begin
     PSingle(R)^ := PSingle(L)^ * PSingle(R)^;
     Inc(L, IncL);
@@ -808,7 +808,7 @@ begin
   end;
 
   // R <- L / R
-  pEnd := R + N * IncL;
+  pEnd := R + N * IncR;
   while R < pEnd do begin
     PSingle(R)^ := PSingle(L)^ / PSingle(R)^;
     Inc(L, IncL);
@@ -1013,7 +1013,7 @@ begin
   end;
 
   // R <- L + R
-  pEnd := R + N * IncL;
+  pEnd := R + N * IncR;
   while R < pEnd do begin
     PDouble(R)^ := PDouble(L)^ + PDouble(R)^;
     Inc(L, IncL);
@@ -1043,7 +1043,7 @@ begin
   end;
 
   // R <- L - R
-  pEnd := R + N * IncL;
+  pEnd := R + N * IncR;
   while R < pEnd do begin
     PDouble(R)^ := PDouble(L)^ - PDouble(R)^;
     Inc(L, IncL);
@@ -1093,7 +1093,7 @@ begin
   end;
 
   // R <- L * R
-  pEnd := R + N * IncL;
+  pEnd := R + N * IncR;
   while R < pEnd do begin
     PDouble(R)^ := PDouble(L)^ * PDouble(R)^;
     Inc(L, IncL);
@@ -1123,7 +1123,7 @@ begin
   end;
 
   // R <- L / R
-  pEnd := R + N * IncL;
+  pEnd := R + N * IncR;
   while R < pEnd do begin
     PDouble(R)^ := PDouble(L)^ / PDouble(R)^;
     Inc(L, IncL);
@@ -1300,7 +1300,7 @@ begin
 //    exit;
 //  end;
 
-  pEnd := R + N * IncL;
+  pEnd := R + N * IncR;
   while R < pEnd do begin
     with PCmplx128(R)^ do begin
       Re := PCmplx128(L)^.Re + Re;
@@ -1341,7 +1341,7 @@ begin
   end;
 
   // R <- L - R
-  pEnd := R + N * IncL;
+  pEnd := R + N * IncR;
 //  if (IncL = cC128Sz) and (IncR = cC128Sz) then begin
 //    VecSub(PCmplx128(L), PCmplx128(R), PCmplx128(R), N);
 //    exit;
@@ -1400,7 +1400,7 @@ end;
 
 procedure MulL_C128(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
 var pEnd: PByte;
-    s: TCmplx128;
+    s, t: TCmplx128;
 begin
   if IncL = 0 then begin
     // R <- l * R
@@ -1413,8 +1413,10 @@ begin
     pEnd := R + N * IncR;
     while R < pEnd do begin
       with PCmplx128(R)^ do begin
-        Re := s.Re * Re - s.Im * Im;
-        Im := s.Re * Im + s.Im * Re;
+        t.Re := s.Re * Re - s.Im * Im;
+        t.Im := s.Re * Im + s.Im * Re;
+        Re := t.Re;
+        Im := t.Im;
       end;
       Inc(R, IncR);
     end;
@@ -1428,12 +1430,14 @@ begin
 //    exit;
 //  end;
 
-  pEnd := R + N * IncL;
+  pEnd := R + N * IncR;
   while R < pEnd do begin
     s := PCmplx128(L)^;
     with PCmplx128(R)^ do begin
-      Re := s.Re * Re - s.Im * Im;
-      Im := s.Re * Im + s.Im * Re;
+      t.Re := s.Re * Re - s.Im * Im;
+      t.Im := s.Re * Im + s.Im * Re;
+      Re := t.Re;
+      Im := t.Im;
     end;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -1447,7 +1451,7 @@ end;
 
 procedure DivL_C128(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
 var pEnd: PByte;
-    s: TCmplx128;
+    s, t: TCmplx128;
     d: Double;
 begin
   if IncL = 0 then begin
@@ -1457,8 +1461,10 @@ begin
     while R < pEnd do begin
       with PCmplx128(R)^ do begin
         d := Re * Re + Im * Im;
-        Re := (s.Re * Re - s.Im * Im) / d;
-        Im := (s.Im * Re + s.Re * Im) / d;
+        t.Re := (s.Re * Re - s.Im * Im) / d;
+        t.Im := (s.Im * Re + s.Re * Im) / d;
+        Re := t.Re;
+        Im := t.Im;
       end;
       Inc(R, IncR);
     end;
@@ -1467,13 +1473,15 @@ begin
   end;
 
   // R <- L / R
-  pEnd := R + N * IncL;
+  pEnd := R + N * IncR;
   while R < pEnd do begin
     with PCmplx128(R)^ do begin
       d := Re * Re + Im * Im;
       s := PCmplx128(L)^;
-      Re := (s.Re * Re - s.Im * Im) / d;
-      Im := (s.Im * Re + s.Re * Im) / d;
+      t.Re := (s.Re * Re - s.Im * Im) / d;
+      t.Im := (s.Im * Re + s.Re * Im) / d;
+      Re := t.Re;
+      Im := t.Im;
     end;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -1482,7 +1490,7 @@ end;
 
 procedure DivR_C128(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
 var pEnd: PByte;
-    s: TCmplx128;
+    s, t: TCmplx128;
     d: Double;
 begin
   if IncR = 0 then begin
@@ -1497,8 +1505,10 @@ begin
     d := s.Re * s.Re + s.Im * s.Im;
     while L < pEnd do begin
       with PCmplx128(L)^ do begin
-        Re := (Re * s.Re - Im * s.Im) / d;
-        Im := (Re * s.Im + Im * s.Re) / d;
+        t.Re := (Re * s.Re - Im * s.Im) / d;
+        t.Im := (Re * s.Im + Im * s.Re) / d;
+        Re := t.Re;
+        Im := t.Im;
       end;
       Inc(L, IncL);
     end;
@@ -1512,8 +1522,10 @@ begin
     s := PCmplx128(R)^;
     d := s.Re * s.Re + s.Im * s.Im;
     with PCmplx128(L)^ do begin
-      Re := (Re * s.Re - Im * s.Im) / d;
-      Im := (Re * s.Im + Im * s.Re) / d;
+      t.Re := (Re * s.Re - Im * s.Im) / d;
+      t.Im := (Re * s.Im + Im * s.Re) / d;
+      Re := t.Re;
+      Im := t.Im;
     end;
     Inc(L, IncL);
     Inc(R, IncR);

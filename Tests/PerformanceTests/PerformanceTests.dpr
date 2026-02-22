@@ -30,7 +30,8 @@ uses
   panda.BLASInit in '..\..\panda.BLASInit.pas',
   panda.PTests.MPNums in 'panda.PTests.MPNums.pas',
   panda.PTests.Nums in 'panda.PTests.Nums.pas',
-  panda.PTests.Poly in 'panda.PTests.Poly.pas';
+  panda.PTests.Poly in 'panda.PTests.Poly.pas',
+  panda.PTests.ArrManip in 'panda.PTests.ArrManip.pas';
 
 {$R *.RES}
 

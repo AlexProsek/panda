@@ -157,6 +157,7 @@ type
   ENDAShapeError = class(ENDAError);
   ENDAPartError = class(ENDAError);
   ENDAIndexError = class(ENDAError);
+  ENDAValueError = class(ENDAError);
   ENDAWriteError = class(ENDAError);
   ENDACastError = class(ENDAError);
   ENDAMapError = class(ENDAError);

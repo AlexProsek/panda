@@ -491,6 +491,8 @@ type
     class procedure Copy<T>(aSrc, aDst: PByte; aCount, aStep: NativeInt); overload; static;
     class procedure Copy<T>(const aArr: INDArray; aDst: PByte); overload; static;
     class function Permute<T>(const aData: TArray<T>; const aIndices: array of Integer): TArray<T>;
+
+    class function _ToUntypedArrays<T>(const aArrs: array of INDArray<T>): TArray<INDArray>;
   public
     class constructor Create;
     class destructor Destroy;
@@ -3415,6 +3417,14 @@ begin
   SetLength(Result, count);
   for I := 0 to High(Result) do
     Result[I] := aData[aIndices[I]];
+end;
+
+class function TNDAUt._ToUntypedArrays<T>(const aArrs: array of INDArray<T>): TArray<INDArray>;
+var I: NativeInt;
+begin
+  SetLength(Result, Length(aArrs));
+  for I := 0 to High(Result) do
+    Result[I] := aArrs[I];
 end;
 
 {$endregion}

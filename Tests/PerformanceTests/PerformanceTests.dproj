@@ -168,6 +168,7 @@
         <DCCReference Include="panda.PTests.MPNums.pas"/>
         <DCCReference Include="panda.PTests.Nums.pas"/>
         <DCCReference Include="panda.PTests.Poly.pas"/>
+        <DCCReference Include="panda.PTests.ArrManip.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

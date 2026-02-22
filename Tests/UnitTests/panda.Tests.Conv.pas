@@ -8,8 +8,6 @@ uses
   , panda.Arrays
   , panda.Conv
   , panda.Tests.NDATestCase
-
-  , panda.Formatter
   ;
 
 type

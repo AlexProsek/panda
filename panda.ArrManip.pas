@@ -21,6 +21,8 @@ type
     class function FlippedAxesIdx(aDim: Integer; const aAxes: array of Integer): INDIndexSeq; static;
     class procedure _MatCpy<T>(const aSrc, aDst: TMatSpec); static;
     class procedure _Tr<T>(const aSrc, aDst: INDArray<T>; const aAxes: TArray<Integer>); static;
+    class function _GetConcatShape(const aArrs: TArray<INDArray>; aAxis: Integer;
+      out aOffsets: TNDAShape): TNDAShape;
   public
     class function GetPart(const aArr: INDArray; const aIdx: INDIndexSeq): INDArray; static;
     class function SetPart(const aArr: INDArray; const aIdx: INDIndexSeq; const aValue: INDArray): Integer; static;
@@ -38,6 +40,8 @@ type
     class function Flip<T>(const aArr: INDArray<T>; aAxis: Integer = 0): INDArray<T>; overload; static;
     class function Flip<T>(const aArr: INDArray<T>; aAxes: array of Integer): INDArray<T>; overload; static;
     class function FlipAll<T>(const aArr: INDArray<T>): INDArray<T>; static;
+
+    class function Concat<T>(const aArrs: array of INDArray<T>; aAxis: Integer = 0): INDArray<T>; static;
   end;
 
 {$region 'low-level functions'}
@@ -431,6 +435,61 @@ end;
 class function TNDAMan.FlipAll<T>(const aArr: INDArray<T>): INDArray<T>;
 begin
   Result := Flip<T>(aArr, TDynAUt.Range_I32(0, aArr.NDim - 1));
+end;
+
+class function TNDAMan._GetConcatShape(const aArrs: TArray<INDArray>; aAxis: Integer;
+  out aOffsets: TNDAShape): TNDAShape;
+var I, J, arrCnt: NativeInt;
+    sh: TNDAShape;
+    nDim: Integer;
+begin
+  arrCnt := Length(aArrs);
+  if arrCnt = 0 then
+    raise ENDAValueError.Create('Need at least one array to concatenate.');
+
+  Result := System.Copy(aArrs[0].Shape);
+  nDim := Length(Result);
+  if (aAxis < 0) or (nDim <= aAxis) then
+    raise ENDAIndexError.Create('Axis index is out of range for concatenation.');
+
+  SetLength(aOffsets, arrCnt);
+  aOffsets[0] := Result[aAxis];
+  for I := 1 to arrCnt - 1 do begin
+    sh := aArrs[I].Shape;
+    if Length(sh) <> nDim then
+      raise ENDAShapeError.CreateFmt(
+        'All the input arrays mut have same number of dimensions, but the array ' +
+        'at index 0 has %d dimension(s) and the array at index %d has %d dimension(s).',
+        [nDim, I, Length(sh)]
+      );
+    for J := 0 to aAxis - 1 do
+      if (J <> aAxis) and (sh[J] <> Result[J]) then
+        raise ENDAShapeError.CreateFmt(
+          'All the input arrays dimensions except for the concatenation axis ' +
+          'must match exactly, but along dimension %d, the array at index 0 has size %d ' +
+          'and the array at index %d has size %d.',
+          [J, Result[J], I, sh[J]]
+        );
+    Inc(Result[aAxis], sh[aAxis]);
+    aOffsets[I] := Result[aAxis];
+  end;
+end;
+
+class function TNDAMan.Concat<T>(const aArrs: array of INDArray<T>; aAxis: Integer): INDArray<T>;
+var I, J, K: NativeInt;
+    shRes, ao: TNDAShape;
+    seq: INDIndexSeq;
+begin
+  shRes := _GetConcatShape(_ToUntypedArrays<T>(aArrs), aAxis, ao);
+  Result := TNDABuffer<T>.Create(shRes);
+  seq := NDIAllSeq(Length(shRes));
+  J := 0;
+  for I := 0 to High(aArrs) do begin
+    K := ao[I];
+    seq[aAxis] := NDISpan(J, K - 1);
+    Result[seq] := aArrs[I];
+    J := K;
+  end;
 end;
 
 {$endregion}
