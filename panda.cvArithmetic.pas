@@ -12,6 +12,7 @@ uses
 
 procedure VecAdd(pA, pB, pRes: PSingle; aCount: NativeInt); overload;
 procedure VecAdd(pA, pB, pRes: PDouble; aCount: NativeInt); overload;
+procedure VecAdd(pA, pB, pRes: PCmplx128; aCount: NativeInt); inline; overload;
 procedure VecAdd(pA: PSingle; B: Single; pRes: PSingle; aCount: NativeInt); overload;
 procedure VecAdd(pA: PDouble; const B: Double; pRes: PDouble; aCount: NativeInt); overload;
 procedure VecAdd(pA: PCmplx128; const B: TCmplx128; pRes: PCmplx128; aCount: NativeInt); overload;
@@ -22,6 +23,7 @@ procedure VecAddInPlace(pA, pB: PSingle; aAStep, aBStep, aCount: NativeInt); ove
 
 procedure VecSub(pA, pB, pRes: PDouble; aCount: NativeInt); overload;
 procedure VecSub(pA, pB, pRes: PSingle; aCount: NativeInt); overload;
+procedure VecSub(pA, pB, pRes: PCmplx128; aCount: NativeInt); inline; overload;
 procedure VecSub(pA: PDouble; const B: Double; pRes: PDouble; aCount: NativeInt); overload;
 procedure VecSub(pA: PSingle; B: Single; pRes: PSingle; aCount: NativeInt); overload;
 procedure VecSub(A: Single; pB: PSingle; pRes: PSingle; aCount: NativeInt); overload;
@@ -358,6 +360,11 @@ begin
   end;
 end;
 {$endif}
+
+procedure VecAdd(pA, pB, pRes: PCmplx128; aCount: NativeInt);
+begin
+  VecAdd(PDouble(pA), PDouble(pB), PDouble(pRes), 2 * aCount);
+end;
 
 procedure VecAdd(pA: PSingle; B: Single; pRes: PSingle; aCount: NativeInt);
 {$if defined(ASMx86)}
@@ -716,6 +723,11 @@ begin
     Inc(pRes);
     Inc(pA);
   end;
+end;
+
+procedure VecSub(pA, pB, pRes: PCmplx128; aCount: NativeInt);
+begin
+  VecSub(PDouble(pA), PDouble(pB), PDouble(pRes), 2 * aCount);
 end;
 
 procedure VecSub(pA: PSingle; B: Single; pRes: PSingle; aCount: NativeInt);
