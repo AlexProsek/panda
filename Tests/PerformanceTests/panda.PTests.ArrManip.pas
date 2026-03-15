@@ -21,7 +21,8 @@ type
     procedure Fill2DByVec;
     procedure TransposeMat;
     procedure TransposeT3;
-    procedure BlockVsStdTrCmp;
+    procedure BlockVsStdTrCmp_Single;
+    procedure BlockVsStdTrCmp_Byte;
   end;
 
   TArrManipPascalImplTests = class(TNDAPerformanceTestCase)
@@ -100,7 +101,7 @@ begin
   SWStop;
 end;
 
-procedure TArrManipTests.BlockVsStdTrCmp;
+procedure TArrManipTests.BlockVsStdTrCmp_Single;
 var a, b: INDArray<Single>;
 const N = 1014;
       M = 768;
@@ -124,6 +125,35 @@ begin
   DoTestLoop(
     procedure begin
       TNDAMan.Transpose<Single>(a, b, [1, 0]);
+    end
+  , 50);
+  SWStop('StdTr');
+end;
+
+procedure TArrManipTests.BlockVsStdTrCmp_Byte;
+var a, b: INDArray<Byte>;
+const N = 1014;
+      M = 768;
+begin
+  a := nda.Full<Byte>([M, N], 0);
+  b := nda.Full<Byte>([N, M], 0);
+
+  // for matrices with continuous rows a transposition by blocks is executed
+  SWStart;
+  DoTestLoop(
+    procedure begin
+      TNDAMan.Transpose<Byte>(a, b, [1, 0]);
+    end
+  , 50);
+  SWStop('BlockTr');
+
+  a := nda.Full<Byte>([M, 2*N], 0);
+  a := a[[NDIAll, NDIAll(2)]]; // make gaps between columns to avoid block transposition
+
+  SWStart;
+  DoTestLoop(
+    procedure begin
+      TNDAMan.Transpose<Byte>(a, b, [1, 0]);
     end
   , 50);
   SWStop('StdTr');

@@ -37,10 +37,12 @@ type
   {$endif}
     function GetTestDataPath(const aFileName: String): String;
   public
+    procedure CheckEquals(const aExpected, aValue: array of Byte); overload;
     procedure CheckEquals(const aExpected, aValue: array of NativeInt); overload;
   {$ifdef CPUX64}
     procedure CheckEquals(const aExpected, aValue: array of Integer); overload;
   {$endif}
+    procedure CheckEquals(const aExpected, aValue: array of Single; const aTol: Single = 0); overload;
     procedure CheckEquals(const aExpected, aValue: array of Double; const aTol: Double = 0); overload;
     procedure CheckEquals(const aExpected: array of String; const aValue: array of String); overload;
     procedure CheckEquals(const aExpected, aValue: TCmplx128; const aTol: Double = 0); overload;
@@ -117,6 +119,14 @@ begin
   Result := TPath.Combine(Result, Format('..\..\TestData\%s', [aFileName]));
 end;
 
+procedure TNDATestCase.CheckEquals(const aExpected, aValue: array of Byte);
+var I: Integer;
+begin
+  CheckEquals(Length(aExpected), Length(aValue));
+  for I := 0 to High(aExpected) do
+    CheckEquals(NativeInt(aExpected[I]), NativeInt(aValue[I]));
+end;
+
 procedure TNDATestCase.CheckEquals(const aExpected, aValue: array of NativeInt);
 var I: Integer;
 begin
@@ -134,6 +144,14 @@ begin
     CheckEquals(aExpected[I], aValue[I]);
 end;
 {$endif}
+
+procedure TNDATestCase.CheckEquals(const aExpected, aValue: array of Single; const aTol: Single);
+var I: Integer;
+begin
+  CheckEquals(Length(aExpected), Length(aValue));
+  for I := 0 to High(aExpected) do
+    CheckEquals(Extended(aExpected[I]), Extended(aValue[I]), aTol);
+end;
 
 procedure TNDATestCase.CheckEquals(const aExpected, aValue: array of Double; const aTol: Double);
 var I: Integer;

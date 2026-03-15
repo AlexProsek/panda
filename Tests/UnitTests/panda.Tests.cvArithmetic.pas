@@ -8,6 +8,7 @@ uses
   , panda.Tests.NDATestCase
   , panda.cvArithmetic
   , System.SysUtils
+  , System.Math
   ;
 
 type
@@ -56,6 +57,7 @@ type
     procedure SubScalarWithSat8_UInt16;
     procedure MulVec1_Cmplx128;
     procedure MulVec2_Cmplx128;
+    procedure MulVec3_Cmplx128;
     procedure MulByScalar3_Single;
     procedure MulByScalar5_Single;
     procedure MulbyScalar1_Cmplx128;
@@ -69,6 +71,10 @@ type
     procedure TestMin_4U8;
     procedure TestMin_NU8;
     procedure TestMax_2U8;
+    procedure TestVecMin_U8_6;
+    procedure TestVecMin_U8_32;
+    procedure TestVecMaxS_Single_3;
+    procedure TestVecMaxS_Single_8;
     procedure TestScal_3_Single;
     procedure TestScal_8_Single;
     procedure TestScal_10_Single;
@@ -104,7 +110,7 @@ type
     procedure TestSCopy_5_Double;
     procedure TestDiff_Double;
     procedure TEstDiff3_Single;
-    procedure TestDiff4_Single;
+    procedure TestDiff8_Single;
     procedure TestDiffWithStep_Single_2;
     procedure TestDiffWithStep_Single_4;
     procedure TestDiffWithStep_Single_6;
@@ -696,6 +702,24 @@ begin
   CheckEquals(38, c[1].Im, dtol);
 end;
 
+procedure TTestVectorMath.MulVec3_Cmplx128;
+var a, b, c: array [0..2] of TCmplx128;
+begin
+  a[0].Init(1, 2);
+  a[1].Init(3, 4);
+  a[2].Init(5, 6);
+  b[0].Init(3, 4);
+  b[1].Init(5, 6);
+  b[2].Init(7, 8);
+  VecMul(PCmplx128(@a), @b, @c, 3);
+  CheckEquals(-5,  c[0].Re, dtol);
+  CheckEquals(10,  c[0].Im, dtol);
+  CheckEquals(-9,  c[1].Re, dtol);
+  CheckEquals(38,  c[1].Im, dtol);
+  CheckEquals(-13, c[2].Re, dtol);
+  CheckEquals(82,  c[2].Im, dtol);
+end;
+
 procedure TTestVectorMath.MulByScalar3_Single;
 const
   A: array [0..2] of Single = (1, 2, 3);
@@ -901,6 +925,58 @@ begin
   CheckEquals(a, res);
   res := Max_2U8(a, a);
   CheckEquals(a, res);
+end;
+
+procedure TTestVectorMath.TestVecMin_U8_6;
+var x, y, res: TArray<Byte>;
+begin
+  x := TArray<Byte>.Create(1, 2, 3, 4, 5, 6);
+  y := TArray<Byte>.Create(3, 1, 1, 5, 7, 2);
+  SetLength(res, Length(x));
+
+  VecMin(PUInt8(x), PUInt8(y), PUInt8(res), Length(x));
+
+  CheckEquals([1, 1, 1, 4, 5, 2], res);
+end;
+
+procedure TTestVectorMath.testVecMin_U8_32;
+var x, y, res: TArray<Byte>;
+    I: Integer;
+begin
+  SetLength(x, 32);
+  SetLength(y, 32);
+  SetLength(res, 32);
+  for I := 0 to High(x) do begin
+    x[I] := I;
+    y[I] := 32 * (I and 1);
+  end;
+
+  VecMin(PUInt8(x), PUInt8(y), PUInt8(res), Length(x));
+
+  for I := 0 to High(res) do
+    CheckEquals(Min(I, 32*(I and 1)), res[I]);
+end;
+
+procedure TTestVectorMath.TestVecMaxS_Single_3;
+var x, res: TArray<Single>;
+begin
+  x := TArray<Single>.Create(1, 2, 3);
+  SetLength(res, Length(x));
+
+  VecMax(2.5, PSingle(x), PSingle(res), Length(x));
+
+  CheckEquals([2.5, 2.5, 3], res, stol);
+end;
+
+procedure TTestVectorMath.TestVecMaxS_Single_8;
+var x, res: TArray<Single>;
+begin
+  x := TArray<Single>.Create(1, 2, 3, 4, 5, 6, 7, 8);
+  SetLength(res, Length(x));
+
+  VecMax(4, PSingle(x), PSingle(res), Length(x));
+
+  CheckEquals([4, 4, 4, 4, 5, 6, 7, 8], res, stol);
 end;
 
 procedure TTestVectorMath.TestScal_3_Single;
@@ -1305,21 +1381,16 @@ begin
   x := TArray<Single>.Create(1, 2, 4, 7);
   SetLength(diffs, Length(x) - 1);
   Differences(PSingle(x), PSingle(diffs), Length(x));
-  CheckEquals(1, diffs[0]);
-  CheckEquals(2, diffs[1]);
-  CheckEquals(3, diffs[2]);
+  CheckEquals([1, 2, 3], diffs);
 end;
 
-procedure TTestVectorMath.TestDiff4_Single;
+procedure TTestVectorMath.TestDiff8_Single;
 var x, diffs: TArray<Single>;
 begin
-  x := TArray<Single>.Create(1, 2, 4, 7, 11);
+  x := TArray<Single>.Create(1, 2, 4, 7, 11, 16, 22, 29, 37);
   SetLength(diffs, Length(x) - 1);
   Differences(PSingle(x), PSingle(diffs), Length(x));
-  CheckEquals(1, diffs[0]);
-  CheckEquals(2, diffs[1]);
-  CheckEquals(3, diffs[2]);
-  CheckEquals(4, diffs[3]);
+  CheckEquals([1, 2, 3, 4, 5, 6, 7, 8], diffs);
 end;
 
 procedure TTestVectorMath.TestDiffWithStep_Single_2;

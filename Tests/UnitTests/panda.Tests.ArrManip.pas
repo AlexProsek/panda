@@ -19,6 +19,9 @@ type
     procedure BlockTr6x4_4B;
     procedure BlockTr6x5_4B;
     procedure BlockTr10x10_4B;
+
+    procedure BlockTr8x8_1B;
+    procedure BlockTr20x20_1B;
   end;
 
   TArrManipTests = class(TNDATestCase)
@@ -160,6 +163,42 @@ begin
 
   for I := 0 to 9 do
     for J := 0 to 9 do
+      CheckEquals(a[I, J], b[J, I]);
+end;
+
+procedure TArrManipLowLvlTests.BlockTr8x8_1B;
+var a: array [0..7, 0..7] of Byte;
+    b: array [0..7, 0..7] of Byte;
+    I, J: Integer;
+begin
+  for I := 0 to 7 do
+    for J := 0 to 7 do begin
+      a[I, J] := 8*I + J;
+      b[I, J] := 0;
+    end;
+
+  Tr8x8_1B(@a, @b, 8, 8);
+
+  for I := 0 to 7 do
+    for J := 0 to 7 do
+      CheckEquals(a[I, J], b[J, I]);
+end;
+
+procedure TArrManipLowLvlTests.BlockTr20x20_1B;
+var a: array [0..19, 0..19] of Byte;
+    b: array [0..19, 0..19] of Byte;
+    I, J: Integer;
+begin
+  for I := 0 to 19 do
+    for J := 0 to 19 do begin
+      a[I, J] := 10*I + J shr 1;
+      b[I, J] := 0;
+    end;
+
+  CTr_1B(@a, @b, 20, 20, 20, 20);
+
+  for I := 0 to 19 do
+    for J := 0 to 19 do
       CheckEquals(a[I, J], b[J, I]);
 end;
 

@@ -524,6 +524,10 @@ type
     class function TryAsDynArray<T>(const aArr: INDArray; out aValue: TArray<T>): Boolean; static;
     class function TryAsDynArray2D<T>(const aArr: INDArray; out aValue: TArray<TArray<T>>): Boolean; static;
     class function TryAsArray<T>(const aArr: INDArray; out aValue: INDArray<T>): Boolean; static;
+    /// <param name="aFnc">aFnc(aIdx: NativeInt): T</param>
+    class function Table1D<T>(const aFunc: TFunc<NativeInt, T>; aLoX, aHiX: NativeInt): INDArray<T>; static;
+    /// <param name="aFunc">aFunc(aRowIdx, aColIdx: NativeInt): T</param>
+    class function Table2D<T>(const aFunc: TFunc<NativeInt, NativeInt, T>; aLoX, aHiX, aLoY, aHiY: NativeInt): INDArray<T>; static;
 
     class procedure Map<T, U, V>(const L: INDArray<T>; const R: U; var aRes: INDArray<V>; aRFnc: TIPProcVV); overload; static;
     class procedure Map<T, U, V>(const L: T; const R: INDArray<U>; var aRes: INDArray<V>; aLFnc: TIPProcVV); overload; static;
@@ -593,6 +597,7 @@ type
 {$endif}
   function NDICheckRange(const aIndices: INDIndexSeq; const aShape: TNDAShape): Boolean;
   function NDIRange(aLo, aHi: NativeInt; aStep: NativeInt = 1): SNDIRange;
+  function CheckRange(var aLo, aHi: NativeInt): Integer;
   function ShapeToStr(const aArr: INDArray): String; inline;
 
   /// <summary>
@@ -1187,6 +1192,16 @@ begin
   Result.fLo := aLo;
   Result.fHi := aHi;
   Result.fStep := aStep;
+end;
+
+function CheckRange(var aLo, aHi: NativeInt): Integer;
+var tmp: Integer;
+begin
+  if aLo > aHi then begin
+    tmp := aLo; aLo := aHi; aHi := tmp;
+    Result := -1;
+  end else
+    Result := 1;
 end;
 
 function ShapeToStr(const aArr: INDArray): String;
@@ -3011,6 +3026,42 @@ end;
 class function TNDAUt.TryAsArray<T>(const aArr: INDArray; out aValue: INDArray<T>): Boolean;
 begin
   Result := SameQ(aArr.GetItemType, TypeInfo(T)) and Supports(aArr, INDArray<T>, aValue);
+end;
+
+class function TNDAUt.Table1D<T>(const aFunc: TFunc<NativeInt, T>; aLoX, aHiX: NativeInt): INDArray<T>;
+var I, xStep: NativeInt;
+    p: TNDA<T>.PT;
+begin
+  xStep := CheckRange(aLoX, aHiX);
+  Result := TNDABuffer<T>.Create([aHiX - aLoX + 1]);
+  p := TNDA<T>.PT(Result.Data);
+  I := aLoX;
+  while I <= aHiX do begin
+    p^ := aFunc(I);
+    Inc(p);
+    Inc(I, xStep);
+  end;
+end;
+
+class function TNDAUt.Table2D<T>(const aFunc: TFunc<NativeInt, NativeInt, T>;
+  aLoX, aHiX, aLoY, aHiY: NativeInt): INDArray<T>;
+var I, J, xStep, yStep: NativeInt;
+    p: TNDA<T>.PT;
+begin
+  xStep := CheckRange(aLoX, aHiX);
+  yStep := CheckRange(aLoY, aHiY);
+  Result := TNDABuffer<T>.Create([aHiY - aLoY + 1, aHiX  - aLoX + 1]);
+  p := TNDA<T>.PT(Result.Data);
+  I := aLoY;
+  while I <= aHiY do begin
+    J := aLoX;
+    while J <= aHiX do begin
+      p^ := aFunc(I, J);
+      Inc(p);
+      Inc(J, xStep);
+    end;
+    Inc(I, yStep);
+  end;
 end;
 
 class procedure TNDAUt.Fill<T>(const aArr: INDArray<T>; const aValue: T);

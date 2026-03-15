@@ -36,6 +36,7 @@ type
     class operator Multiply(const A, B: TTensorI32): TTensorI32;
 
     property NDA: INDArray<Integer> read fArr;
+    property Shape: TNDAShape read GetShape;
   end;
 
   TTensorI64 = record

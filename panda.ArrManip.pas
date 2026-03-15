@@ -34,6 +34,8 @@ type
     class function Transpose<T>(const aArr: INDArray<T>): INDArray<T>; overload; static;
     class function Transpose<T>(const aArr: INDArray<T>; const aAxes: TArray<Integer>): INDArray<T>; overload; static;
     class procedure Transpose<T>(const aSrc, aDst: INDArray<T>; const aAxes: TArray<Integer>); overload; static;
+    class function TransposedView<T>(const aArr: INDArray<T>; const aAxes: TArray<Integer> = nil): INDArray<T>; static;
+
     /// <summary>
     ///   <c>Flip<T>(aArr, axis)</c> reverses the order of elements in an array along the given axis.
     /// </summary>
@@ -54,6 +56,10 @@ function CColsQ(const aMat: TMatSpec): Boolean; inline;
 procedure Tr4x4_4B(pSrc, pDst: PByte; aSrcStep, aDstStep: NativeInt);
 procedure TrRxC_4B(pSrc, pDst: PByte; aSrcStep, aDstStep: NativeInt; R, C: NativeInt);
 procedure CTr_4B(pSrc, pDst: PByte; aSrcRCnt, aSrcCCnt, aSrcRStep, aDstRStep: NativeInt);
+
+procedure Tr8x8_1B(pSrc, pDst: PByte; aSrcStep, aDstStep: NativeInt);
+procedure TrRxC_1B(pSrc, pDst: PByte; aSrcStep, aDstStep: NativeInt; R, C: NativeInt);
+procedure CTr_1B(pSrc, pDst: PByte; aSrcRCnt, aSrcCCnt, aSrcRStep, aDstRStep: NativeInt);
 
 {$endregion}
 
@@ -168,8 +174,7 @@ end;
 
 procedure CTr_4B(pSrc, pDst: PByte; aSrcRCnt, aSrcCCnt, aSrcRStep, aDstRStep: NativeInt);
 var pEnd, pSrcBlock, pDstBlock, pRowEnd: PByte;
-    srcRWb: NativeInt;
-    RRest, CRest: NativeInt;
+    RRest, CRest, srcRWb: NativeInt;
 const cBlockSz = 4;
 begin
   srcRWb := ((aSrcCCnt shr 2) shl 2) * cF32Sz;
@@ -201,6 +206,150 @@ begin
     end;
     // right-bottom corner transposition
     TrRxC_4B(pSrc, pDst, aSrcRStep, aDstRStep, RRest, CRest);
+  end;
+end;
+
+procedure Tr8x8_1B(pSrc, pDst: PByte; aSrcStep, aDstStep: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- pSrc, RDX <- pDst, R8 <- aSrcStep, R9 <- aDstStep
+asm
+  push rdi
+  sub rsp, 32
+  movdqa [rsp], xmm6
+  movdqa [rsp + 16], xmm7
+
+  // load 8 rows
+  movq xmm0,[rcx]
+  movq xmm1,[rcx + r8]
+  lea r10,[r8*2]
+  movq xmm2,[rcx + r10]
+  lea r11,[r10 + r8]
+  movq xmm3,[rcx + r11]
+  lea r10,[r11 + r8]
+  movq xmm4,[rcx + r10]
+  lea r11,[r10 + r8]
+  movq xmm5,[rcx + r11]
+  lea r10,[r11 + r8]
+  movq xmm6,[rcx + r10]
+  lea r11,[r10 + r8]
+  movq xmm7,[rcx + r11]
+
+  // stage 1
+  punpcklbw xmm0,xmm1
+  punpcklbw xmm2,xmm3
+  punpcklbw xmm4,xmm5
+  punpcklbw xmm6,xmm7
+
+  // stage 2
+  movdqa xmm1,xmm0
+  punpcklwd xmm0,xmm2
+  punpckhwd xmm1,xmm2
+
+  movdqa xmm3,xmm4
+  punpcklwd xmm4,xmm6
+  punpckhwd xmm3,xmm6
+
+  // stage 3
+  movdqa xmm2,xmm0
+  punpckldq xmm0,xmm4
+  punpckhdq xmm2,xmm4
+
+  movdqa xmm6,xmm1
+  punpckldq xmm1,xmm3
+  punpckhdq xmm6,xmm3
+
+  // store rows
+  mov rdi, rdx
+  movq [rdi],xmm0
+  psrldq xmm0,8
+  movq [rdx + r9],xmm0
+
+  lea rdi, [rdx + 4*r9]
+  movq [rdi],xmm1
+  psrldq xmm1,8
+  movq [rdi + r9],xmm1
+
+  lea rdi, [rdx + 2*r9]
+  movq [rdi],xmm2
+  psrldq xmm2,8
+  movq [rdi + r9],xmm2
+
+  lea rdi, [rdi + 4*r9]
+  movq [rdi],xmm6
+  psrldq xmm6,8
+  movq [rdi + r9],xmm6
+
+  movdqa xmm6, [rsp]
+  movdqa xmm7, [rsp + 16]
+  add rsp, 32
+  pop rdi
+end;
+{$else}
+var I: Integer;
+begin
+  for I := 0 to 7 do begin
+    pDst^                 := pSrc^;
+    (pDst +   aDstStep)^  := (pSrc + 1)^;
+    (pDst + 2*aDstStep)^  := (pSrc + 2)^;
+    (pDst + 3*aDstStep)^  := (pSrc + 3)^;
+    (pDst + 4*aDstStep)^  := (pSrc + 4)^;
+    (pDst + 5*aDstStep)^  := (pSrc + 5)^;
+    (pDst + 6*aDstStep)^  := (pSrc + 6)^;
+    (pDst + 7*aDstStep)^  := (pSrc + 7)^;
+
+    Inc(pSrc, aSrcStep);
+    Inc(pDst);
+  end;
+end;
+{$endif}
+
+procedure TrRxC_1B(pSrc, pDst: PByte; aSrcStep, aDstStep: NativeInt; R, C: NativeInt);
+var I: NativeInt;
+    pEnd: PByte;
+begin
+  pEnd := pSrc + R * aSrcStep;
+  while pSrc < pEnd do begin
+    for I := 0 to C - 1 do
+      (pDst + I*aDstStep)^ := (pSrc + I)^;
+    Inc(pSrc, aSrcStep);
+    Inc(pDst);
+  end;
+end;
+
+procedure CTr_1B(pSrc, pDst: PByte; aSrcRCnt, aSrcCCnt, aSrcRStep, aDstRStep: NativeInt);
+var pEnd, pSrcBlock, pDstBlock, pRowEnd: PByte;
+    RRest, CRest, srcRWb: NativeInt;
+const cBlockSz = 8;
+begin
+  srcRWb := ((aSrcCCnt shr 3) shl 3);
+  CRest := aSrcCCnt and (cBlockSz - 1);
+  RRest := aSrcRcnt and (cBlockSz - 1);
+  pEnd := pSrc + ((aSrcRCnt shr 3) shl 3) * aSrcRStep;
+  while pSrc < pEnd do begin
+    pRowEnd := pSrc + srcRWb;
+    pSrcBlock := pSrc;
+    pDstBlock := pDst;
+    while pSrcBlock < pRowEnd do begin
+      Tr8x8_1B(pSrcBlock, pDstBlock, aSrcRStep, aDstRStep);
+      Inc(pDstBlock, 8 * aDstRStep);
+      Inc(pSrcBlock, 8);
+    end;
+    // remaining right block transposition
+    if CRest > 0 then
+      TrRxC_1B(pSrcBlock, pDstBlock, aSrcRStep, aDstRStep, 8, CRest);
+    Inc(pSrc, 8 * aSrcRStep);
+    Inc(pDst, 8);
+  end;
+  // remaining bottom blocks transposition
+  if RRest > 0 then begin
+    pRowEnd := pSrc + srcRWb;
+    while pSrc < pRowEnd do begin
+      TrRxC_1B(pSrc, pDst, aSrcRStep, aDstRStep, RRest, 8);
+      Inc(pDst, 8 * aDstRStep);
+      Inc(pSrc, 8);
+    end;
+    // right-bottom corner transposition
+    TrRxC_1B(pSrc, pDst, aSrcRStep, aDstRStep, RRest, CRest);
   end;
 end;
 
@@ -332,6 +481,9 @@ begin
     GetMatSpec(aDst, dstMat);
     if CRowsQ(srcMat) and CRowsQ(dstMat) then begin
       case srcMat.ElSize of
+        1: CTr_1B(srcMat.data, dstMat.Data, srcMat.NRows, srcMat.NCols,
+          srcMat.RStep, dstMat.RStep
+        );
         cF32Sz: CTr_4B(srcMat.data, dstMat.Data, srcMat.NRows, srcMat.NCols,
           srcMat.RStep, dstMat.RStep
         );
@@ -353,7 +505,16 @@ begin
     GetMatSpec(itDst.CurrentSlice, dstMat);
     if CColsQ(srcMat) and CRowsQ(dstMat) then begin
       case srcMat.ElSize of
-        cF32Sz: begin
+        1:
+          while itSrc.MoveNext and itDst.MoveNext do begin
+            CTr_1B(itSrc.Current, itDst.Current,
+              // swap source axes back because they are swapped by iterator
+              srcMat.NCols, srcMat.NRows,
+              srcMat.CStep, dstMat.RStep
+            );
+          end;
+
+        cF32Sz:
           while itSrc.MoveNext and itDst.MoveNext do begin
             CTr_4B(itSrc.Current, itDst.Current,
               // swap source axes back because they are swapped by iterator
@@ -361,7 +522,6 @@ begin
               srcMat.CStep, dstMat.RStep
             );
           end;
-        end;
       else
         while itSrc.MoveNext and itDst.MoveNext do begin
           srcMat.Data := itSrc.Current;
@@ -404,6 +564,17 @@ begin
     raise ENDAShapeError.Create(sErrMsg);
 
   _Tr<T>(aSrc, aDst, aAxes);
+end;
+
+class function TNDAMan.TransposedView<T>(const aArr: INDArray<T>; const aAxes: TArray<Integer>): INDArray<T>;
+var axes: TArray<Integer>;
+begin
+  if aAxes = nil then
+    axes := TDynAUt.Range_I32(aArr.NDim - 1, 0, -1)
+  else
+    axes := aAxes;
+
+  Result := TNDArrayWrapper<T>.CreatePermuted(aArr, axes);
 end;
 
 class function TNDAMan.FlippedAxesIdx(aDim: Integer; const aAxes: array of Integer): INDIndexSeq;

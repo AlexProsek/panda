@@ -65,6 +65,7 @@ function ndaTotalAtLvl(const aArr: INDArray<Double>; aLvl: Integer): INDArray<Do
 ///   Gives a product of vectors, matrices and tensors.
 /// </summary>
 function ndaDot(const aA, aB: INDArray<Single>): INDArray<Single>; overload;
+procedure ndaDot(const aA, aB: INDArray<Single>; var aRes: INDArray<Single>); overload;
 function ndaDot(const aA, aB: INDArray<Double>): INDArray<Double>; overload;
 
 function ndaOuter(const aA, aB: INDArray<Single>): INDArray<Single>; overload;
@@ -506,6 +507,11 @@ function ndaDot(const aA, aB: INDArray<Single>): INDArray<Single>;
 begin
   Result := TNDAMath.MakeInnerProdResBuffer<Single>(aA, aB);
   TNDAMath.DoInnerProd(aA, aB, Result, sdot)
+end;
+
+procedure ndaDot(const aA, aB: INDArray<Single>; var aRes: INDArray<Single>);
+begin
+  TNDAMath.DoInnerProd(aA, aB, aRes, sdot);
 end;
 
 function ndaDot(const aA, aB: INDArray<Double>): INDArray<Double>;

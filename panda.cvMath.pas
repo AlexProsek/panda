@@ -31,6 +31,8 @@ procedure cvAbsMax(pData: PDouble; aCount: NativeInt; var aMax: Double); overloa
 
 implementation
 
+{$EXCESSPRECISION OFF} // to prevent Single -> Double conversion by x64 compiler
+
 uses
     panda.cvArithmetic
   ;

@@ -49,6 +49,7 @@ type
     procedure VecNeg_Double;
     procedure VecAbs_Single;
     procedure VecAbs_Double;
+    procedure VecMin_UI8;
     procedure Diff_Single;
     procedure SQDiffs_Single;
     procedure SQDiffs_Double;
@@ -139,7 +140,7 @@ begin
   SetLength(res, N);
 
   SWStart;
-  VecMul(PCmplx128(@x[0]), @x[0], @res[0], N);
+  DoTestLoop(procedure begin VecMul(PCmplx128(@x[0]), @x[0], @res[0], N) end, 100);
   SWStop;
 end;
 
@@ -625,6 +626,18 @@ begin
 
   SWStart;
   VecAbs(PDouble(x), PDouble(y), Length(x));
+  SWStop;
+end;
+
+procedure TVecMathPerformance.VecMin_UI8;
+var x, y: TArray<UInt8>;
+const N = 10000000;
+begin
+  SetLength(x, N);
+  SetLength(y, N);
+
+  SWStart;
+  VecMin(PUInt8(x), PUInt8(x), PUInt8(y), Length(x));
   SWStop;
 end;
 

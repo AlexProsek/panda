@@ -59,6 +59,8 @@ const
   NDAF_ALIGNED          = $0100;
   NDAF_WRITEABLE        = $0400;
 
+  NDAF_MASK             = $FFFF;
+
   NDAF_CONTIGUOUS = NDAF_C_CONTIGUOUS or NDAF_F_CONTIGUOUS;
   NDAF_COW = NDAF_C_CONTIGUOUS or NDAF_OWNDATA or NDAF_WRITEABLE;
 
@@ -142,6 +144,11 @@ type
     NCols: NativeInt;
     RStep: NativeInt;
     CStep: NativeInt;
+  end;
+
+  TMatIdx = record
+    RIdx: NativeInt;
+    CIdx: Nativeint;
   end;
 
   // In place procedure types ( X <- F(X, Y) or Y <- F(X, Y) )
