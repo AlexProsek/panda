@@ -22,6 +22,9 @@ type
 
     procedure BlockTr8x8_1B;
     procedure BlockTr20x20_1B;
+
+    procedure BlockTr8x8_2B;
+    procedure BlockTr20x20_2B;
   end;
 
   TArrManipTests = class(TNDATestCase)
@@ -50,6 +53,23 @@ type
     procedure Concat2Dx3_A0;
     procedure Concat2Dx3_A1;
     procedure Concat_SingleArr;
+
+    procedure Append1D;
+    procedure Prepend1D;
+    procedure Insert1D;
+    procedure InsertList1D;
+    procedure Insert2D_A0;
+    procedure Insert2D_A1;
+    procedure InsertList2D_A0;
+    procedure InsertList2D_A1;
+    procedure Riffle1D;
+    procedure Riffle2D_A0;
+    procedure Riffle2D_A1;
+
+    procedure Pad1D;
+    procedure Pad2D;
+    procedure Pad3D;
+    procedure Pad2D_DiffPadWidths;
   end;
 
 implementation
@@ -196,6 +216,40 @@ begin
     end;
 
   CTr_1B(@a, @b, 20, 20, 20, 20);
+
+  for I := 0 to 19 do
+    for J := 0 to 19 do
+      CheckEquals(a[I, J], b[J, I]);
+end;
+
+procedure TArrManipLowLvlTests.BlockTr8x8_2B;
+var a, b: array [0..7, 0..7] of Int16;
+    I, J: Integer;
+begin
+  for I := 0 to 7 do
+    for J := 0 to 7 do begin
+      a[I, J] := 8*I + J;
+      b[I, J] := 0;
+    end;
+
+  Tr8x8_2B(@a, @b, 16, 16);
+
+  for I := 0 to 7 do
+    for J := 0 to 7 do
+      CheckEquals(a[I, J], b[J, I]);
+end;
+
+procedure TArrManipLowLvlTests.BlockTr20x20_2B;
+var a, b: array [0..19, 0..19] of Word;
+    I, J: Integer;
+begin
+  for I := 0 to 19 do
+    for J := 0 to 19 do begin
+      a[I, J] := 10*I + J;
+      b[I, J] := 0;
+    end;
+
+  CTr_2B(@a, @b, 20, 20, 40, 40);
 
   for I := 0 to 19 do
     for J := 0 to 19 do
@@ -560,6 +614,248 @@ begin
 
   CheckTrue(TNDAUt.TryAsDynArray<Integer>(b, v));
   CheckEquals([1, 2, 3], v);
+end;
+
+
+procedure TArrManipTests.Append1D;
+var a: INDArray<Integer>;
+    v: TArray<Integer>;
+begin
+  a := TNDAUt.AsArray<Integer>([1, 2, 3]);
+
+  a := TNDAMan.Append<Integer>(a, 4);
+
+  CheckTrue(TNDAUt.TryAsDynArray<Integer>(a, v));
+  CheckEquals([1, 2, 3, 4], v);
+end;
+
+procedure TArrManipTests.Prepend1D;
+var a: INDArray<Integer>;
+    v: TArray<Integer>;
+begin
+  a := TNDAUt.AsArray<Integer>([1, 2, 3]);
+
+  a := TNDAMan.Prepend<Integer>(a, 4);
+
+  CheckTrue(TNDAUt.TryAsDynArray<Integer>(a, v));
+  CheckEquals([4, 1, 2, 3], v);
+end;
+
+procedure TArrManipTests.Insert1D;
+var a, b: INDArray<Integer>;
+    v: TArray<Integer>;
+begin
+  a := TNDAUt.AsArray<Integer>([1, 2, 3]);
+  b := TNDAMan.Insert<Integer>(a, 4, 0);
+
+  CheckTrue(TNDAUt.TryAsDynArray<Integer>(b, v));
+  CheckEquals([4, 1, 2, 3], v);
+
+  b := TNDAMan.Insert<Integer>(a, 4, -1);
+
+  CheckTrue(TNDAUt.TryAsDynArray<Integer>(b, v));
+  CheckEquals([1, 2, 4, 3], v);
+
+  b := TNDAMan.Insert<Integer>(a, 4, 1);
+
+  CheckTrue(TNDAUt.TryAsDynArray<Integer>(b, v));
+  CheckEquals([1, 4, 2, 3], v);
+end;
+
+procedure TArrManipTests.InsertList1D;
+var a: INDArray<Integer>;
+    v: TArray<Integer>;
+begin
+  a := TNDAUt.AsArray<Integer>([0, 1, 2, 3, 4]);
+
+  a := TNDAMan.Insert<Integer>(a, [5, 6, 7], [-1, 3, 0]);
+
+  CheckTrue(TNDAUt.TryAsDynArray<Integer>(a, v));
+  CheckEquals([7, 0, 1, 2, 6, 3, 5, 4], v);
+end;
+
+procedure TArrManipTests.Insert2D_A0;
+var a, b: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2], [3, 4], [5, 6]]);
+  b := TNDAUt.AsArray<Integer>([7, 8]);
+
+  a := TNDAMan.Insert<Integer>(a, b, 1);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(a, m));
+  CheckEquals(4, Length(m));
+  CheckEquals([1, 2], m[0]);
+  CheckEquals([7, 8], m[1]);
+  CheckEquals([3, 4], m[2]);
+  CheckEquals([5, 6], m[3]);
+end;
+
+procedure TArrManipTests.Insert2D_A1;
+var a, b: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6]]);
+  b := TNDAUt.AsArray<Integer>([7, 8]);
+
+  a := TNDAMan.Insert<Integer>(a, b, 1, 1);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(a, m));
+  CheckEquals(2, Length(m));
+  CheckEquals([1, 7, 2, 3], m[0]);
+  CheckEquals([4, 8, 5, 6], m[1]);
+end;
+
+procedure TArrManipTests.InsertList2D_A0;
+var a, b: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2], [3, 4], [5, 6]]);
+  b := TNDAUt.AsArray<Integer>([7, 8]);
+
+  a := TNDAMan.Insert<Integer>(a, [b, b, b], [0, 1, -1]);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(a, m));
+  CheckEquals(6, Length(m));
+  CheckEquals([7, 8], m[0]);
+  CheckEquals([1, 2], m[1]);
+  CheckEquals([7, 8], m[2]);
+  CheckEquals([3, 4], m[3]);
+  CheckEquals([7, 8], m[4]);
+  CheckEquals([5, 6], m[5]);
+end;
+
+procedure TArrManipTests.InsertList2D_A1;
+var a, b: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6]]);
+  b := TNDAUt.AsArray<Integer>([7, 8]);
+
+  a := TNDAMan.Insert<Integer>(a, [b, b, b], [0, 1, -1], 1);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(a, m));
+  CheckEquals(2, Length(m));
+  CheckEquals([7, 1, 7, 2, 7, 3], m[0]);
+  CheckEquals([8, 4, 8, 5, 8, 6], m[1]);
+end;
+
+procedure TArrManipTests.Riffle1D;
+var a: INDArray<Integer>;
+    v: TArray<Integer>;
+begin
+  a := TNDAUt.AsArray<Integer>([1, 2, 3]);
+
+  a := TNDAMan.Riffle<Integer>(a, 4);
+
+  CheckTrue(TNDAUt.TryAsDynArray<Integer>(a, v));
+  CheckEquals([1, 4, 2, 4, 3, 4], v);
+end;
+
+procedure TArrManipTests.Riffle2D_A0;
+var a, b: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2], [3, 4], [5, 6]]);
+  b := TNDAut.AsArray<Integer>([[7, 8]]);
+
+  a := TNDAMan.Riffle<Integer>(a, b);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(a, m));
+  CheckEquals(6, Length(m));
+  CheckEquals([1, 2], m[0]);
+  CheckEquals([7, 8], m[1]);
+  CheckEquals([3, 4], m[2]);
+  CheckEquals([7, 8], m[3]);
+  CheckEquals([5, 6], m[4]);
+  CheckEquals([7, 8], m[5]);
+end;
+
+procedure TArrManipTests.Riffle2D_A1;
+var a, b: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6]]);
+  b := TNDAUt.AsArray<Integer>([[7, 8]]);
+
+  a := TNDAMan.Riffle<Integer>(a, b, 1);
+
+  CheckTrue(TNDAut.TryAsDynArray2D<Integer>(a, m));
+  CheckEquals(2, Length(m));
+  CheckEquals([1, 7, 2, 7, 3, 7], m[0]);
+  CheckEquals([4, 8, 5, 8, 6, 8], m[1]);
+end;
+
+procedure TArrManipTests.Pad1D;
+var a, b: INDArray<Integer>;
+    v: TArray<Integer>;
+begin
+  a := TNDAUt.AsArray<Integer>([1, 2, 3]);
+
+  b := TNDAMan.Pad<Integer>(a, 1);
+
+  CheckTrue(TNDAUt.TryAsDynArray<Integer>(b, v));
+  CheckEquals([0, 1, 2, 3, 0], v);
+end;
+
+procedure TArrManipTests.Pad2D;
+var a, b: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2], [3, 4]]);
+
+  b := TNDAMan.Pad<Integer>(a, 1);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(b, m));
+  CheckEquals(4, Length(m));
+  CheckEquals([0, 0, 0, 0], m[0]);
+  CheckEquals([0, 1, 2, 0], m[1]);
+  CheckEquals([0, 3, 4, 0], m[2]);
+  CheckEquals([0, 0, 0, 0], m[3]);
+end;
+
+procedure TArrManipTests.Pad3D;
+var a, b: INDArray<Integer>;
+    m: TArray<TArray<TArray<Integer>>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[[1]]]);
+
+  b := TNDAMan.Pad<Integer>(a, 1, 5);
+
+  CheckTrue(TNDAUt.TryAsDynArray3D<Integer>(b, m));
+  CheckEquals(3, Length(m));
+
+  CheckEquals(3, Length(m[0]));
+  CheckEquals([5, 5, 5], m[0, 0]);
+  CheckEquals([5, 5, 5], m[0, 1]);
+  CheckEquals([5, 5, 5], m[0, 2]);
+
+  CheckEquals(3, Length(m[1]));
+  CheckEquals([5, 5, 5], m[1, 0]);
+  CheckEquals([5, 1, 5], m[1, 1]);
+  CheckEquals([5, 5, 5], m[1, 2]);
+
+  CheckEquals(3, Length(m[2]));
+  CheckEquals([5, 5, 5], m[2, 0]);
+  CheckEquals([5, 5, 5], m[2, 1]);
+  CheckEquals([5, 5, 5], m[2, 2]);
+end;
+
+
+procedure TArrManipTests.Pad2D_DiffPadWidths;
+var a, b: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2], [3, 4]]);
+
+  b := TNDAMan.Pad<Integer>(a, [1, 2], 0);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(b, m));
+  CheckEquals(4, Length(m));
+  CheckEquals([0, 0, 0, 0, 0, 0], m[0]);
+  CheckEquals([0, 0, 1, 2, 0, 0], m[1]);
+  CheckEquals([0, 0, 3, 4, 0, 0], m[2]);
+  CheckEquals([0, 0, 0, 0, 0, 0], m[3]);
 end;
 
 {$endregion}

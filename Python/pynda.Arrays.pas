@@ -250,6 +250,15 @@ begin
       if (p = nil) or (p^.two <> 2) then exit(False);
 
       case p^.typekind of
+        'u':
+          case p^.itemsize of
+            1: aArr := TNumpyArrayWrapper<UInt8>.Create(aObj, p^);
+            2: aArr := TNumpyArrayWrapper<UInt16>.Create(aObj, p^);
+            4: aArr := TNumpyArrayWrapper<UInt32>.Create(aObj, p^);
+            8: aArr := TNumpyArrayWrapper<UInt64>.Create(aObj, p^);
+          else
+            exit(False);
+          end;
         'i':
           case p^.itemsize of
             4: aArr := TNumpyArrayWrapper<Integer>.Create(aObj, p^);
@@ -923,8 +932,10 @@ begin
     fData := aArrIntf.data;
 
     fFlags := 0;
+    if (flags and NPY_ARRAY_C_CONTIGUOUS) <> 0 then
+      fFlags := NDAF_C_CONTIGUOUS;
     if (flags and NPY_ARRAY_WRITEABLE) <> 0 then
-      fFlags := NDAF_WRITEABLE;
+      fFlags := fFlags or NDAF_WRITEABLE;
   end;
 end;
 

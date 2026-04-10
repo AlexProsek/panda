@@ -2219,11 +2219,11 @@ var offset, r: Integer;
 begin
   Result.Init(0, 0);
   offset := B shr W_LOG2_BITS;
-  if offset >= 2 then exit;
+  if offset >= LCnt then exit;
 
   r := B and cLimbRemMask;
   p := PByte(@A) + offset * cLimbSize;
-  _shr(p, @Result, r, 2 - offset);
+  _shr(p, @Result, r, LCnt - offset);
 end;
 
 class operator TUInt128.LeftShift(const A: TUInt128; const B: Cardinal): TUInt128;
@@ -2232,11 +2232,11 @@ var offset, r: Integer;
 begin
   Result.Init(0, 0);
   offset := B shr W_LOG2_BITS;
-  if offset >= 2 then exit;
+  if offset >= LCnt then exit;
 
   r := B and cLimbRemMask;
   p := PByte(@Result) + offset * cLimbSize;
-  _shl(@A, p, r, 2 - offset);
+  _shl(@A, p, r, LCnt - offset);
 end;
 
 class function TUInt128.Compare(const A, B: TUInt128): Integer;

@@ -22,6 +22,7 @@ type
     procedure TransposeMat;
     procedure TransposeT3;
     procedure BlockVsStdTrCmp_Single;
+    procedure BlockVsStrTrCmp_Word;
     procedure BlockVsStdTrCmp_Byte;
   end;
 
@@ -125,6 +126,35 @@ begin
   DoTestLoop(
     procedure begin
       TNDAMan.Transpose<Single>(a, b, [1, 0]);
+    end
+  , 50);
+  SWStop('StdTr');
+end;
+
+procedure TArrManipTests.BlockVsStrTrCmp_Word;
+var a, b: INDArray<Word>;
+const N = 1014;
+      M = 768;
+begin
+  a := nda.Full<Word>([M, N], 0);
+  b := nda.Full<Word>([N, M], 0);
+
+  // for matrices with continuous rows a transposition by blocks is executed
+  SWStart;
+  DoTestLoop(
+    procedure begin
+      TNDAMan.Transpose<Word>(a, b, [1, 0]);
+    end
+  , 50);
+  SWStop('BlockTr');
+
+  a := nda.Full<Word>([M, 2*N], 0);
+  a := a[[NDIAll, NDIAll(2)]]; // make gaps between columns to avoid block transposition
+
+  SWStart;
+  DoTestLoop(
+    procedure begin
+      TNDAMan.Transpose<Word>(a, b, [1, 0]);
     end
   , 50);
   SWStop('StdTr');

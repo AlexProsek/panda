@@ -75,6 +75,10 @@ type
     procedure TestVecMin_U8_32;
     procedure TestVecMaxS_Single_3;
     procedure TestVecMaxS_Single_8;
+    procedure TestVecMax_Single_3;
+    procedure TestVecMax_Single_8;
+    procedure TestVecClip_Single_3;
+    procedure TestVecClip_Single_8;
     procedure TestScal_3_Single;
     procedure TestScal_8_Single;
     procedure TestScal_10_Single;
@@ -136,6 +140,22 @@ type
     procedure TestSQDiffs_Single_3;
     procedure TestSQDiffs_Single_4;
     procedure TestSQDiffs_Single_9;
+    procedure TestSqrEuclidDist_Single_3;
+    procedure TestSqrEuclidDist_Single_8;
+    procedure TestSqrEuclidDist_Double_3;
+    procedure TestSqrEuclidDist_Double_8;
+    procedure NormL1_Single_8;
+    procedure NormL1_Single_10;
+    procedure NormL2_Single_8;
+    procedure NormL2_Single_10;
+    procedure NormLInf_Single_8;
+    procedure NormLInf_Single_10;
+    procedure NormL1_Double_8;
+    procedure NormL1_Double_10;
+    procedure NormL2_Double_8;
+    procedure NormL2_Double_10;
+    procedure NormLInf_Double_8;
+    procedure NormLInf_Double_10;
   end;
 
 implementation
@@ -979,6 +999,46 @@ begin
   CheckEquals([4, 4, 4, 4, 5, 6, 7, 8], res, stol);
 end;
 
+procedure TTestVectorMath.TestVecMax_Single_3;
+var x, y, res: TArray<Single>;
+begin
+  x := TArray<Single>.Create(1, 2, 3);
+  y := TArray<Single>.Create(3, 2, 1);
+  SetLength(res, Length(x));
+
+  VecMax(PSingle(x), PSingle(y), PSingle(res), Length(x));
+
+  CheckEquals([3, 2, 3], res, stol);
+end;
+
+procedure TTestVectorMath.TestVecMax_Single_8;
+var x, y, res: TArray<Single>;
+begin
+  x := TArray<Single>.Create(1, 2, 3, 4, 5, 4, 3, 2);
+  y := TArray<Single>.Create(5, 4, 3, 2, 1, 2, 3, 4);
+  SetLength(res, Length(x));
+
+  VecMax(PSingle(x), PSingle(y), PSingle(res), Length(x));
+
+  CheckEquals([5, 4, 3, 4, 5, 4, 3, 4], res, stol);
+end;
+
+procedure TTestVectorMath.TestVecClip_Single_3;
+var x: TArray<Single>;
+begin
+  x := TArray<Single>.Create(0, 2, 4);
+  VecClip(PSingle(x), Length(x), 1, 3);
+  CheckEquals([1, 2, 3], x, stol);
+end;
+
+procedure TTestVectorMath.TestVecClip_Single_8;
+var x: TArray<Single>;
+begin
+  x := TArray<Single>.Create(0, 2, 4, 3, 1, 0, 2, 4);
+  VecClip(PSingle(x), Length(x), 1, 3);
+  CheckEquals([1, 2, 3, 3, 1, 1, 2, 3], x, stol);
+end;
+
 procedure TTestVectorMath.TestScal_3_Single;
 var src: TArray<Single>;
 begin
@@ -1685,6 +1745,170 @@ begin
   SQDiffs(PSingle(x), PSingle(y), PSingle(res), Length(x));
   for I := 0 to High(res) do
     CheckEquals(Sqr(x[I] - y[I]), res[I], dtol);
+end;
+
+procedure TTestVectorMath.TestSqrEuclidDist_Single_3;
+var x, y: TArray<Single>;
+    res: Single;
+begin
+  x := TArray<Single>.Create(1, 2, 3);
+  y := TArray<Single>.Create(2, 4, 6);
+
+  res := SquaredEuclideanDistance(PSingle(x), PSingle(y), Length(x));
+  CheckEquals(14, res, stol);
+end;
+
+procedure TTestVectorMath.TestSqrEuclidDist_Single_8;
+var x, y: TArray<Single>;
+    res: Single;
+begin
+  x := TArray<Single>.Create(1, 2, 3, 4, 5, 6, 7, 8);
+  y := TArray<Single>.Create(2, 4, 6, 8, 10, 12, 14, 16);
+
+  res := SquaredEuclideanDistance(PSingle(x), PSingle(y), Length(x));
+  CheckEquals(204, res, stol);
+end;
+
+procedure TTestVectorMath.TestSqrEuclidDist_Double_3;
+var x, y: TArray<Double>;
+    res: Double;
+begin
+  x := TArray<Double>.Create(1, 2, 3);
+  y := TArray<Double>.Create(2, 4, 6);
+
+  res := SquaredEuclideanDistance(PDouble(x), PDouble(y), Length(x));
+  CheckEquals(14, res, dtol);
+end;
+
+procedure TTestVectorMath.TestSqrEuclidDist_Double_8;
+var x, y: TArray<Double>;
+    res: Double;
+begin
+  x := TArray<Double>.Create(1, 2, 3, 4, 5, 6, 7, 8);
+  y := TArray<Double>.Create(2, 4, 6, 8, 10, 12, 14, 16);
+
+  res := SquaredEuclideanDistance(PDouble(x), PDouble(y), Length(x));
+  CheckEquals(204, res, dtol);
+end;
+
+procedure TTestVectorMath.NormL1_Single_8;
+var x: TArray<Single>;
+    res: Single;
+begin
+  x := TArray<Single>.Create(1, -2, 3, -4, 5, -6, 7, -8);
+
+  res := NormL1(PSingle(x), Length(x));
+  CheckEquals(36, res, stol);
+end;
+
+procedure TTestVectorMath.NormL1_Single_10;
+var x: TArray<Single>;
+    res: Single;
+begin
+  x := TArray<Single>.Create(1, -2, 3, -4, 5, -6, 7, -8, 9, -10);
+
+  res := NormL1(PSingle(x), Length(x));
+  CheckEquals(55, res, stol);
+end;
+
+procedure TTestVectorMath.NormL2_Single_8;
+var x: TArray<Single>;
+    res: Single;
+begin
+  x := TArray<Single>.Create(1, -2, 3, -4, 5, -6, 7, -8);
+
+  res := NormL2(PSingle(x), Length(x));
+  CheckEquals(2*Sqrt(51), res, stol);
+end;
+
+procedure TTestVectorMath.NormL2_Single_10;
+var x: TArray<Single>;
+    res: Single;
+begin
+  x := TArray<Single>.Create(1, -2, 3, -4, 5, -6, 7, -8, 9, -10);
+
+  res := NormL2(PSingle(x), Length(x));
+  CheckEquals(Sqrt(385), res, stol);
+end;
+
+procedure TTestVectorMath.NormLInf_Single_8;
+var x: TArray<Single>;
+    res: Single;
+begin
+  x := TArray<Single>.Create(1, -2, 3, -4, 5, -6, 7, -8);
+
+  res := NormLInf(PSingle(x), Length(x));
+  CheckEquals(8, res, stol);
+end;
+
+procedure TTestVectorMath.NormLInf_Single_10;
+var x: TArray<Single>;
+    res: Single;
+begin
+  x := TArray<Single>.Create(1, -2, 3, -4, 5, -6, 7, -8, 9, -10);
+
+  res := NormLInf(PSingle(x), Length(x));
+  CheckEquals(10, res, dtol);
+end;
+
+procedure TTestVectorMath.NormL1_Double_8;
+var x: TArray<Double>;
+    res: Double;
+begin
+  x := TArray<Double>.Create(1, -2, 3, -4, 5, -6, 7, -8);
+
+  res := NormL1(PDouble(x), Length(x));
+  CheckEquals(36, res, dtol);
+end;
+
+procedure TTestVectorMath.NormL1_Double_10;
+var x: TArray<Double>;
+    res: Double;
+begin
+  x := TArray<Double>.Create(1, -2, 3, -4, 5, -6, 7, -8, 9, -10);
+
+  res := NormL1(PDouble(x), Length(x));
+  CheckEquals(55, res, dtol);
+end;
+
+procedure TTestVectorMath.NormL2_Double_8;
+var x: TArray<Double>;
+    res: Double;
+begin
+  x := TArray<Double>.Create(1, -2, 3, -4, 5, -6, 7, -8);
+
+  res := NormL2(PDouble(x), Length(x));
+  CheckEquals(2*Sqrt(51), res, dtol);
+end;
+
+procedure TTestVectorMath.NormL2_Double_10;
+var x: TArray<Double>;
+    res: Double;
+begin
+  x := TArray<Double>.Create(1, -2, 3, -4, 5, -6, 7, -8, 9, -10);
+
+  res := NormL2(PDouble(x), Length(x));
+  CheckEquals(Sqrt(385), res, dtol);
+end;
+
+procedure TTestVectorMath.NormLInf_Double_8;
+var x: TArray<Double>;
+    res: Double;
+begin
+  x := TArray<Double>.Create(1, -2, 3, -4, 5, -6, 7, -8);
+
+  res := NormLInf(PDouble(x), Length(x));
+  CheckEquals(8, res, dtol);
+end;
+
+procedure TTestVectorMath.NormLInf_Double_10;
+var x: TArray<Double>;
+    res: Double;
+begin
+  x := TArray<Double>.Create(1, -2, 3, -4, 5, -6, 7, -8, 9, -10);
+
+  res := NormLInf(PDouble(x), Length(x));
+  CheckEquals(10, res, dtol);
 end;
 
 {$endregion}

@@ -462,8 +462,13 @@ type
 
   TNDAUt = class
   public type
+    TFuncUt<T> = record
+      class procedure FillR(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt); static;
+    end;
+
     TOArray<T> = array of T;  // open array
     TOArray2D<T> = array of TOArray<T>;
+    TOArray3D<T> = array of TOArray2D<T>;
   protected class var
     fConstrs: TDictionary<PTypeInfo, TNDAFactory>;
     fCvtFuncs: TDictionary<TPair<PTypeInfo, PTypeInfo>, TIPProcVV>;
@@ -519,10 +524,13 @@ type
     class function AsArray<T>(const aItems: array of T; const aDims: array of NativeInt): INDArray<T>; overload; static;
     class function AsArray<T>(const aItems: array of T): INDArray<T>; overload; static;
     class function AsArray<T>(const aItems: TOArray2D<T>): INDArray<T>; overload; static;
-    class function Scalar<T>(const aValue: T): INDScalar<T>; static;
+    class function AsArray<T>(const aItems: TOArray3D<T>): INDArray<T>; overload; static;
+    class function Scalar<T>(const aValue: T): INDScalar<T>; static; inline;
     class function TryAsScalar<T>(const aArr: INDArray; out aValue: T): Boolean; static;
+    class function TryAsScalars<T>(const aArrs: array of INDArray<T>; out aValues: TArray<T>): Boolean; static;
     class function TryAsDynArray<T>(const aArr: INDArray; out aValue: TArray<T>): Boolean; static;
     class function TryAsDynArray2D<T>(const aArr: INDArray; out aValue: TArray<TArray<T>>): Boolean; static;
+    class function TryAsDynArray3D<T>(const aArr: INDArray; out aValue: TArray<TArray<TArray<T>>>): Boolean; static;
     class function TryAsArray<T>(const aArr: INDArray; out aValue: INDArray<T>): Boolean; static;
     /// <param name="aFnc">aFnc(aIdx: NativeInt): T</param>
     class function Table1D<T>(const aFunc: TFunc<NativeInt, T>; aLoX, aHiX: NativeInt): INDArray<T>; static;
@@ -539,7 +547,8 @@ type
     class procedure Fill<T>(const aArr: INDArray<T>; const aValue: T); overload; static;
     class procedure Fill<T>(const aArr: INDArray<T>; const aValue: INDArray<T>); overload; static;
     class function Copy<T>(const aArr: INDArray<T>): INDArray<T>; overload; static;
-    class function TryAsType<T>(const aArr: INDArray; out aRes: INDArray<T>; aForceCopy: Boolean = False): Boolean; static;
+    class function TryAsType<T>(const aArr: INDArray; var aRes: INDArray<T>; aForceCopy: Boolean = False): Boolean; static;
+    class function Cvt<T, U>(const aArr: TArray<T>; aForceCopy: Boolean = False): INDArray<U>; overload; static; inline;
     class function AsType<T>(const aArr: INDArray; aForceCopy: Boolean = False): INDArray<T>; overload; static;
     class function AsType<T>(const aArrays: array of INDArray; aForceCopy: Boolean = False): TArray<INDArray<T>>; overload; static;
     class function AsContiguousArray<T>(const aArr: INDArray<T>): INDArray<T>; overload; static;
@@ -556,9 +565,9 @@ type
   function GetSize(const aDims: array of NativeInt): NativeInt; overload;
   function GetSize(const aArr: INDArray): NativeInt; overload; inline;
   function NBytes(const aArr: INDArray): NativeInt; inline;
-  function ScalarQ(const aArr: INDArray): Boolean;
-  function VectorQ(const aArr: INDArray): Boolean;
-  function MatrixQ(const aArr: INDArray): Boolean;
+  function ScalarQ(const aArr: INDArray): Boolean; inline;
+  function VectorQ(const aArr: INDArray): Boolean; inline;
+  function MatrixQ(const aArr: INDArray): Boolean; inline;
   function GetCContLvl(const aArr: INDArray; out aBlockSz: NativeInt): Integer;
   function GetCommonCContLvl(const A, B: INDArray; out aSz: NativeInt): Integer;
   function CheckCContLvl(const aArr: INDArray; aRequiredLvl: Integer): Boolean;
@@ -579,6 +588,8 @@ type
   function NDIAllFrom(aFrom: NativeInt; aStep: NativeInt = 1): INDSpanIndex; inline;
   function NDIAllSeq(aCount: Integer): INDIndexSeq;
   function NDIIntSeq(aCount: Integer): INDIndexSeq; overload;
+  // Returns span index [aLo[0]:aLo[0] + aSize[0] - 1, (aLo[1]:aLo[1] + aSize[1] - 1, ...]
+  function NDIBlockSeq(const aLo, aSize: array of NativeInt): INDIndexSeq;
   function NDIFirst: INDIntIndex; inline;
   function NDILast: INDIntIndex; inline;
 
@@ -1021,6 +1032,17 @@ begin
     Result[I] := NDI(0);
 end;
 
+function NDIBlockSeq(const aLo, aSize: array of NativeInt): INDIndexSeq;
+var lo: NativeInt;
+    I: Integer;
+begin
+  Assert(Length(aLo) = Length(aSize));
+  SetLength(Result, Length(aLo));
+  for I := 0 to High(Result) do begin
+    lo := aLo[I];
+    Result[I] := NDISpan(lo, lo + aSize[I] - 1);
+  end;
+end;
 
 function NDIFirst: INDIntIndex;
 begin
@@ -2740,16 +2762,45 @@ end;
 
 {$region 'TNDAUt'}
 
+{$region 'TNDAUt.TFuncUt<T>'}
+
+class procedure TNDAUt.TFuncUt<T>.FillR(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+var pEnd: PByte;
+    s: T;
+type PT = ^T;
+begin
+  pEnd := L + N * IncL;
+  if IncR = 0 then begin
+    s := PT(R)^;
+    while L < pEnd do begin
+      PT(L)^ := s;
+      Inc(L, IncL);
+    end;
+  end else begin
+    while L < pEnd do begin
+      PT(L)^ := PT(R)^;
+      Inc(L, IncL);
+      Inc(R, IncR);
+    end;
+  end;
+end;
+
+{$endregion}
+
 class constructor TNDAUt.Create;
 begin
   fCvtFuncs := TDictionary<TPair<PTypeInfo, PTypeInfo>, TIPProcVV>.Create;
 
+
   AddCvtFunc<Byte,    Single>(cvt_UI8F32);
+
   AddCvtFunc<Integer, Single>(cvt_I32F32);
-  AddCvtFunc<Double,  Single>(cvt_F64F32);
+  AddCvtFunc<Integer,  Int64>(cvt_I32I64);
 
   AddCvtFunc<Single,    Byte>(cvt_F32UI8);
   AddCvtFunc<Single,  Double>(cvt_F32F64);
+
+  AddCvtFunc<Double,  Single>(cvt_F64F32);
 
   fConstrs := TObjectDictionary<PTypeInfo, TNDAFactory>.Create([doOwnsValues]);
 
@@ -2949,6 +3000,30 @@ begin
   end;
 end;
 
+class function TNDAUt.AsArray<T>(const aItems: TOArray3D<T>): INDArray<T>;
+var I, J, w, h, d, ws: NativeInt;
+    m: TOArray2D<T>;
+    pRes: PByte;
+begin
+  d := Length(aItems);
+  Assert(d > 0);
+  h := Length(aItems[0]);
+  Assert(h > 0);
+  w := Length(aItems[0][0]);
+  Result := TNDABuffer<T>.Create([d, h, w]);
+  pRes := Result.Data;
+  ws := Result.Strides[1];
+  for I := 0 to d - 1 do begin
+    m := aItems[I];
+    Assert(Length(m) = h);
+    for J := 0 to h - 1 do begin
+      Assert(Length(m[J]) = w);
+      Copy<T>(PByte(@m[J, 0]), pRes, w);
+      Inc(pRes, ws);
+    end;
+  end;
+end;
+
 class function TNDAUt.Scalar<T>(const aValue: T): INDScalar<T>;
 begin
   Result := TNDScalar<T>.Create(aValue);
@@ -2958,6 +3033,17 @@ class function TNDAUt.TryAsScalar<T>(const aArr: INDArray; out aValue: T): Boole
 begin
   Result := SameQ(aArr.GetItemType, TypeInfo(T)) and (aArr.Shape = nil);
   if Result then aValue := TNDA<T>.PT(aArr.Data)^;
+end;
+
+class function TNDAUt.TryAsScalars<T>(const aArrs: array of INDArray<T>; out aValues: TArray<T>): Boolean;
+var I: NativeInt;
+begin
+  SetLength(aValues, Length(aArrs));
+  for I := 0 to High(aValues) do begin
+    if not ScalarQ(aArrs[I]) then exit(False);
+    aValues[I] := TNDA<T>.PT(aArrs[I].Data)^;
+  end;
+  Result := True;
 end;
 
 class function TNDAUt.TryAsDynArray<T>(const aArr: INDArray; out aValue: TArray<T>): Boolean;
@@ -3020,6 +3106,20 @@ begin
       Inc(pRow, stepRow);
     end;
   end;
+  Result := True;
+end;
+
+class function TNDAUt.TryAsDynArray3D<T>(const aArr: INDArray; out aValue: TArray<TArray<TArray<T>>>): Boolean;
+var arr: INDArray<T>;
+    I: NativeInt;
+begin
+  if not (SameQ(aArr.GetItemType, TypeInfo(T)) and (aArr.NDim = 3)) then exit(False);
+
+  arr := (aArr as INDArray<T>);
+  SetLength(aValue, arr.Shape[0]);
+  for I := 0 to High(aValue) do
+    if not TryAsDynArray2D<T>(arr[[NDI(I)]], aValue[I]) then exit(False);
+
   Result := True;
 end;
 
@@ -3333,14 +3433,14 @@ end;
 class procedure TNDAUt.Map<T, U, V>(const L: INDArray<T>; const R: U;
   var aRes: INDArray<V>; aRFnc: TIPProcVV);
 begin
-  if not Assigned(aRes) then aRes := AsType<V>(L, True);
+  TryAsType<V>(L, aRes, True);
   MapR(aRes, @R, aRFnc);
 end;
 
 class procedure TNDAUt.Map<T, U, V>(const L: T; const R: INDArray<U>;
   var aRes: INDArray<V>; aLFnc: TIPProcVV);
 begin
-  if not Assigned(aRes) then aRes := AsType<V>(R, True);
+  TryAsType<V>(R, aRes, True);
   MapL(@L, aRes, aLFnc);
 end;
 
@@ -3348,10 +3448,10 @@ class procedure TNDAUt.Map<T, U, V>(const L: INDArray<T>; const R: INDArray<U>;
   var aRes: INDArray<V>; aLFnc, aRFnc: TIPProcVV);
 begin
   if L.NDim >= R.NDim then begin
-    if not Assigned(aRes) then aRes := AsType<V>(L, True);
+    TryAsType<V>(L, aRes, True);
     MapR(aRes, R, aRFnc);
   end else begin
-    if not Assigned(aRes) then aRes := AsType<V>(R, True);
+    TryAsType<V>(R, aRes, True);
     MapL(L, aRes, aLFnc);
   end;
 end;
@@ -3414,24 +3514,36 @@ begin
   end;
 end;
 
-class function TNDAUt.TryAsType<T>(const aArr: INDArray; out aRes: INDArray<T>;
+class function TNDAUt.TryAsType<T>(const aArr: INDArray; var aRes: INDArray<T>;
   aForceCopy: Boolean): Boolean;
 var cvtFunc: TIPProcVV;
 begin
   if SameQ(aArr.GetItemType, TypeInfo(T))  then begin
-    aRes := (aArr as INDArray<T>);
-    if aForceCopy then
-      aRes := Copy<T>(aRes);
+    if Assigned(aRes) then
+      Fill<T>(aRes, aArr as INDArray<T>)
+    else begin
+      aRes := (aArr as INDArray<T>);
+      if aForceCopy then
+        aRes := Copy<T>(aRes);
+    end;
     exit(True);
   end;
 
   if TryGetCvtFunc(aArr.GetItemType, TypeInfo(T), cvtFunc) then begin
-    aRes := Empty<T>(aArr.Shape);
+    if not Assigned(aRes) then
+      aRes := Empty<T>(aArr.Shape);
     MapSS(aArr, aRes, cvtFunc);
     exit(True);
   end;
 
   Result := False;
+end;
+
+class function TNDAUt.Cvt<T, U>(const aArr: TArray<T>; aForceCopy: Boolean): INDArray<U>;
+var arr: INDArray<T>;
+begin
+  arr := TDynArrWrapper<T>.Create(aArr);
+  Result := AsType<U>(arr, aForceCopy);
 end;
 
 class function TNDAUt.AsType<T>(const aArr: INDArray; aForceCopy: Boolean): INDArray<T>;

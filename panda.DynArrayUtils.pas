@@ -27,7 +27,7 @@ type
     fCmp: IComparer<T>;
     procedure Merge(pL, pR, pRes: PT; aLCnt, aRCnt: NativeInt);
   public
-    constructor Create(const aComparer: IComparer<T>);
+    procedure Init(const aComparer: IComparer<T>);
     function Sort(const aData: TArray<T>): TArray<T>;
   end;
 
@@ -122,6 +122,11 @@ type
     constructor Create(const aComparer: IComparer<U>);
     function Compare({$ifdef FPC}constref{$else}const{$endif} aLeft, aRight: TIndexedValue<U>): Integer; override;
 	end;
+
+  TIndexedValueIndexComparer<U> = class(TComparer<TIndexedValue<U>>)
+  public
+    function Compare({$ifdef FPC}constref{$else}const{$endif} aLeft, aRight: TIndexedValue<U>): Integer; override;
+  end;
 
   TIndexedValueList<U> = class(TList<TIndexedValue<U>>)
   end;
@@ -244,7 +249,7 @@ type
     /// <remarks> Don't use negative <c>RotateBy</c> and use function <c>RotateRight</c>. </remarks>
     /// <returns> Rotated Array. </returns>
     class function RotateLeft<T>(const aData: TArray<T>; RotateBy: NativeInt): TArray<T>; static;
-    class procedure MergeSort<T>(aData: TArray<T>; aComparer: IComparer<T> = nil); static;
+    class procedure MergeSort<T>(var aData: TArray<T>; aComparer: IComparer<T> = nil); static;
     /// <summary>
     ///   Creates heap on the <c>aData</c> input.
     /// </summary>
@@ -367,8 +372,10 @@ type
   {$ifndef FPC}
     class function SortPerm<T>(const aData: TArray<T>; const aComparer: TComparison<T>): TArray<NativeInt>; overload; static; inline;
   {$endif}
+    class function MakeIndexedValues<T>(const aPos: array of NativeInt; aValues: array of T): TArray<TIndexedValue<T>>; static;
     class procedure SortIndexedValues<T>(var aValues: TArray<TIndexedValue<T>>; aComparer: IComparer<T> = nil); static;
     class procedure SortIndexedValuesByIndex<T>(var aValues: TArray<TIndexedValue<T>>); static;
+    class procedure MergeSortIndexedValuesByIndex<T>(var aValues: TArray<TIndexedValue<T>>); static;
     /// <summary>
     ///   Maps a function <c>aFnc</c> on each element from input array <c>aData</c>.
     ///   At i-th position in output array is stored result by function <c>aFnc</c> which
@@ -461,10 +468,11 @@ implementation
 
 {$region 'TMergeSort<T>'}
 
-constructor TMergeSort<T>.Create(const aComparer: IComparer<T>);
+procedure TMergeSort<T>.Init(const aComparer: IComparer<T>);
 begin
-  fCmp := aComparer;
-  if not Assigned(fCmp) then
+  if Assigned(aComparer) then
+    fCmp := aComparer
+  else
     fCmp := TComparer<T>.Default;
 end;
 
@@ -702,13 +710,26 @@ end;
 
 constructor TIndexedValueComparer<U>.Create(const aComparer: IComparer<U>);
 begin
-  fComparer := aComparer;
+  if Assigned(aComparer) then
+    fComparer := aComparer
+  else
+    fComparer := TComparer<U>.Default;
 end;
 
 function TIndexedValueComparer<U>.Compare(
   {$ifdef FPC}constref{$else}const{$endif} aLeft, aRight: TIndexedValue<U>): Integer;
 begin
   Result := fComparer.Compare(aLeft.Value, aRight.Value);
+end;
+
+{$endregion}
+
+{$region 'TIndexedValueIndexComparer<U>'}
+
+function TIndexedValueIndexComparer<U>.Compare(
+  {$ifdef FPC}constref{$else}const{$endif} aLeft, aRight: TIndexedValue<U>): Integer;
+begin
+  Result := (aLeft.Idx - aRight.Idx);
 end;
 
 {$endregion}
@@ -1280,10 +1301,10 @@ begin
   end;
 end;
 
-class procedure TDynAUt.MergeSort<T>(aData: TArray<T>; aComparer: IComparer<T>);
+class procedure TDynAUt.MergeSort<T>(var aData: TArray<T>; aComparer: IComparer<T>);
 var me: TMergeSort<T>;
 begin
-  me.Create(aComparer);
+  me.Init(aComparer);
   aData := me.Sort(aData);
 end;
 
@@ -1780,7 +1801,20 @@ end;
 
 {$endif}
 
+class function TDynAUt.MakeIndexedValues<T>(const aPos: array of NativeInt; aValues: array of T): TArray<TIndexedValue<T>>;
+var I: NativeInt;
+begin
+  Assert(Length(aPos) = Length(aValues));
+  SetLength(Result, Length(aPos));
+  for I := 0 to High(Result) do
+    with Result[I] do begin
+      Idx := aPos[I];
+      Value := aValues[I];
+    end;
+end;
+
 class procedure TDynAUt.SortIndexedValues<T>(var aValues: TArray<TIndexedValue<T>>; aComparer: IComparer<T>);
+var cmp: IComparer<TIndexedValue<T>>;
 begin
   if not Assigned(aComparer) then
     aComparer := TComparer<T>.Default;
@@ -1788,31 +1822,27 @@ begin
 {$ifdef FPC}
   // todo
 {$else}
-  TArray.Sort<TIndexedValue<T>>(aValues,
-    TComparer<TIndexedValue<T>>.Construct(
-      function(const Left, Right: TIndexedValue<T>): Integer
-      begin
-        Result := aComparer.Compare(Left.Value, Right.Value);
-      end
-    )
-  );
+  cmp := TIndexedValueComparer<T>.Create(aComparer);
+  TArray.Sort<TIndexedValue<T>>(aValues, cmp);
 {$endif}
 end;
 
 class procedure TDynAUt.SortIndexedValuesByIndex<T>(var aValues: TArray<TIndexedValue<T>>);
+var cmp: IComparer<TIndexedValue<T>>;
 begin
 {$ifdef FPC}
   // todo
 {$else}
-  TArray.Sort<TIndexedValue<T>>(aValues,
-    TComparer<TIndexedValue<T>>.Construct(
-      function (const aLeft, aRight: TIndexedValue<T>): Integer
-      begin
-        Result := (aLeft.Idx - aRight.Idx)
-      end
-    )
-  );
+  cmp := TIndexedValueIndexComparer<T>.Create;
+  TArray.Sort<TIndexedValue<T>>(aValues, cmp);
 {$endif}
+end;
+
+class procedure TDynAUt.MergeSortIndexedValuesByIndex<T>(var aValues: TArray<TIndexedValue<T>>);
+var cmp: IComparer<TIndexedValue<T>>;
+begin
+  cmp := TIndexedValueIndexComparer<T>.Create;
+  MergeSort<TIndexedValue<T>>(aValues, cmp);
 end;
 
 class function TDynAUt.Map<TIn, TOut>(const aData: TArray<TIn>;
@@ -1826,7 +1856,7 @@ end;
 
 class function TDynAUt.Map2D<Tin, TOut>(const aData: TArray<TArray<TIn>>;
   const aFnc: TFnc<TIn, TOut>): TArray<TArray<TOut>>;
-var I, J: Integer;
+var I, J: NativeInt;
     srcRow: TArray<TIn>;
     dstRow: TArray<TOut>;
 begin

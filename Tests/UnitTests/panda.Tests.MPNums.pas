@@ -73,6 +73,8 @@ type
     procedure LongDiv;
     procedure Less;
     procedure Incr;
+    procedure RightShift;
+    procedure LeftShift;
   {$ifopt Q+}
     procedure AddOverflow;
     procedure SubOverflow;
@@ -921,6 +923,24 @@ begin
   Inc(a);
   CheckEquals(0, a.Lo);
   CheckEquals(5, a.Hi);
+end;
+
+procedure TUInt128Tests.RightShift;
+var a: TUInt128;
+begin
+  a.Init(0, 1);
+  a := a shr 64;
+  CheckEquals(1, a.Lo);
+  CheckEquals(0, a.Hi);
+end;
+
+procedure TUInt128Tests.LeftShift;
+var a: TUInt128;
+begin
+  a.Init(1, 0);
+  a := a shl 64;
+  CheckEquals(0, a.Lo);
+  CheckEquals(1, a.Hi);
 end;
 
 {$ifopt Q+}

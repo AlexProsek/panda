@@ -220,6 +220,10 @@ type
   TNDACvtTests = class(TNDATestCase)
   published
     procedure CvtF32F64;
+    procedure TryCvtI32I64_NullRes;
+    procedure TryCvtI32I64_NotNullRes;
+    procedure TryCvtI32I32_NullRes;
+    procedure TryCvtI32I32_NotNullRes;
   end;
 
 implementation
@@ -2289,9 +2293,7 @@ begin
 
   CheckTrue(TNDAUt.TryAsDynArray<Integer>(a, v));
   CheckEquals(3, Length(v));
-  CheckEquals(1, v[0]);
-  CheckEquals(1, v[1]);
-  CheckEquals(1, v[2]);
+  CheckEquals([1, 1, 1], v);
 end;
 
 procedure TNDAUtTests.FillVecByVec;
@@ -2304,9 +2306,7 @@ begin
 
   CheckTrue(TNDAUt.TryAsDynArray<Integer>(a, v));
   CheckEquals(3, Length(v));
-  CheckEquals(1, v[0]);
-  CheckEquals(2, v[1]);
-  CheckEquals(3, v[2]);
+  CheckEquals([1, 2, 3], v);
 end;
 
 {$endregion}
@@ -2820,16 +2820,65 @@ end;
 procedure TNDACvtTests.CvtF32F64;
 var a: INDArray<Single>;
     b: INDArray<Double>;
-    bArr: TArray<Double>;
+    v: TArray<Double>;
 begin
   a := TNDAUt.AsArray<Single>([1, 2, 3]);
   b := TNDAUt.AsType<Double>(a);
-  CheckTrue(TNDAUt.TryAsDynArray<Double>(b, bArr));
+  CheckTrue(TNDAUt.TryAsDynArray<Double>(b, v));
 
-  CheckEquals(3, Length(bArr));
-  CheckEquals(1, bArr[0]);
-  CheckEquals(2, bArr[1]);
-  CheckEquals(3, bArr[2]);
+  CheckEquals([1, 2, 3], v);
+end;
+
+procedure TNDACvtTests.TryCvtI32I64_NullRes;
+var a: INDArray<Integer>;
+    b: INDArray<Int64>;
+    v: TArray<Int64>;
+begin
+  a := TNDAUt.AsArray<Integer>([1, 2, 3]);
+
+  CheckTrue(TNDAUt.TryAsType<Int64>(a, b));
+
+  CheckTrue(TNDAUt.TryAsDynArray<Int64>(b, v));
+  CheckEquals([1, 2, 3], v);
+end;
+
+procedure TNDACvtTests.TryCvtI32I64_NotNullRes;
+var a: INDArray<Integer>;
+    b: INDArray<Int64>;
+    v: TArray<Int64>;
+begin
+  a := TNDAUt.AsArray<Integer>([1, 2, 3]);
+  b := TNDAUt.Empty<Int64>(a.Shape);
+
+  CheckTrue(TNDAUt.TryAsType<Int64>(a, b));
+
+  CheckTrue(TNDAUt.TryAsDynArray<Int64>(b, v));
+  CheckEquals([1, 2, 3], v);
+end;
+
+procedure TNDACvtTests.TryCvtI32I32_NullRes;
+var a, b: INDArray<Integer>;
+    v: TArray<Integer>;
+begin
+  a := TNDAUt.AsArray<Integer>([1, 2, 3]);
+
+  CheckTrue(TNDAUt.TryAsType<Integer>(a, b));
+
+  CheckTrue(TNDAUt.TryAsDynArray<Integer>(b, v));
+  CheckEquals([1, 2, 3], v);
+end;
+
+procedure TNDACvtTests.TryCvtI32I32_NotNullRes;
+var a, b: INDArray<Integer>;
+    v: TArray<Integer>;
+begin
+  a := TNDAUt.AsArray<Integer>([1, 2, 3]);
+  b := TNDAUt.Empty<Integer>(a.Shape);
+
+  CheckTrue(TNDAUt.TryAsType<Integer>(a, b));
+
+  CheckTrue(TNDAUt.TryAsDynArray<Integer>(b, v));
+  CheckEquals([1, 2, 3], v);
 end;
 
 {$endregion}

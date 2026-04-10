@@ -22,6 +22,7 @@ type
     procedure Format1D;
     procedure Format2D;
     procedure Format3D;
+    procedure Format3D_2x1x2;
     procedure Format1DStepLv;
     procedure Format2DStepLvl1;
     procedure PyLikeFormat;
@@ -90,6 +91,15 @@ begin
   a := iRng2NDA([2, 3, 2]);
   s := fFmt.GetString(a);
   CheckEquals('{{{1, 2}, {3, 4}, {5, 6}}, {{7, 8}, {9, 10}, {11, 12}}}', s);
+end;
+
+procedure TFormatterTests.Format3D_2x1x2;
+var a: INDArray;
+    s: String;
+begin
+  a := iRng2NDA([2, 1, 2]);
+  s := fFmt.GetString(a);
+  CheckEquals('{{{1, 2}}, {{3, 4}}}', s);
 end;
 
 procedure TFormatterTests.Format1DStepLv;

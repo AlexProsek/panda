@@ -295,7 +295,8 @@ begin
           sb.Append(fArrBegin);
         while it.MoveNext do begin
           WriteArray1D(sb, it.Current, hiSz, step);
-          for I := hiLvl - 1 downto 0 do begin
+          I := hiLvl - 1;
+          while I >= 0 do begin
             if it.IsLast(I) then
               sb.Append(fArrEnd)
             else begin
@@ -303,9 +304,12 @@ begin
               lvl := I + 1;
               break;
             end;
+            Dec(I);
           end;
-          for I := lvl to hiLvl - 1 do
-            sb.Append(fArrBegin);
+          if I >= 0 then begin
+            for I := lvl to hiLvl - 1 do
+              sb.Append(fArrBegin);
+          end;
         end;
       finally
         it.Free;

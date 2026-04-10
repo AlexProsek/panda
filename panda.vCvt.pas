@@ -4,6 +4,7 @@ interface
 
 procedure cvt_UI8F32(N: NativeInt; X: PByte; XInc: NativeInt; Y: PByte; Yinc: NativeInt);
 procedure cvt_I32F32(N: NativeInt; X: PByte; XInc: NativeInt; Y: PByte; YInc: NativeInt);
+procedure cvt_I32I64(N: NativeInt; X: PByte; XInc: NativeInt; Y: PByte; YInc: NativeInt);
 procedure cvt_F32UI8(N: NativeInt; X: PByte; XInc: NativeInt; Y: PByte; YInc: NativeInt);
 procedure cvt_F32F64(N: NativeInt; X: PByte; XInc: NativeInt; Y: PByte; YInc: NativeInt);
 procedure cvt_F64F32(N: NativeInt; X: PByte; XInc: NativeInt; Y: PByte; YInc: NativeInt);
@@ -40,6 +41,20 @@ begin
     end;
   end else
     cvt(PInteger(X), PSingle(Y), N);
+end;
+
+procedure cvt_I32I64(N: NativeInt; X: PByte; XInc: NativeInt; Y: PByte; YInc: NativeInt);
+var pEnd: PByte;
+begin
+  if (XInc <> SizeOf(Integer)) or (YInc <> SizeOf(Int64)) then begin
+    pEnd := X + XInc * N;
+    while X < pEnd do begin
+      PInt64(Y)^ := PInteger(X)^;
+      Inc(X, XInc);
+      Inc(Y, YInc);
+    end;
+  end else
+    cvt(PInteger(X), PInt64(Y), N);
 end;
 
 procedure cvt_F32UI8(N: NativeInt; X: PByte; XInc: NativeInt; Y: PByte; YInc: NativeInt);

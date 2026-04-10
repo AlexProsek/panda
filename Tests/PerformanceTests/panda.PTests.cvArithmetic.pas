@@ -50,10 +50,19 @@ type
     procedure VecAbs_Single;
     procedure VecAbs_Double;
     procedure VecMin_UI8;
+    procedure VecMax_Single;
     procedure Diff_Single;
     procedure SQDiffs_Single;
     procedure SQDiffs_Double;
+    procedure SqrEuclidDist_Single;
+    procedure SqrEuclidDist_Double;
     procedure DiffWithStep_Single;
+    procedure NormL1_Single;
+    procedure NormL2_Single;
+    procedure NormInf_Single;
+    procedure NormL1_Double;
+    procedure NormL2_Double;
+    procedure NormInf_Double;
   end;
 
 implementation
@@ -641,6 +650,18 @@ begin
   SWStop;
 end;
 
+procedure TVecMathPerformance.VecMax_Single;
+var x, y: TArray<Single>;
+const N = 10000000;
+begin
+  SetLength(x, N);
+  SetLength(y, N);
+
+  SWStart;
+  VecMax(PSingle(x), PSingle(y), PSingle(y), Length(x));
+  SWStop;
+end;
+
 procedure TVecMathPerformance.Diff_Single;
 var x, y: TArray<Single>;
 const N = 10000000;
@@ -677,6 +698,30 @@ begin
   SWStop;
 end;
 
+procedure TVecMathPerformance.SqrEuclidDist_Single;
+var x, y: TArray<Single>;
+const N = 10000000;
+begin
+  SetLength(x, N);
+  SetLength(y, N);
+
+  SWStart;
+  SquaredEuclideanDistance(PSingle(x), PSingle(y), Length(x));
+  SWStop;
+end;
+
+procedure TVecMathPerformance.SqrEuclidDist_Double;
+var x, y: TArray<Double>;
+const N = 10000000;
+begin
+  SetLength(x, N);
+  SetLength(y, N);
+
+  SWStart;
+  SquaredEuclideanDistance(PDouble(x), PDouble(y), Length(x));
+  SWStop;
+end;
+
 procedure TVecMathPerformance.DiffWithStep_Single;
 var x, y: TArray<Single>;
 const N = 10000000;
@@ -686,6 +731,72 @@ begin
 
   SWStart;
   Differences(PSingle(x), PSingle(y), 2, 2, Length(x));
+  SWStop;
+end;
+
+procedure TVecMathPerformance.NormL1_Single;
+var x: TArray<Single>;
+const N = 10000000;
+begin
+  SetLength(x, N);
+
+  SWStart;
+  NormL1(PSingle(x), Length(x));
+  SWStop;
+end;
+
+procedure TVecMathPerformance.NormL2_Single;
+var x: TArray<Single>;
+const N = 10000000;
+begin
+  SetLength(x, N);
+
+  SWStart;
+  NormL2(PSingle(x), Length(x));
+  SWStop;
+end;
+
+procedure TVecMathPerformance.NormInf_Single;
+var x: TArray<Single>;
+const N = 10000000;
+begin
+  SetLength(x, N);
+
+  SWStart;
+  NormLInf(PSingle(x), Length(x));
+  SWStop;
+end;
+
+procedure TVecMathPerformance.NormL1_Double;
+var x: TArray<Double>;
+const N = 10000000;
+begin
+  SetLength(x, N);
+
+  SWStart;
+  NormL1(PDouble(x), Length(x));
+  SWStop;
+end;
+
+procedure TVecMathPerformance.NormL2_Double;
+var x: TArray<Double>;
+const N = 10000000;
+begin
+  SetLength(x, N);
+
+  SWStart;
+  NormL2(PDouble(x), Length(x));
+  SWStop;
+end;
+
+procedure TVecMathPerformance.NormInf_Double;
+var x: TArray<Double>;
+const N = 10000000;
+begin
+  SetLength(x, N);
+
+  SWStart;
+  NormLInf(PDouble(x), Length(x));
   SWStop;
 end;
 

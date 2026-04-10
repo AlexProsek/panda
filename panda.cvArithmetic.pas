@@ -81,6 +81,8 @@ procedure VecMax(pA, pB, pRes: PDouble; aCount: NativeInt); overload;
 procedure VecMax(A: Single; pB, pRes: PSingle; aCount: NativeInt); overload;
 procedure VecMax(pA, pB, pRes: PSingle; aCount: NativeInt); overload;
 
+procedure VecClip(pX: PSingle; aCount: NativeInt; const aMin, aMax: Single); overload;
+
 // X <- a * X
 procedure sscal(pX: PSingle; aCount: NativeInt; a: Single);
 procedure dscal(pX: PDouble; aCount: NativeInt; a: Double);
@@ -112,8 +114,16 @@ procedure SQDiffs(pX, pY, pRes: PSingle; aCount: NativeInt); overload;
 
 function SquaredEuclideanDistance(pX, pY: PDouble; aCount: NativeInt): Double; overload;
 function SquaredEuclideanDistance(pX, pY: PSingle; aCount: NativeInt): Single; overload;
+
+function NormL1(pX: PDouble; aCount: NativeInt): Double; overload;
+function NormL2(pX: PDouble; aCount: NativeInt): Double; overload;
+function NormLInf(pX: PDouble; aCount: NativeInt): Double; overload;
 function Norm(pX: PDouble; aCount: NativeInt; p: Double = 2): Double; overload;
 function Norm(const X: TArray<Double>; p: Double = 2): Double; overload;
+
+function NormL1(pX: PSingle; aCount: NativeInt): Single; overload;
+function NormL2(pX: PSingle; aCount: NativeInt): Single; overload;
+function NormLInf(pX: PSingle; aCount: NativeInt): Single; overload;
 function Norm(pX: PSingle; aCount: NativeInt; p: Single = 2): Single; overload;
 function Norm(const X: TArray<Single>; p: Single = 2): Single; overload;
 
@@ -2164,7 +2174,7 @@ end;
 {$endif}
 
 procedure VecAnd(pA, pB, pRes: PByte; aCount: NativeInt);
-{$ifdef ASMx86}
+{$if defined(ASMx86)}
 asm
   // EAX <- pA, EDX <- pB, ECX <- pRes, [EBP + 8] <- aCount
   push edi
@@ -3560,7 +3570,7 @@ asm
   shr ecx, 2
   jz @rest
 
-@mainLoop:
+@L:
   movups xmm0, [eax]
   movups xmm1, [eax + 4]
   subps xmm1, xmm0
@@ -3568,14 +3578,14 @@ asm
   add eax, 16
   add edx, 16
   dec ecx
-  jnz @mainLoop
+  jnz @L
 
 @rest:
   mov ecx, ebx
   and ecx, 3
   jz @end
 
-@restLoop:
+@Lrest:
   movss xmm0, [eax]
   movss xmm1, [eax + 4]
   subss xmm1, xmm0
@@ -3583,7 +3593,7 @@ asm
   add eax, 4
   add edx, 4
   dec ecx
-  jnz @restLoop
+  jnz @Lrest
 
 @end:
   pop ebx
@@ -3890,12 +3900,62 @@ end;
 {$endif}
 
 function SquaredEuclideanDistance(pX, pY: PDouble; aCount: NativeInt): Double;
+{$if defined(ASMx64)}
+// RCX <- pX, RDX <- pY, R8 <- aCount
+asm
+{$ifdef DEBUG}
+  cmp r8, 0
+  jg @begin
+  call RaiseNotPositiveLength
+{$endif}
+@begin:
+  xorps xmm0, xmm0
+  mov r9, r8
+  shr r8, 2
+  jz @rest
+@L:
+  movupd xmm1, [rcx]
+  movupd xmm2, [rdx]
+  subpd xmm1, xmm2
+  mulpd xmm1, xmm1
+  addpd xmm0, xmm1
+  add rcx, 16
+  add rdx, 16
+  movupd xmm1, [rcx]
+  movupd xmm2, [rdx]
+  subpd xmm1, xmm2
+  mulpd xmm1, xmm1
+  addpd xmm0, xmm1
+  add rcx, 16
+  add rdx, 16
+  dec r8
+  jnz @L
+
+  // horizontal sum
+  movhlps xmm1, xmm0
+  addsd xmm0, xmm1
+@rest:
+  and r9, 3
+  jz @end
+@Lrest:
+  movsd xmm1, [rcx]
+  movsd xmm2, [rdx]
+  subsd xmm1, xmm2
+  mulsd xmm1, xmm1
+  addsd xmm0, xmm1
+  add rcx, 8
+  add rdx, 8
+  dec r9
+  jnz @Lrest
+@end:
+end;
+{$else}
 var pEnd: PByte;
     d: Double;
 begin
   Assert(aCount > 0);
   Result := 0;
-  pEnd := PByte(pX) + aCount * SizeOf(Double);
+  pEnd := PByte(pX) + aCount * cF64Sz;
   while PByte(pX) < pEnd do begin
     d := pX^ - pY^;
     Result := Result + d * d;
@@ -3903,14 +3963,68 @@ begin
     Inc(pY);
   end;
 end;
+{$endif}
 
 function SquaredEuclideanDistance(pX, pY: PSingle; aCount: NativeInt): Single;
+{$if defined(ASMx64)}
+// RCX <- pX, RDX <- pY, R8 <- aCount
+asm
+{$ifdef DEBUG}
+  cmp r8, 0
+  jg @begin
+  call RaiseNotPositiveLength
+{$endif}
+@begin:
+  xorps xmm0, xmm0
+  mov r9, r8
+  shr r8, 3
+  jz @rest
+@L:
+  movups xmm1, [rcx]
+  movups xmm2, [rdx]
+  subps xmm1, xmm2
+  mulps xmm1, xmm1
+  addps xmm0, xmm1
+  add rcx, 16
+  add rdx, 16
+  movups xmm1, [rcx]
+  movups xmm2, [rdx]
+  subps xmm1, xmm2
+  mulps xmm1, xmm1
+  addps xmm0, xmm1
+  add rcx, 16
+  add rdx, 16
+  dec r8
+  jnz @L
+
+  // horizontal sum
+  movhlps xmm1, xmm0
+  addps xmm0, xmm1
+  movaps xmm1, xmm0
+  shufps xmm1, xmm1, 1
+  addss xmm0, xmm1
+@rest:
+  and r9, 7
+  jz @end
+@Lrest:
+  movss xmm1, [rcx]
+  movss xmm2, [rdx]
+  subss xmm1, xmm2
+  mulss xmm1, xmm1
+  addss xmm0, xmm1
+  add rcx, 4
+  add rdx, 4
+  dec r9
+  jnz @Lrest
+@end:
+end;
+{$else}
 var pEnd: PByte;
     d: Single;
 begin
   Assert(aCount > 0);
   Result := 0;
-  pEnd := PByte(pX) + aCount * SizeOf(Single);
+  pEnd := PByte(pX) + aCount * cF32Sz;
   while PByte(pX) < pEnd do begin
     d := pX^ - pY^;
     Result := Result + d * d;
@@ -3918,28 +4032,195 @@ begin
     Inc(pY);
   end;
 end;
+{$endif}
+
+function NormL1(pX: PDouble; aCount: NativeInt): Double;
+{$if defined(ASMx64)}
+const cMask: UInt64 = $7FFFFFFFFFFFFFFF;
+ // RCX <- pX, RDX <- aCount
+ asm
+{$ifdef DEBUG}
+  cmp rdx, 0
+  jg @begin
+  call RaiseNotPositiveLength
+{$endif}
+@begin:
+  movq xmm2, cMask
+  movlhps xmm2, xmm2
+  xorpd xmm0, xmm0
+  mov r8, rdx
+  shr rdx, 2
+  jz @rest
+@L:
+  movupd xmm1, [rcx]
+  andpd xmm1, xmm2
+  addpd xmm0, xmm1
+  add rcx, 16
+  movupd xmm1, [rcx]
+  andpd xmm1, xmm2
+  addpd xmm0, xmm1
+  add rcx, 16
+  dec rdx
+  jnz @L
+
+  // horizontal sum
+  movhlps xmm1, xmm0
+  addsd xmm0, xmm1
+ @rest:
+  and r8, 3
+  jz @end
+@Lrest:
+  movsd xmm1, [rcx]
+  andpd xmm1, xmm2
+  addsd xmm0, xmm1
+  add rcx, 8
+  dec r8
+  jnz @Lrest
+ @end:
+ end;
+{$else}
+var pEnd: PByte;
+begin
+  Assert(aCount > 0);
+  Result := 0;
+  pEnd := PByte(pX) + aCount * cF64Sz;
+  while PByte(pX) < pEnd do begin
+    Result := Result + Abs(pX^);
+    Inc(pX);
+  end;
+end;
+{$endif}
+
+function NormL2(pX: PDouble; aCount: NativeInt): Double;
+{$if defined(ASMx64)}
+// RCX <- pX, RDX <- aCount
+asm
+{$ifdef DEBUG}
+  cmp rdx, 0
+  jg @begin
+  call RaiseNotPositiveLength
+{$endif}
+@begin:
+  xorpd xmm0, xmm0
+  mov r8, rdx
+  shr rdx, 2
+  jz @rest
+@L:
+  movupd xmm1, [rcx]
+  mulpd xmm1, xmm1
+  addpd xmm0, xmm1
+  add rcx, 16
+  movupd xmm1, [rcx]
+  mulpd xmm1, xmm1
+  addpd xmm0, xmm1
+  add rcx, 16
+  dec rdx
+  jnz @L
+
+  movhlps xmm1, xmm0
+  addsd xmm0, xmm1
+@rest:
+  and r8, 3
+  jz @end
+@Lrest:
+  movsd xmm1, [rcx]
+  mulsd xmm1, xmm1
+  addpd xmm0, xmm1
+  add rcx, 8
+  dec r8
+  jnz @Lrest
+@end:
+  sqrtsd xmm0, xmm0
+end;
+{$else}
+var pEnd: PByte;
+begin
+  Assert(aCount > 0);
+  Result := 0;
+  pEnd := PByte(pX) + aCount * cF64Sz;
+  while PByte(pX) < pEnd do begin
+    Result := Result + Sqr(pX^);
+    Inc(pX);
+  end;
+  Result := Sqrt(Result);
+end;
+{$endif}
+
+function NormLInf(pX: PDouble; aCount: NativeInt): Double;
+{$if defined(ASMx64)}
+// RCX <- pX, RDX <- aCount
+const cMask: UInt64 = $7FFFFFFFFFFFFFFF;
+asm
+{$ifdef DEBUG}
+  cmp rdx, 0
+  jg @begin
+  call RaiseNotPositiveLength
+{$endif}
+@begin:
+  movq xmm2, cMask
+  movlhps xmm2, xmm2
+  xorpd xmm0, xmm0
+  mov r8, rdx
+  shr rdx, 2
+  jz @rest
+@L:
+  movupd xmm1, [rcx]
+  andpd xmm1, xmm2
+  maxpd xmm0, xmm1
+  add rcx, 16
+  movupd xmm1, [rcx]
+  andpd xmm1, xmm2
+  maxpd xmm0, xmm1
+  add rcx, 16
+  dec rdx
+  jnz @L
+
+  movhlps xmm1, xmm0
+  maxsd xmm0, xmm1
+@rest:
+  and r8, 3
+  jz @end
+@Lrest:
+  movsd xmm1, [rcx]
+  andpd xmm1, xmm2
+  maxsd xmm0, xmm1
+  add rcx, 8
+  dec r8
+  jnz @Lrest
+@end:
+end;
+{$else}
+var pEnd: PByte;
+    v: Single;
+begin
+  Assert(aCount > 0);
+  Result := 0;
+  pEnd := PByte(pX) + aCount * cF64Sz;
+  while PByte(pX) < pEnd do begin
+    v := Abs(pX^);
+    if v > Result then
+      Result := v;
+    Inc(pX);
+  end;
+end;
+{$endif}
 
 function Norm(pX: PDouble; aCount: NativeInt; p: Double = 2): Double;
 var pEnd: PByte;
-    v: Double;
 begin
   Assert((aCount > 0) and (p >= 1));
-  pEnd := PByte(pX) + aCount * SizeOf(Double);
-  Result := 0;
-  if SameValue(p, 1) then begin
-    while PByte(pX) < pEnd do begin
-      Result := Result + Abs(pX^);
-      Inc(pX);
-    end;
-  end else
-  if p = Infinity then begin
-    while PByte(pX) < pEnd do begin
-      v := Abs(pX^);
-      if v > Result then
-        Result := v;
-      Inc(pX);
-    end;
-  end else begin
+
+  if p = 1 then
+    Result := NormL1(pX, aCount)
+  else
+  if p = 2 then
+    Result := NormL2(pX, aCount)
+  else
+  if p = Infinity then
+    Result := NormLInf(pX, aCount)
+  else begin
+    pEnd := PByte(pX) + aCount * cF64Sz;
+    Result := 0;
     while PByte(pX) < pEnd do begin
       Result := Result + Power(Abs(pX^), p);
       Inc(pX);
@@ -3953,27 +4234,202 @@ begin
   Result := Norm(PDouble(X), Length(X), p);
 end;
 
+function NormL1(pX: PSingle; aCount: NativeInt): Single;
+{$if defined(ASMx64)}
+const cMask: UInt64 = $7FFFFFFF7FFFFFFF;
+ // RCX <- pX, RDX <- aCount
+ asm
+{$ifdef DEBUG}
+  cmp rdx, 0
+  jg @begin
+  call RaiseNotPositiveLength
+{$endif}
+@begin:
+  movq xmm2, cMask
+  movlhps xmm2, xmm2
+  xorps xmm0, xmm0
+  mov r8, rdx
+  shr rdx, 3
+  jz @rest
+@L:
+  movups xmm1, [rcx]
+  andps xmm1, xmm2
+  addps xmm0, xmm1
+  add rcx, 16
+  movups xmm1, [rcx]
+  andps xmm1, xmm2
+  addps xmm0, xmm1
+  add rcx, 16
+  dec rdx
+  jnz @L
+
+  // horizontal sum
+  movhlps xmm1, xmm0
+  addps xmm0, xmm1
+  movaps xmm1, xmm0
+  shufps xmm1, xmm1, 1
+  addss xmm0, xmm1
+ @rest:
+  and r8, 7
+  jz @end
+@Lrest:
+  movss xmm1, [rcx]
+  andps xmm1, xmm2
+  addss xmm0, xmm1
+  add rcx, 4
+  dec r8
+  jnz @Lrest
+ @end:
+ end;
+{$else}
+var pEnd: PByte;
+begin
+  Assert(aCount > 0);
+  Result := 0;
+  pEnd := PByte(pX) + aCount * cF32Sz;
+  while PByte(pX) < pEnd do begin
+    Result := Result + Abs(pX^);
+    Inc(pX);
+  end;
+end;
+{$endif}
+
+function NormL2(pX: PSingle; aCount: NativeInt): Single;
+{$if defined(ASMx64)}
+// RCX <- pX, RDX <- aCount
+asm
+{$ifdef DEBUG}
+  cmp rdx, 0
+  jg @begin
+  call RaiseNotPositiveLength
+{$endif}
+@begin:
+  xorps xmm0, xmm0
+  mov r8, rdx
+  shr rdx, 3
+  jz @rest
+@L:
+  movups xmm1, [rcx]
+  mulps xmm1, xmm1
+  addps xmm0, xmm1
+  add rcx, 16
+  movups xmm1, [rcx]
+  mulps xmm1, xmm1
+  addps xmm0, xmm1
+  add rcx, 16
+  dec rdx
+  jnz @L
+
+  movhlps xmm1, xmm0
+  addps xmm0, xmm1
+  movaps xmm1, xmm0
+  shufps xmm1, xmm1, 1
+  addss xmm0, xmm1
+@rest:
+  and r8, 7
+  jz @end
+@Lrest:
+  movss xmm1, [rcx]
+  mulss xmm1, xmm1
+  addps xmm0, xmm1
+  add rcx, 4
+  dec r8
+  jnz @Lrest
+@end:
+  sqrtss xmm0, xmm0
+end;
+{$else}
+var pEnd: PByte;
+begin
+  Assert(aCount > 0);
+  Result := 0;
+  pEnd := PByte(pX) + aCount * cF32Sz;
+  while PByte(pX) < pEnd do begin
+    Result := Result + Sqr(pX^);
+    Inc(pX);
+  end;
+  Result := Sqrt(Result);
+end;
+{$endif}
+
+function NormLInf(pX: PSingle; aCount: NativeInt): Single;
+{$if defined(ASMx64)}
+// RCX <- pX, RDX <- aCount
+const cMask: UInt64 = $7FFFFFFF7FFFFFFF;
+asm
+{$ifdef DEBUG}
+  cmp rdx, 0
+  jg @begin
+  call RaiseNotPositiveLength
+{$endif}
+@begin:
+  movq xmm2, cMask
+  movlhps xmm2, xmm2
+  xorps xmm0, xmm0
+  mov r8, rdx
+  shr rdx, 3
+  jz @rest
+@L:
+  movups xmm1, [rcx]
+  andps xmm1, xmm2
+  maxps xmm0, xmm1
+  add rcx, 16
+  movups xmm1, [rcx]
+  andps xmm1, xmm2
+  maxps xmm0, xmm1
+  add rcx, 16
+  dec rdx
+  jnz @L
+
+  movhlps xmm1, xmm0
+  maxps xmm0, xmm1
+  movaps xmm1, xmm0
+  shufps xmm1, xmm1, 1
+  maxss xmm0, xmm1
+@rest:
+  and r8, 7
+  jz @end
+@Lrest:
+  movss xmm1, [rcx]
+  andps xmm1, xmm2
+  maxss xmm0, xmm1
+  add rcx, 4
+  dec r8
+  jnz @Lrest
+@end:
+end;
+{$else}
+var pEnd: PByte;
+    v: Single;
+begin
+  Assert(aCount > 0);
+  Result := 0;
+  pEnd := PByte(pX) + aCount * cF32Sz;
+  while PByte(pX) < pEnd do begin
+    v := Abs(pX^);
+    if v > Result then
+      Result := v;
+    Inc(pX);
+  end;
+end;
+{$endif}
+
 function Norm(pX: PSingle; aCount: NativeInt; p: Single = 2): Single;
 var pEnd: PByte;
-    v: Double;
 begin
   Assert((aCount > 0) and (p >= 1));
-  pEnd := PByte(pX) + aCount * SizeOf(Single);
-  Result := 0;
-  if SameValue(p, 1) then begin
-    while PByte(pX) < pEnd do begin
-      Result := Result + Abs(pX^);
-      Inc(pX);
-    end;
-  end else
-  if p = Infinity then begin
-    while PByte(pX) < pEnd do begin
-      v := Abs(pX^);
-      if v > Result then
-        Result := v;
-      Inc(pX);
-    end;
-  end else begin
+
+  if p = 1 then
+    Result := NormL1(pX, aCount)
+  else
+  if p = 2 then
+    Result := NormL2(pX, aCount)
+  else
+  if p = Infinity then
+    Result := NormLInf(pX, aCount)
+  else begin
+    pEnd := PByte(pX) + aCount * cF32Sz;
+    Result := 0;
     while PByte(pX) < pEnd do begin
       Result := Result + Power(Abs(pX^), p);
       Inc(pX);
@@ -4482,7 +4938,7 @@ asm
   shr r9, 3
   jz @rest
 {$ifdef AVX}
-  vbroadcastss xmm0, xmm0
+  vbroadcastss ymm0, xmm0
 {$else}
   movss xmm1, xmm0
   shufps xmm0, xmm1, 0  //xmm1 <- 4 x B
@@ -4539,6 +4995,45 @@ end;
 {$endif}
 
 procedure VecMax(pA, pB, pRes: PSingle; aCount: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- pA, RDX <- pB, R8 <- pRes, R9 <- aCount
+asm
+  mov r10, r9
+  shr r9, 3
+  jz @rest
+@L:
+  movups xmm0, [rcx]
+  movups xmm1, [rdx]
+  maxps xmm0, xmm1
+  movups [r8], xmm0
+  add rcx, 16
+  add rdx, 16
+  add r8, 16
+  movups xmm0, [rcx]
+  movups xmm1, [rdx]
+  maxps xmm0, xmm1
+  movups [r8], xmm0
+  add rcx, 16
+  add rdx, 16
+  add r8, 16
+  dec r9
+  jnz @L
+@rest:
+  and r10, 7
+  jz @end
+@Lrest:
+  movss xmm0, [rcx]
+  movss xmm1, [rdx]
+  maxss xmm0, xmm1
+  movss [r8], xmm0
+  add rcx, 4
+  add rdx, 4
+  add r8, 4
+  dec r10
+  jnz @Lrest
+@end:
+end;
+{$else}
 var pEnd: PByte;
 begin
   pEnd := PByte(pA) + aCount * cF32Sz;
@@ -4549,6 +5044,78 @@ begin
     Inc(pB);
   end;
 end;
+{$endif}
+
+procedure VecClip(pX: PSingle; aCount: NativeInt; const aMin, aMax: Single);
+{$if defined(ASMx64)}
+// RCX <- pX, RDX <- aCount, XMM2 <- aMin, XMM3 <- aMax
+asm
+  mov r8, rdx
+  shr rdx, 3
+  jz @rest
+{$ifdef AVX}
+  vbroadcastss ymm2, xmm2
+  vbroadcastss ymm3, xmm3
+{$else}
+  movss xmm0, xmm2
+  shufps xmm2, xmm0, 0 // xmm2 <- 4 x aMin
+  movss xmm0, xmm3
+  shufps xmm3, xmm0, 0 // xmm3 <- 4 x aMax
+{$endif}
+@L:
+{$ifdef AVX}
+  vmovups ymm0, [rcx]
+  vmaxps ymm0, ymm0, ymm2
+  vminps ymm0, ymm0, ymm3
+  vmovups [rcx], ymm0
+  add rcx, 32
+{$else}
+  movups xmm0, [rcx]
+  maxps xmm0, xmm2
+  minps xmm0, xmm3
+  movups [rcx], xmm0
+  add rcx, 16
+  movups xmm0, [rcx]
+  maxps xmm0, xmm2
+  minps xmm0, xmm3
+  movups [rcx], xmm0
+  add rcx, 16
+{$endif}
+  dec rdx
+  jnz @L
+{$ifdef AVX}
+  vzeroupper
+{$endif}
+@rest:
+  and r8, 7
+  jz @end
+@Lrest:
+  movss xmm0, [rcx]
+  maxss xmm0, xmm2
+  minss xmm0, xmm3
+  movss [rcx], xmm0
+  add rcx, 4
+  dec r8
+  jnz @Lrest
+@end:
+end;
+{$else}
+var pEnd: PByte;
+    v: Single;
+begin
+  Assert(aMin <= aMax);
+  pEnd := PByte(pX) + aCount * cF32Sz;
+  while PByte(pX) < pEnd do begin
+    v := pX^;
+    if v < aMin then
+      pX^ := aMin
+    else
+    if v > aMax then
+      pX^ := aMax;
+    Inc(pX);
+  end;
+end;
+{$endif}
 
 {$ifdef RANGEON}
   {$R+}
