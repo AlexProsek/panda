@@ -491,7 +491,6 @@ type
     class procedure MapR<T>(const L: INDArray<T>; const R: T; aRFnc: TIPProcVV); overload; static;
     class procedure MapL<T>(const L: T; const R: INDArray<T>; aLFnc :TIPProcVV); overload; static;
 
-    class procedure FillR<T>(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt); static;
     class procedure Copy<T>(aSrc, aDst: PByte; aCount: NativeInt); overload; static;
     class procedure Copy<T>(aSrc, aDst: PByte; aCount, aStep: NativeInt); overload; static;
     class procedure Copy<T>(const aArr: INDArray; aDst: PByte); overload; static;
@@ -513,6 +512,7 @@ type
     /// </summary>
     class function Full<T>(const aDims: array of NativeInt; const aValue: T): INDArray<T>; overload; static;
     class function Full<T>(const aDims: array of NativeInt; const aValue: INDArray<T>): INDArray<T>; overload; static;
+    class function Fill<T>(const aDims: array of NativeInt; const aFunc: TFunc<T>): INDArray<T>; overload; static;
     /// <summary>
     ///   Returns the a square array with ones on the main diagonal.
     /// </summary>
@@ -1801,7 +1801,7 @@ begin
     try
       while it1.MoveNext do begin
         it2.MoveNext;
-        TNDAUt.MapR(it2.CurrentSlice, it1.CurrentSlice, TNDAUt.FillR<T>);
+        TNDAUt.MapR(it2.CurrentSlice, it1.CurrentSlice, TNDAUt.TFuncUt<T>.FillR);
       end;
     finally
       it1.Free;
@@ -1824,7 +1824,7 @@ end;
 
 function TNDA<T>.GetFillRFunc: TIPProcVV;
 begin
-  Result := TNDAUt.FillR<T>;
+  Result := TNDAUt.TFuncUt<T>.FillR;
 end;
 
 function TNDA<T>.PermuteAxes(const aPerm: array of Integer): INDArray;
@@ -1960,7 +1960,7 @@ var data: PByte;
 begin
   data := InitBuffer(aDims, aAlignment);
   Create(data, aDims);
-  TNDAUt.FillR<T>(Size, fData, SizeOf(T), @aValue, 0);
+  TNDAUt.TFuncUt<T>.FillR(Size, fData, SizeOf(T), @aValue, 0);
 end;
 
 function TNDABuffer<T>.InitBuffer(const aDims: array of NativeInt; aAlignment: Integer): PByte;
@@ -2843,28 +2843,6 @@ begin
   fCvtFuncs.AddOrSetValue(p, aFunc);
 end;
 
-class procedure TNDAUt.FillR<T>(N: NativeInt; L: PByte; IncL: NativeInt;
-  R: PByte; IncR: NativeInt);
-var pEnd: PByte;
-    s: T;
-type PT = ^T;
-begin
-  pEnd := L + N * IncL;
-  if IncR = 0 then begin
-    s := TNDA<T>.PT(R)^;
-    while L < pEnd do begin
-      PT(L)^ := s;
-      Inc(L, IncL);
-    end;
-  end else begin
-    while L < pEnd do begin
-      PT(L)^ := PT(R)^;
-      Inc(L, IncL);
-      Inc(R, IncR);
-    end;
-  end;
-end;
-
 class procedure TNDAUt.Copy<T>(aSrc, aDst: PByte; aCount: NativeInt);
 var pEnd: PByte;
 begin
@@ -2917,6 +2895,19 @@ class function TNDAUt.Full<T>(const aDims: array of NativeInt; const aValue: IND
 begin
   Result := TNDABuffer<T>.Create(aDims);
   Fill<T>(Result, aValue);
+end;
+
+class function TNDAUt.Fill<T>(const aDims: array of NativeInt; const aFunc: TFunc<T>): INDArray<T>;
+var p: TNDA<T>.PT;
+    pEnd: PByte;
+begin
+  Result := TNDABuffer<T>.Create(aDims);
+  p := TNDA<T>.PT(Result.Data);
+  pEnd := PByte(p) + GetSize(Result);
+  while PByte(p) < pEnd do begin
+    p^ := aFunc();
+    Inc(p);
+  end;
 end;
 
 class function TNDAUt.Identity<T>(aN: Integer): INDArray<T>;
@@ -3166,15 +3157,15 @@ end;
 
 class procedure TNDAUt.Fill<T>(const aArr: INDArray<T>; const aValue: T);
 begin
-  MapR(aArr, @aValue, FillR<T>);
+  MapR(aArr, @aValue, TFuncUt<T>.FillR);
 end;
 
 class procedure TNDAUt.Fill<T>(const aArr: INDArray<T>; const aValue: INDArray<T>);
 begin
   if aValue.NDim > aArr.NDim then
-    MapR(aArr, aValue[NDIIntSeq(aValue.NDim - aArr.NDim)], FillR<T>)
+    MapR(aArr, aValue[NDIIntSeq(aValue.NDim - aArr.NDim)], TFuncUt<T>.FillR)
   else
-    MapR(aArr, aValue, FillR<T>);
+    MapR(aArr, aValue, TFuncUt<T>.FillR);
 end;
 
 class procedure TNDAUt.MapR(const L: INDArray; pR: PByte; aRFnc: TIPProcVV);
@@ -3548,6 +3539,7 @@ end;
 
 class function TNDAUt.AsType<T>(const aArr: INDArray; aForceCopy: Boolean): INDArray<T>;
 begin
+  Result := nil;
   if not TryAsType<T>(aArr, Result, aForceCopy) then
     raise ENotImplemented.CreateFmt('TNDAUt.AsType<%s>() is not implemented yet.',
       [GetTypeName(TypeInfo(T))]

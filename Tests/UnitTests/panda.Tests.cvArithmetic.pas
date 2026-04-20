@@ -77,6 +77,8 @@ type
     procedure TestVecMaxS_Single_8;
     procedure TestVecMax_Single_3;
     procedure TestVecMax_Single_8;
+    procedure TestVecMinMax_U8_3;
+    procedure TestVecMinMax_U8_16;
     procedure TestVecClip_Single_3;
     procedure TestVecClip_Single_8;
     procedure TestScal_3_Single;
@@ -1021,6 +1023,34 @@ begin
   VecMax(PSingle(x), PSingle(y), PSingle(res), Length(x));
 
   CheckEquals([5, 4, 3, 4, 5, 4, 3, 4], res, stol);
+end;
+
+procedure TTestVectorMath.TestVecMinMax_U8_3;
+var x, y, mi, ma: TArray<Byte>;
+begin
+  x := TArray<Byte>.Create(1, 3, 6);
+  y := TArray<Byte>.Create(5, 2, 1);
+  SetLength(mi, Length(x));
+  SetLength(ma, Length(y));
+
+  VecMinMax(PUInt8(x), PUInt8(y), PUInt8(mi), PUInt8(ma), Length(x));
+
+  CheckEquals([1, 2, 1], mi);
+  CheckEquals([5, 3, 6], ma);
+end;
+
+procedure TTestVectorMath.TestVecMinMax_U8_16;
+var x, y, mi, ma: TArray<Byte>;
+begin
+  x := TArray<Byte>.Create(1,   2,  3,  4,  5,  6,  7, 8, 9, 10, 11, 12, 13, 14, 15, 16);
+  y := TArray<Byte>.Create(16, 15, 14, 13, 12, 11, 10, 9, 8,  7,  6,  5,  4,  3,  2,  1);
+  SetLength(mi, Length(x));
+  SetLength(ma, Length(y));
+
+  VecMinMax(PUInt8(x), PUInt8(y), PUInt8(mi), PUInt8(ma), Length(x));
+
+  CheckEquals([1,   2,  3,  4,  5,  6,  7, 8, 8, 7,   6,  5,  4,  3,  2,  1], mi);
+  CheckEquals([16, 15, 14, 13, 12, 11, 10, 9, 9, 10, 11, 12, 13, 14, 15, 16], ma);
 end;
 
 procedure TTestVectorMath.TestVecClip_Single_3;

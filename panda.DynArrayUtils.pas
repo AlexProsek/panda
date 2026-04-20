@@ -27,7 +27,7 @@ type
     fCmp: IComparer<T>;
     procedure Merge(pL, pR, pRes: PT; aLCnt, aRCnt: NativeInt);
   public
-    procedure Init(const aComparer: IComparer<T>);
+    procedure Init(const aComparer: IComparer<T> = nil);
     function Sort(const aData: TArray<T>): TArray<T>;
   end;
 
@@ -178,13 +178,7 @@ type
     /// </remarks>
     class function SearchPos<T>(const data: array of T; const Value: T; out Pos: NativeInt;
       Comparer: IComparer<T> = nil; StartPos: NativeInt = 0; EndPos: NativeInt = -1): Boolean; overload; static;
-    class function SearchPos(const data: array of Double; const Value: Double; out Pos: NativeInt;
-      StartPos: NativeInt = 0; EndPos: NativeInt = -1) : boolean; overload; static;
-    class function BinarySearch(const Values: array of Double; const Item: Double;
-      out FoundIndex: NativeInt; Index, Count: NativeInt): Boolean; overload; static;
-    class function BinarySearch(const Values: array of Double; const Item: Double;
-      out FoundIndex: NativeInt): Boolean; overload; static;
-    class procedure QuickSort(var Values: array of Double; L, R: NativeInt); static;
+    class procedure MergeSort<T>(var aData: TArray<T>; aComparer: IComparer<T> = nil); overload; static;
     /// <summary>
     ///   Finds index <c>I</c> in a data array such that <c>data[I]</c> is the greathest smaller value than
     ///   <c>Value</c>. This method goes through data item by item until required index is reached.
@@ -249,7 +243,6 @@ type
     /// <remarks> Don't use negative <c>RotateBy</c> and use function <c>RotateRight</c>. </remarks>
     /// <returns> Rotated Array. </returns>
     class function RotateLeft<T>(const aData: TArray<T>; RotateBy: NativeInt): TArray<T>; static;
-    class procedure MergeSort<T>(var aData: TArray<T>; aComparer: IComparer<T> = nil); static;
     /// <summary>
     ///   Creates heap on the <c>aData</c> input.
     /// </summary>
@@ -506,28 +499,60 @@ begin
 end;
 
 function TMergeSort<T>.Sort(const aData: TArray<T>): TArray<T>;
-var I, J, mid, aCount: NativeInt;
-    l, r, lres, rres: TArray<T>;
+var A, B, tmp: TArray<T>;
+    I, step, step2, count, cnt, rCnt: NativeInt;
+    pL, pR, pRes: PT;
+    pEnd: PByte;
 begin
-  aCount := Length(aData);
-  if aCount <= 1 then
-    exit(aData);
-
-  mid := Round(aCount / 2);
-  SetLength(l, mid);
-  SetLength(r, aCount - mid);
-  for I := 0 to mid - 1 do
-    l[I] := aData[I];
-  J := 0;
-  for I := mid to aCount - 1 do begin
-    r[J] := aData[I];
-    Inc(J);
+  count := Length(aData);
+  if count = 1 then begin
+    SetLength(Result, 1);
+    Result[0] := aData[0];
+    exit;
   end;
 
-  lres := Sort(l);
-  rres := Sort(r);
-  SetLength(Result, aCount);
-  merge(@lres[0], @rres[0], @Result[0], mid, aCount - mid);
+  SetLength(A, count);
+  SetLength(B, count);
+  step := 2;
+  cnt := (count div step) * step;
+  I := 0;
+  while I < cnt do begin
+    if fCmp.Compare(aData[I], aData[I + 1]) <= 0 then begin
+      A[I] := aData[I];
+      A[I + 1] := aData[I + 1];
+    end else begin
+      A[I] := aData[I + 1];
+      A[I + 1] := aData[I];
+    end;
+    Inc(I, 2);
+  end;
+  if cnt < count then
+    A[cnt] := aData[cnt];
+
+  while step < count do begin
+    pL := PT(@A[0]);
+    pR := PT(@A[step]);
+    pRes := PT(B);
+    step2 := 2 * step;
+    cnt := (count div step2) * step2;
+    pEnd := PByte(pL) + cnt * SizeOf(T);
+    while PByte(pL) < pEnd do begin
+      Merge(pL, pR, pRes, step, step);
+      Inc(pRes, step2);
+      Inc(pL, step2);
+      Inc(pR, step2);
+    end;
+    rCnt := count - cnt;
+    if rCnt > step then
+      Merge(pL, pR, pRes, step, rCnt - step)
+    else
+      TDynAUt.Copy<T>(A, B, cnt, cnt, rCnt);
+    step := step2;
+    tmp := A;
+    A := B;
+    B := tmp;
+  end;
+  Result := A;
 end;
 
 {$endregion}
@@ -920,117 +945,11 @@ begin
   Result := True;
 end;
 
-class function TDynAUt.SearchPos(const data: array of Double; const Value: Double;
-  out Pos: NativeInt; StartPos, EndPos: NativeInt): Boolean;
-var I, J, K : NativeInt;
-    LoLo, HiHi, MidLo, MidHi: Double;
+class procedure TDynAUt.MergeSort<T>(var aData: TArray<T>; aComparer: IComparer<T>);
+var me: TMergeSort<T>;
 begin
-  if EndPos >= 0 then
-    EndPos := Max(EndPos, High(data))
-  else
-    EndPos := High(data);
-
-  if EndPos < StartPos then exit(False);
-
-  if EndPos = StartPos then begin
-    if Value = data[StartPos] then begin
-      Pos := StartPos;
-      exit(True);
-    end else
-      exit(False);
-  end;
-
-  I := StartPos; J := EndPos - 1;
-  K := (I + J) div 2;
-  LoLo := data[I];
-  HiHi := data[J + 1];
-  if not InRange(Value, LoLo, HiHi) then exit(False);
-  MidLo := data[K];
-  MidHi := data[K + 1];
-  // while not (MidLo <= Value < MidHi) do ...
-  while (MidLo > Value) or (Value >= MidHi) do begin
-    if Value < MidLo then
-      J := K - 1
-    else
-    if Value >= MidHi then
-      I := K + 1;
-    K := (I + J) div 2;
-    MidLo := data[K];
-    MidHi := data[K + 1];
-  end;
-  Pos := K;
-  Result := True;
-end;
-
-class function TDynAUt.BinarySearch(const Values: array of Double; const Item: Double;
-  out FoundIndex: NativeInt; Index, Count: NativeInt): Boolean;
-var L, H, mid: NativeInt;
-begin
-  if (Index < Low(Values)) or ((Index > High(Values)) and (Count > 0))
-    or (Index + Count - 1 > High(Values)) or (Count < 0)
-    or (Index + Count < 0) then
-    raise EArgumentOutOfRangeException.CreateRes(@cSArgumentOutOfRange);
-  if Count = 0 then
-  begin
-    FoundIndex := Index;
-    Exit(False);
-  end;
-
-  Result := False;
-  L := Index;
-  H := Index + Count - 1;
-  while L <= H do
-  begin
-    mid := L + (H - L) shr 1;
-    if Values[mid] < Item then
-      L := mid + 1
-    else
-    begin
-      H := mid - 1;
-      if Values[mid] = Item then
-        Result := True;
-    end;
-  end;
-  FoundIndex := L;
-end;
-
-class function TDynAUt.BinarySearch(const Values: array of Double; const Item: Double;
-  out FoundIndex: NativeInt): Boolean;
-begin
-  Result := BinarySearch(Values, Item, FoundIndex, Low(Values), Length(Values));
-end;
-
-class procedure TDynAUt.QuickSort(var Values: array of Double; L, R: NativeInt);
-var I, J: NativeInt;
-    pivot, temp: Double;
-begin
-  if (Length(Values) = 0) or ((R - L) <= 0) then
-    Exit;
-  repeat
-    I := L;
-    J := R;
-    pivot := Values[L + (R - L) shr 1];
-    repeat
-      while Values[I] < pivot do
-        Inc(I);
-      while Values[J] > pivot do
-        Dec(J);
-      if I <= J then
-      begin
-        if I <> J then
-        begin
-          temp := Values[I];
-          Values[I] := Values[J];
-          Values[J] := temp;
-        end;
-        Inc(I);
-        Dec(J);
-      end;
-    until I > J;
-    if L < J then
-      QuickSort(Values, L, J);
-    L := I;
-  until I >= R;
+  me.Init(aComparer);
+  aData := me.Sort(aData);
 end;
 
 class function TDynAUt.SearchPosSuccessively<T>(const data: array of T; const Comparer: IComparer<T>; const Value: T;
@@ -1299,13 +1218,6 @@ begin
     if RotateBy = 0 then exit;
     Move(aData[0], Result[Length(aData) - RotateBy], RotateBy * SizeOf(T));
   end;
-end;
-
-class procedure TDynAUt.MergeSort<T>(var aData: TArray<T>; aComparer: IComparer<T>);
-var me: TMergeSort<T>;
-begin
-  me.Init(aComparer);
-  aData := me.Sort(aData);
 end;
 
 class procedure TDynAUt.MakeHeap<T>(aData: TArray<T>; aComparer: IComparer<T>;
@@ -2701,6 +2613,5 @@ end;
 {$endif}
 
 {$endregion}
-
 
 end.
