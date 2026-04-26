@@ -18,6 +18,18 @@
         <Projects Include="Tests\PerformanceTests\PerformanceTests.dproj">
             <Dependencies/>
         </Projects>
+        <Projects Include="Filters\UnitTests\FilterTests.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="Filters\PerformanceTests\FilterPerformanceTests.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="ImgProc\UnitTests\ImgProcTests.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="ImgProc\PerformanceTests\ImgProcPerformanceTests.dproj">
+            <Dependencies/>
+        </Projects>
     </ItemGroup>
     <ProjectExtensions>
         <Borland.Personality>Default.Personality.12</Borland.Personality>
@@ -71,14 +83,50 @@
     <Target Name="PerformanceTests:Make">
         <MSBuild Projects="Tests\PerformanceTests\PerformanceTests.dproj" Targets="Make"/>
     </Target>
+    <Target Name="FilterTests">
+        <MSBuild Projects="Filters\UnitTests\FilterTests.dproj"/>
+    </Target>
+    <Target Name="FilterTests:Clean">
+        <MSBuild Projects="Filters\UnitTests\FilterTests.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="FilterTests:Make">
+        <MSBuild Projects="Filters\UnitTests\FilterTests.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="FilterPerformanceTests">
+        <MSBuild Projects="Filters\PerformanceTests\FilterPerformanceTests.dproj"/>
+    </Target>
+    <Target Name="FilterPerformanceTests:Clean">
+        <MSBuild Projects="Filters\PerformanceTests\FilterPerformanceTests.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="FilterPerformanceTests:Make">
+        <MSBuild Projects="Filters\PerformanceTests\FilterPerformanceTests.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="ImgProcTests">
+        <MSBuild Projects="ImgProc\UnitTests\ImgProcTests.dproj"/>
+    </Target>
+    <Target Name="ImgProcTests:Clean">
+        <MSBuild Projects="ImgProc\UnitTests\ImgProcTests.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="ImgProcTests:Make">
+        <MSBuild Projects="ImgProc\UnitTests\ImgProcTests.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="ImgProcPerformanceTests">
+        <MSBuild Projects="ImgProc\PerformanceTests\ImgProcPerformanceTests.dproj"/>
+    </Target>
+    <Target Name="ImgProcPerformanceTests:Clean">
+        <MSBuild Projects="ImgProc\PerformanceTests\ImgProcPerformanceTests.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="ImgProcPerformanceTests:Make">
+        <MSBuild Projects="ImgProc\PerformanceTests\ImgProcPerformanceTests.dproj" Targets="Make"/>
+    </Target>
     <Target Name="Build">
-        <CallTarget Targets="panda4PyTests;NDAPyTest;pandapy;PandaTests;PerformanceTests"/>
+        <CallTarget Targets="panda4PyTests;NDAPyTest;pandapy;PandaTests;PerformanceTests;FilterTests;FilterPerformanceTests;ImgProcTests;ImgProcPerformanceTests"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="panda4PyTests:Clean;NDAPyTest:Clean;pandapy:Clean;PandaTests:Clean;PerformanceTests:Clean"/>
+        <CallTarget Targets="panda4PyTests:Clean;NDAPyTest:Clean;pandapy:Clean;PandaTests:Clean;PerformanceTests:Clean;FilterTests:Clean;FilterPerformanceTests:Clean;ImgProcTests:Clean;ImgProcPerformanceTests:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="panda4PyTests:Make;NDAPyTest:Make;pandapy:Make;PandaTests:Make;PerformanceTests:Make"/>
+        <CallTarget Targets="panda4PyTests:Make;NDAPyTest:Make;pandapy:Make;PandaTests:Make;PerformanceTests:Make;FilterTests:Make;FilterPerformanceTests:Make;ImgProcTests:Make;ImgProcPerformanceTests:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>
