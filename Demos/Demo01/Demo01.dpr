@@ -7,6 +7,11 @@ uses
 {$R *.res}
 
 begin
+{$ifdef MSWINDOWS}
+{$WARN SYMBOL_PLATFORM OFF}
+  if DebugHook <> 0 then ReportMemoryLeaksOnShutDown := True;
+{$endif}
+
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
   Application.CreateForm(TForm1, Form1);

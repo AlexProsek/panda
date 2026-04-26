@@ -4,12 +4,13 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls
   , panda.Intfs
   , panda.Arrays
   , panda.Arithmetic
   , panda.Math
-  , panda.Formatter, Vcl.StdCtrls, Vcl.ExtCtrls
+  , panda.Formatter
+  , System.UITypes
   ;
 
 type

@@ -1,8 +1,9 @@
-program Demo02;
+program Demo05;
 
 uses
   Vcl.Forms,
-  Unit1 in 'Unit1.pas' {Form2};
+  Unit05 in 'Unit05.pas' {Form5},
+  panda.ImgProc.VCLImages in '..\..\ImgProc\panda.ImgProc.VCLImages.pas';
 
 {$R *.res}
 
@@ -14,6 +15,6 @@ begin
 
   Application.Initialize;
   Application.MainFormOnTaskbar := True;
-  Application.CreateForm(TForm2, Form2);
+  Application.CreateForm(TForm5, Form5);
   Application.Run;
 end.

@@ -198,6 +198,7 @@
         <DCCReference Include="..\..\panda.MPNums.pas"/>
         <DCCReference Include="..\..\panda.Poly.pas"/>
         <DCCReference Include="panda.Tests.Poly.pas"/>
+        <DCCReference Include="panda.Tests.DynArrayUtils.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -244,6 +245,12 @@
                     </Platform>
                 </DeployFile>
                 <DeployFile LocalName="Win32\Debug\PandaTests.exe" Configuration="Debug" Class="ProjectOutput"/>
+                <DeployFile LocalName="Win32\Debug\PandaTests.exe" Configuration="Debug" Class="ProjectOutput">
+                    <Platform Name="Win32">
+                        <RemoteName>PandaTests.exe</RemoteName>
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
                 <DeployFile LocalName="Win64\Debug\PandaTests.exe" Configuration="Debug" Class="ProjectOutput"/>
                 <DeployFile LocalName="Win64\Debug\PandaTests.exe" Configuration="Debug" Class="ProjectOutput">
                     <Platform Name="Win64">
@@ -251,7 +258,6 @@
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
-                <DeployFile LocalName="Win64\Debug\PandaTests.rsm" Configuration="Debug" Class="DebugSymbols"/>
                 <DeployFile LocalName="Win64\Debug\PandaTests.rsm" Configuration="Debug" Class="DebugSymbols">
                     <Platform Name="Win64">
                         <RemoteName>PandaTests.rsm</RemoteName>

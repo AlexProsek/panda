@@ -43,7 +43,6 @@ object Form3: TForm3
     Height = 41
     Align = alTop
     TabOrder = 1
-    ExplicitWidth = 1014
     object btLoadImg: TButton
       Left = 9
       Top = 8
@@ -61,7 +60,6 @@ object Form3: TForm3
     Height = 552
     Align = alClient
     TabOrder = 2
-    ExplicitWidth = 717
     object edInput: TSynEdit
       Left = 1
       Top = 1
@@ -81,6 +79,7 @@ object Form3: TForm3
       Gutter.Font.Height = -13
       Gutter.Font.Name = 'Consolas'
       Gutter.Font.Style = []
+      Gutter.Font.Quality = fqClearTypeNatural
       Gutter.Bands = <
         item
           Kind = gbkMarks
@@ -106,8 +105,6 @@ object Form3: TForm3
         'img["R"] = img["G"]'
         'img["G"] = tmp')
       SelectedColor.Alpha = 0.400000005960464500
-      ExplicitWidth = 713
-      ExplicitHeight = 241
     end
     object Panel1: TPanel
       Left = 1
@@ -116,9 +113,6 @@ object Form3: TForm3
       Height = 41
       Align = alBottom
       TabOrder = 1
-      ExplicitLeft = 144
-      ExplicitTop = 472
-      ExplicitWidth = 185
       DesignSize = (
         403
         41)
@@ -132,7 +126,6 @@ object Form3: TForm3
         Enabled = False
         TabOrder = 0
         OnClick = btExecClick
-        ExplicitLeft = 630
       end
     end
   end

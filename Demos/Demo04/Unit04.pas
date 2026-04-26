@@ -12,7 +12,10 @@ uses
   , panda.Arithmetic
   , panda.Math
   , panda.Conv
-  , panda.Demos.Utils
+  , panda.ImgProc.Types
+  , panda.ImgProc.Images
+  , panda.ImgProc.VCLImages
+  , panda.ImgProc.io
   , System.Diagnostics
   , System.UITypes
   ;
@@ -35,7 +38,7 @@ type
     procedure Button1Click(Sender: TObject);
   private
     { Private declarations }
-    fImg: INDArray<TRGB24>;
+    fImg: IImage<TRGB24>;
     function CreateKernel(aDim: Integer): INDArray<Single>;
     procedure ShowImage(const aData: INDArray<Byte>);
   public
@@ -82,7 +85,8 @@ begin
   sw.Reset;
   sw.Start;
 
-  ch := TNDAMan.Transpose<Byte>(TRGB24Channels.Create(fImg), [2, 0, 1]);
+  ch := TImgUt.AsArray<TRGB24, Byte>(fImg);
+  ch := TNDAMan.Transpose<Byte>(ch, [2, 0, 1]);
   src := TNDAUt.AsType<Single>(ch);
   if cbUseSepKer.Checked then begin
     k := CreateKernel(1);
@@ -107,22 +111,16 @@ begin
 end;
 
 procedure TForm4.ShowImage(const aData: INDArray<Byte>);
-var bmp: TBitmap;
 var w, h: Integer;
-    i: INDArray<TRGB24>;
-    ch: INDArray<Byte>;
+    i: IImage<TRGB24>;
 begin
   w := aData.Shape[1];
   h := aData.Shape[0];
-  bmp := TBitmap.Create(w, h);
-  bmp.PixelFormat := pf24bit;
-  bmp.SetSize(w, h);
-  i := TImageRGB24.Create(bmp);
-  ch := TRGB24Channels.Create(i);
-  TNDAUt.Fill<Byte>(ch, aData);
+  i := TBmpRGB24.Create(w, h);
+  TNDAUt.Fill<Byte>(TImgUt.AsArray<TRGB24, Byte>(i), aData);
 
-  Image1.SetBounds(0, 0, bmp.Width, bmp.Height);
-  Image1.Picture.Assign(bmp);
+  Image1.SetBounds(0, 0, w, h);
+  Image1.Picture.Assign((i as IBitmapImage).Bitmap);
 end;
 
 procedure TForm4.Button1Click(Sender: TObject);
@@ -130,11 +128,16 @@ var bmp: TBitmap;
 begin
   if FileOpenDialog1.Execute then begin
     bmp := TBitmap.Create;
-    bmp.LoadFromFile(FileOpenDialog1.FileName);
+    if not LoadBitmapFromFile(FileOpenDialog1.FileName, bmp) then begin
+      MessageDlg(Format('Import of file ''%s'' failed.', [FileOpenDialog1.FileName]),
+        mtError, [mbOk], 0);
+      bmp.Free;
+      exit;
+    end;
     bmp.PixelFormat := pf24bit;
     Image1.SetBounds(0, 0, bmp.Width, bmp.Height);
     Image1.Picture.Assign(bmp);
-    fImg := TImageRGB24.Create(bmp);
+    fImg := TBmpRGB24.Create(bmp);
     btExecute.Enabled := True;
   end;
 end;

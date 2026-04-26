@@ -49,7 +49,8 @@ uses
   panda.Tests.MPNums in 'panda.Tests.MPNums.pas',
   panda.MPNums in '..\..\panda.MPNums.pas',
   panda.Poly in '..\..\panda.Poly.pas',
-  panda.Tests.Poly in 'panda.Tests.Poly.pas';
+  panda.Tests.Poly in 'panda.Tests.Poly.pas',
+  panda.Tests.DynArrayUtils in 'panda.Tests.DynArrayUtils.pas';
 
 {$R *.RES}
 

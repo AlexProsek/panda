@@ -30,6 +30,7 @@ object Form2: TForm2
     Lines.Strings = (
       '{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}')
     TabOrder = 0
+    ExplicitWidth = 622
   end
   object mmOutput: TMemo
     Left = 0
@@ -39,6 +40,8 @@ object Form2: TForm2
     Align = alClient
     ReadOnly = True
     TabOrder = 1
+    ExplicitWidth = 622
+    ExplicitHeight = 242
   end
   object Panel1: TPanel
     Left = 0
@@ -47,11 +50,13 @@ object Form2: TForm2
     Height = 41
     Align = alBottom
     TabOrder = 2
+    ExplicitTop = 392
+    ExplicitWidth = 622
     DesignSize = (
       624
       41)
     object btExecute: TButton
-      Left = 532
+      Left = 528
       Top = 8
       Width = 75
       Height = 25
@@ -59,7 +64,7 @@ object Form2: TForm2
       Caption = 'Execute'
       TabOrder = 0
       OnClick = btExecuteClick
-      ExplicitLeft = 536
+      ExplicitLeft = 526
     end
     object ComboBox1: TComboBox
       Left = 15

@@ -23,7 +23,7 @@ object Form1: TForm1
       624
       41)
     object btFlipH: TSpeedButton
-      Left = 471
+      Left = 467
       Top = 9
       Width = 60
       Height = 22
@@ -36,7 +36,7 @@ object Form1: TForm1
       ExplicitLeft = 477
     end
     object btFlipV: TSpeedButton
-      Left = 538
+      Left = 534
       Top = 9
       Width = 60
       Height = 22
@@ -58,16 +58,16 @@ object Form1: TForm1
       OnClick = Button1Click
     end
     object btSplitRGB: TButton
-      Left = 390
+      Left = 386
       Top = 8
       Width = 75
       Height = 25
       Anchors = [akTop, akRight]
-      Caption = 'Spit RGB'
+      Caption = 'Split RGB'
       Enabled = False
       TabOrder = 1
       OnClick = btSplitRGBClick
-      ExplicitLeft = 388
+      ExplicitLeft = 384
     end
   end
   object ScrollBox1: TScrollBox
@@ -93,8 +93,8 @@ object Form1: TForm1
     FavoriteLinks = <>
     FileTypes = <
       item
-        DisplayName = 'Bitmap image'
-        FileMask = '*.bmp'
+        DisplayName = 'Image file'
+        FileMask = '*.bmp;*.jpeg;*.jpg;*.png;*.gif'
       end>
     Options = []
     Left = 256

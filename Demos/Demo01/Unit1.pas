@@ -7,7 +7,10 @@ uses
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls, Vcl.Buttons
   , panda.Intfs
   , panda.Arrays
-  , panda.Demos.Utils
+  , panda.ImgProc.Types
+  , panda.ImgProc.Images
+  , panda.ImgProc.VCLImages
+  , panda.ImgProc.io
   ;
 
 type
@@ -25,7 +28,7 @@ type
     procedure btSplitRGBClick(Sender: TObject);
   private
     { Private declarations }
-    fImg: INDArray<TRGB24>;
+    fImg: IImage<TRGB24>;
   public
     { Public declarations }
   end;
@@ -38,45 +41,46 @@ implementation
 {$R *.dfm}
 
 procedure TForm1.btFlipChanged(Sender: TObject);
-var i: INDArray<TRGB24>;
+var src, dst: INDArray<TRGB24>;
+    i: IImage<TRGB24>;
 begin
-  i := TImageRGB24.Create(fImg.Shape[1], fImg.Shape[0]);
+  src := TImgUt.AsArray<TRGB24>(fImg);
+  i := TBmpRGB24.Create(fImg.Width, fImg.Height);
+  dst := TImgUt.AsArray<TRGB24>(i);
 
   if btFlipH.Down and btFlipV.Down then
-    i[[NDIAll, NDIAll]] := fImg[[NDIAll(-1), NDIAll(-1)]]
+    dst[[NDIAll, NDIAll]] := src[[NDIAll(-1), NDIAll(-1)]]
   else
   if btFlipH.Down then
-    i[[NDIAll, NDIAll]] := fImg[[NDIAll(-1), NDIAll]]
+    dst[[NDIAll, NDIAll]] := src[[NDIAll(-1), NDIAll]]
   else
   if btFlipV.Down then
-    i[[NDIAll, NDIAll]] := fImg[[NDIAll, NDIAll(-1)]]
+    dst[[NDIAll, NDIAll]] := src[[NDIAll, NDIAll(-1)]]
   else
-    i[[NDIAll, NDIAll]] := fImg[[NDIAll, NDIAll]];
+    dst[[NDIAll, NDIAll]] := src[[NDIAll, NDIAll]];
 
-  Image1.Picture.Assign(TImageRGB24(i).Bitmap);
+  Image1.Picture.Assign((i as IBitmapImage).Bitmap);
 end;
 
 procedure TForm1.btSplitRGBClick(Sender: TObject);
-var i: INDArray<TRGB24>;
+var i: IImage<TRGB24>;
     chSrc, chDst: INDArray<Byte>;
-    w, h, w2, h2: NativeInt;
+    w, h: NativeInt;
 begin
-  w := fImg.Shape[1];
-  h := fImg.Shape[0];
-  chSrc := TRGB24Channels.Create(fImg);
+  chSrc := TImgUt.AsArray<TRGB24, Byte>(fImg);
   chSrc := chSrc[[NDIAll(2), NDIAll(2)]];
-  w2 := chSrc.Shape[1];
-  h2 := chSrc.Shape[0];
-  i := TImageRGB24.Create(2*w2, 2*h2);
-  chDst := TRGB24Channels.Create(i);
+  w := chSrc.Shape[1];
+  h := chSrc.Shape[0];
+  i := TBmpRGB24.Create(2*w, 2*h);
+  chDst := TImgUt.AsArray<TRGB24, Byte>(i);
 
   TNDAUt.Fill<Byte>(chDst, 0);
-  chDst[[NDISpan(h2, -1), NDISpan(0, w2 - 1)]] := chSrc;
-  chDst[[NDISpan(h2, -1), NDISpan(w2, -1), NDI(2)]] := chSrc[[NDIAll, NDIAll, NDI(2)]];
-  chDst[[NDISpan(0, h2 - 1), NDISpan(0, w2 - 1), NDI(1)]] := chSrc[[NDIAll, NDIAll, NDI(1)]];
-  chDst[[NDISpan(0, h2 - 1), NDISpan(w2, -1), NDI(0)]] := chSrc[[NDIAll, NDIAll, NDI(0)]];
+  chDst[[NDISpan(h, -1), NDISpan(0, w - 1)]] := chSrc;
+  chDst[[NDISpan(h, -1), NDISpan(w, -1), NDI(2)]] := chSrc[[NDIAll, NDIAll, NDI(2)]];
+  chDst[[NDISpan(0, h - 1), NDISpan(0, w - 1), NDI(1)]] := chSrc[[NDIAll, NDIAll, NDI(1)]];
+  chDst[[NDISpan(0, h - 1), NDISpan(w, -1), NDI(0)]] := chSrc[[NDIAll, NDIAll, NDI(0)]];
 
-  Image1.Picture.Assign(TImageRGB24(i).Bitmap);
+  Image1.Picture.Assign((i as IBitmapImage).Bitmap);
 end;
 
 procedure TForm1.Button1Click(Sender: TObject);
@@ -84,11 +88,16 @@ var bmp: TBitmap;
 begin
   if FileOpenDialog1.Execute then begin
     bmp := TBitmap.Create;
-    bmp.LoadFromFile(FileOpenDialog1.FileName);
+      if not LoadBitmapFromFile(FileOpenDialog1.FileName, bmp) then begin
+        MessageDlg(Format('Import of file ''%s'' failed.', [FileOpenDialog1.FileName]),
+          mtError, [mbOk], 0);
+        bmp.Free;
+        exit;
+      end;
     bmp.PixelFormat := pf24bit;
     Image1.SetBounds(0, 0, bmp.Width, bmp.Height);
     Image1.Picture.Assign(bmp);
-    fImg := TImageRGB24.Create(bmp);
+    fImg := TBmpRGB24.Create(bmp);
 
     btFlipH.Enabled := True;
     btFlipV.Enabled := True;
