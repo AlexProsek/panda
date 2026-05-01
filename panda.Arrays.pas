@@ -557,6 +557,7 @@ type
   function SameQ(const aIdx1, aIdx2: array of NativeInt): Boolean; overload;
   function SameQ(const aIdx1, aIdx2: array of NativeInt; out aUpTo: Integer): Boolean; overload;
   function SameUpToQ(const aIdx1, aIdx2: array of NativeInt; aUpTo: Integer): Boolean; overload;
+  function SameQ(const aIdx1, aIdx2: array of NativeInt; const aIdx1Perm: array of Integer): Boolean; overload;
   function SameShapeQ(const A, B: INDArray): Boolean; inline;
   function ValidShapeQ(const aShape: TNDAShape): Boolean; inline;
   function AxesPermQ(const aAxes: array of Integer): Boolean;
@@ -601,7 +602,7 @@ type
   function NDISpanIndices(const aItemCount: NativeInt; const aIdx: INDSpanIndex;
     out aLo, aHi, aStep: NativeInt): Boolean;
   procedure NDISplit(const aIdx: INDIndexSeq; out aSetIdx: INDIndexSeq; out aSpanIdx: INDIndexSeq;
-    out aAxesPerm: TArray<Integer>);
+    out aAxesPerm: TArray<Integer>; aDim: Integer = -1);
   function NDIToStr(const aIndices: array of NativeInt): String; overload;
 {$ifdef FPC}
   function NDIToStr(const aIndices: TArray<NativeInt>): String; overload;
@@ -665,6 +666,17 @@ begin
 
   for I := 0 to aUpTo do
     if aIdx1[0] <> aIdx2[I] then exit(False);
+  Result := True;
+end;
+
+function SameQ(const aIdx1, aIdx2: array of NativeInt; const aIdx1Perm: array of Integer): Boolean;
+var I: Integer;
+begin
+  if Length(aIdx1) <> Length(aIdx2) then exit(False);
+
+  Assert(Length(aIdx1) = Length(aIdx1Perm));
+  for I := 0 to High(aIdx1) do
+    if aIdx1[I] <> aIdx2[aIdx1Perm[I]] then exit(False);
   Result := True;
 end;
 
@@ -1116,16 +1128,21 @@ begin
 end;
 
 procedure NDISplit(const aIdx: INDIndexSeq; out aSetIdx: INDIndexSeq; out aSpanIdx: INDIndexSeq;
-  out aAxesPerm: TArray<Integer>);
+  out aAxesPerm: TArray<Integer>; aDim: Integer);
 var I, nDim, setTop, spanTop: Integer;
     idx: INDIndexSeq;
 begin
-  nDim := Length(aIdx);
+  if aDim < 0 then
+    nDim := Length(aIdx)
+  else begin
+    Assert(aDim >= Length(aIdx));
+    nDim := aDim;
+  end;
   SetLength(idx, 2 * nDim);
   SetLength(aAxesPerm, 2 * nDim);
   setTop := 0;
   spanTop := nDim;
-  for I := 0 to nDim - 1 do begin
+  for I := 0 to Min(High(aIdx), nDim - 1) do begin
     if aIdx[I].IndexType = nditSet then begin
       idx[setTop] := aIdx[I];
       aAxesPerm[setTop] := I;
@@ -1135,6 +1152,11 @@ begin
       aAxesPerm[spanTop] := I;
       Inc(spanTop);
     end;
+  end;
+  for I := Length(aIdx) to nDim - 1 do begin
+    idx[spanTop] := NDIAll();
+    aAxesPerm[spanTop] := I;
+    Inc(spanTop);
   end;
   SetLength(aSetIdx, setTop);
   for I := 0 to setTop - 1 do
@@ -1664,6 +1686,7 @@ var it: TNDASliceItChain;
     setIdx, spanIdx: INDIndexSeq;
     axesPerm: TArray<Integer>;
     arr: INDArray;
+    elSz: Integer;
 
   function GetPermutedArray(var aPerm: TArray<Integer>): INDArray;
   var I, count, nDim: Integer;
@@ -1681,7 +1704,7 @@ var it: TNDASliceItChain;
   end;
 
 begin
-  NDISplit(aIdx, setIdx, spanIdx, axesPerm);
+  NDISplit(aIdx, setIdx, spanIdx, axesPerm, NDim);
   arr := GetPermutedArray(axesPerm);
   sh := GetPartShape(arr, setIdx);
   shv := aValue.Shape;
@@ -1693,8 +1716,14 @@ begin
       if SameQ(sh, shv) then begin
         itv := TNDASliceIt.Create(aValue, 0, Length(shs) - 1);
         try
-          while it.MoveNext and itv.MoveNext do
-           TNDAUt.MapR(it.CurrentSlice, itv.CurrentSlice, ff);
+          if it.CurrentSlice.NDim = 0 then begin
+            elSz := arr.ItemSize;
+            while it.MoveNext and itv.MoveNext do
+              ff(1, it.CurrentSlice.Data, elSz, itv.CurrentSlice.Data, elSz);
+          end else begin
+            while it.MoveNext and itv.MoveNext do
+              TNDAUt.MapR(it.CurrentSlice, itv.CurrentSlice, ff);
+           end;
         finally
           itv.Free;
         end;
@@ -1702,9 +1731,20 @@ begin
       end;
 
       while it.MoveNext do begin
-        TNDAut.MapR(it.CurrentSlice, aValue, ff);
+        TNDAUt.MapR(it.CurrentSlice, aValue, ff);
       end;
     end else begin // Length(spanIdx) > 0
+      if SameQ(sh, shv, axesPerm) then begin
+        itv := TNDASliceIt.Create(aValue, 0, Length(sh) - Length(shs) - 1, axesPerm);
+        try
+          while it.MoveNext and itv.MoveNext do
+           SetSlicePart(it.CurrentSlice, spanIdx, itv.CurrentSlice);
+        finally
+          itv.Free;
+        end;
+        exit;
+      end;
+
       while it.MoveNext do begin
         SetSlicePart(it.CurrentSlice, spanIdx, aValue);
       end;
@@ -1816,10 +1856,12 @@ begin
 end;
 
 procedure TNDA<T>.SetSlicePart(const aSlice: INDArray; const aIdx: INDIndexSeq; const aValue: INDArray);
-var slice: INDArray<T>;
+var slice, val: INDArray<T>;
 begin
   slice := TNDArray<T>.Create(aSlice.Data, aSlice.Shape, aSlice.Strides);
-  slice[aIdx] := (aValue as INDArray<T>);
+  if not Supports(aValue, INDArray<T>, val) then
+    val := TNDArray<T>.Create(aValue.Data, aValue.Shape, aValue.Strides);
+  slice[aIdx] := val;
 end;
 
 function TNDA<T>.GetFillRFunc: TIPProcVV;
@@ -2522,6 +2564,7 @@ end;
 
 constructor TNDAConstSliceIt.Create(const aSlice: INDArray);
 begin
+  fArr := aSlice;
   fSlice := aSlice;
   fPos := -1;
 end;
@@ -2611,9 +2654,13 @@ begin
 
   SetLength(fIts, top);
   if top > 0 then begin
-    for I := 0 to top - 2 do
-      fIts[I].MoveNext; // ? raise exception if not
-    fSlice := fIts[top - 1].CurrentSlice;
+    for I := 0 to top - 2 do with fIts[I] do begin
+      ResetData;
+      MoveNext; // ? raise exception if not
+    end;
+    it := fIts[top - 1];
+    it.ResetData;
+    fSlice := it.CurrentSlice;
   end else
     fSlice := fData;
 end;
@@ -2627,7 +2674,7 @@ begin
 end;
 
 function TNDASliceItChain.MoveNext: Boolean;
-var I, hi: Integer;
+var I, J, hi: Integer;
 begin
   hi := High(fIts);
   if fIts[hi].MoveNext then exit(True);
@@ -2635,10 +2682,11 @@ begin
   I := hi - 1;
   while I >= 0 do begin
     if fIts[I].MoveNext then begin
-      for I := I + 1 to hi do begin
-        fIts[I].Reset;
-        if not fIts[I].MoveNext then exit(False);
-      end;
+      for J := I + 1 to hi do
+        with fIts[J] do begin
+          Reset;
+          if not MoveNext then exit(False);
+        end;
       exit(True);
     end;
     Dec(I);

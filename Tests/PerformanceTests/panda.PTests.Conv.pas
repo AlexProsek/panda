@@ -29,6 +29,8 @@ type
 
 implementation
 
+{$EXCESSPRECISION OFF} // to prevent Single -> Double conversion by x64 compiler
+
 {$region 'TCorrTests'}
 
 procedure TCorrTests.Corr1D_F32;
@@ -115,7 +117,6 @@ end;
 
 {$region 'TCorrPascalImplTests'}
 
-// Single to Double implicit conversion significantly decreases performance
 procedure TCorrPascalImplTests.Corr1D_Pascal_F32;
 var k, v, res: TArray<Single>;
     I, J: Integer;

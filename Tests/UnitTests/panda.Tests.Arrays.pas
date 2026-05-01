@@ -154,6 +154,27 @@ type
     procedure Array2DAPerm;
   end;
 
+  TNDIdxSetTests = class(TNDATestCase)
+  published
+    procedure SubMat;
+    procedure SubMatRevA0;
+    procedure SubMatRevA1;
+    procedure SubMatRevA0A1;
+
+    procedure SwapRows;
+    procedure SwapCols;
+    procedure SwapCorners;
+
+    procedure SwapSlices3DA0;
+    procedure SwapSlices3DA1;
+    procedure SwapSlices3DA2;
+
+    procedure SwapSlices3DA0A1;
+    procedure SwapSlices3DA1A2;
+
+    procedure SwapSlices3DA0A1_ShortExpr;
+  end;
+
   TNDAUtTests = class(TNDATestCase)
   published
     procedure FullArray2D;
@@ -2007,6 +2028,260 @@ end;
 
 {$endregion}
 
+{$region 'TNDIdxSetTests'}
+
+procedure TNDIdxSetTests.SubMat;
+var a, b: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+  b := a[[NDI([0, 2]), NDI([0, 2])]];
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(b, m));
+  CheckEquals(2, Length(m));
+  CheckEquals([1, 3], m[0]);
+  CheckEquals([7, 9], m[1]);
+end;
+
+procedure TNDIdxSetTests.SubMatRevA0;
+var a, b: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+  b := a[[NDI([2, 0]), NDI([0, 2])]];
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(b, m));
+  CheckEquals(2, Length(m));
+  CheckEquals([7, 9], m[0]);
+  CheckEquals([1, 3], m[1]);
+end;
+
+procedure TNDIdxSetTests.SubMatRevA1;
+var a, b: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+  b := a[[NDI([0, 2]), NDI([2, 0])]];
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(b, m));
+  CheckEquals(2, Length(m));
+  CheckEquals([3, 1], m[0]);
+  CheckEquals([9, 7], m[1]);
+end;
+
+procedure TNDIdxSetTests.SubMatRevA0A1;
+var a, b: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+  b := a[[NDI([2, 0]), NDI([2, 0])]];
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(b, m));
+  CheckEquals(2, Length(m));
+  CheckEquals([9, 7], m[0]);
+  CheckEquals([3, 1], m[1]);
+end;
+
+procedure TNDIdxSetTests.SwapRows;
+var a: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+  a[[NDI([0, 2]), NDIAll]] := a[[NDI([2, 0]), NDIAll]];
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(a, m));
+  CheckEquals(3, Length(m));
+  CheckEquals([7, 8, 9], m[0]);
+  CheckEquals([4, 5, 6], m[1]);
+  CheckEquals([1, 2, 3], m[2]);
+end;
+
+procedure TNDIdxSetTests.SwapCols;
+var a: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+  a[[NDIAll, NDI([0, 2])]] := a[[NDIAll, NDI([2, 0])]];
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(a, m));
+  CheckEquals(3, Length(m));
+  CheckEquals([3, 2, 1], m[0]);
+  CheckEquals([6, 5, 4], m[1]);
+  CheckEquals([9, 8, 7], m[2]);
+end;
+
+procedure TNDIdxSetTests.SwapCorners;
+var a: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+  a[[NDI([2, 0]), NDI([0, 2])]] := a[[NDI([0, 2]), NDI([2, 0])]];
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(a, m));
+  CheckEquals(3, Length(m));
+  CheckEquals([9, 2, 7], m[0]);
+  CheckEquals([4, 5, 6], m[1]);
+  CheckEquals([3, 8, 1], m[2]);
+end;
+
+procedure TNDIdxSetTests.SwapSlices3DA0;
+var a: INDArray<Integer>;
+    m: TArray<TArray<TArray<Integer>>>;
+begin
+  a := iRng2NDA([3, 3, 2]);
+  a[[NDI([0, 2]), NDIAll, NDIAll]] := a[[NDI([2, 0]), NDIAll, NDIAll]];
+
+  CheckTrue(TNDAUt.TryAsDynArray3D<Integer>(a, m));
+  CheckEquals(3, Length(m));
+
+  CheckEquals(3, Length(m[0]));
+  CheckEquals([13, 14], m[0, 0]);
+  CheckEquals([15, 16], m[0, 1]);
+  CheckEquals([17, 18], m[0, 2]);
+
+  CheckEquals(3, Length(m[1]));
+  CheckEquals([ 7,  8], m[1, 0]);
+  CheckEquals([ 9, 10], m[1, 1]);
+  CheckEquals([11, 12], m[1, 2]);
+
+  CheckEquals(3, Length(m[2]));
+  CheckEquals([1, 2], m[2, 0]);
+  CheckEquals([3, 4], m[2, 1]);
+  CheckEquals([5, 6], m[2, 2]);
+end;
+
+procedure TNDIdxSetTests.SwapSlices3DA1;
+var a: INDArray<Integer>;
+    m: TArray<TArray<TArray<Integer>>>;
+begin
+  a := iRng2NDA([3, 3, 2]);
+  a[[NDIAll, NDI([0, 2]), NDIAll]] := a[[NDIAll, NDI([2, 0]), NDIAll]];
+
+  CheckTrue(TNDAUt.TryAsDynArray3D<Integer>(a, m));
+  CheckEquals(3, Length(m));
+
+  CheckEquals(3, Length(m[0]));
+  CheckEquals([5, 6], m[0, 0]);
+  CheckEquals([3, 4], m[0, 1]);
+  CheckEquals([1, 2], m[0, 2]);
+
+  CheckEquals(3, Length(m[1]));
+  CheckEquals([11, 12], m[1, 0]);
+  CheckEquals([ 9, 10], m[1, 1]);
+  CheckEquals([ 7,  8], m[1, 2]);
+
+  CheckEquals(3, Length(m[2]));
+  CheckEquals([17, 18], m[2, 0]);
+  CheckEquals([15, 16], m[2, 1]);
+  CheckEquals([13, 14], m[2, 2]);
+end;
+
+procedure TNDIdxSetTests.SwapSlices3DA2;
+var a: INDArray<Integer>;
+    m: TArray<TArray<TArray<Integer>>>;
+begin
+  a := iRng2NDA([3, 3, 2]);
+  a[[NDIAll, NDIAll, NDI([0, 1])]] := a[[NDIAll, NDIAll, NDI([1, 0])]];
+
+  CheckTrue(TNDAUt.TryAsDynArray3D<Integer>(a, m));
+  CheckEquals(3, Length(m));
+
+  CheckEquals(3, Length(m[0]));
+  CheckEquals([2, 1], m[0, 0]);
+  CheckEquals([4, 3], m[0, 1]);
+  CheckEquals([6, 5], m[0, 2]);
+
+  CheckEquals(3, Length(m[1]));
+  CheckEquals([ 8,  7], m[1, 0]);
+  CheckEquals([10,  9], m[1, 1]);
+  CheckEquals([12, 11], m[1, 2]);
+
+  CheckEquals(3, Length(m[2]));
+  CheckEquals([14, 13], m[2, 0]);
+  CheckEquals([16, 15], m[2, 1]);
+  CheckEquals([18, 17], m[2, 2]);
+end;
+
+procedure TNDIdxSetTests.SwapSlices3DA0A1;
+var a: INDArray<Integer>;
+    m: TArray<TArray<TArray<Integer>>>;
+begin
+  a := iRng2NDA([3, 3, 2]);
+  a[[NDI([0, 2]), NDI([2, 0]), NDIAll]] := a[[NDI([2, 0]), NDI([0, 2]), NDIAll]];
+
+  CheckTrue(TNDAUt.TryAsDynArray3D<Integer>(a, m));
+  CheckEquals(3, Length(m));
+
+  CheckEquals(3, Length(m[0]));
+  CheckEquals([17, 18], m[0, 0]);
+  CheckEquals([ 3,  4], m[0, 1]);
+  CheckEquals([13, 14], m[0, 2]);
+
+  CheckEquals(3, Length(m[1]));
+  CheckEquals([ 7,  8], m[1, 0]);
+  CheckEquals([ 9, 10], m[1, 1]);
+  CheckEquals([11, 12], m[1, 2]);
+
+  CheckEquals(3, Length(m[2]));
+  CheckEquals([ 5,  6], m[2, 0]);
+  CheckEquals([15, 16], m[2, 1]);
+  CheckEquals([ 1,  2], m[2, 2]);
+end;
+
+procedure TNDIdxSetTests.SwapSlices3DA1A2;
+var a: INDArray<Integer>;
+    m: TArray<TArray<TArray<Integer>>>;
+begin
+  a := iRng2NDA([3, 3, 2]);
+  a[[NDIAll, NDI([2, 0]), NDI([1, 0])]] := a[[NDIAll, NDI([0, 2]), NDI([0, 1])]];
+
+  CheckTrue(TNDAUt.TryAsDynArray3D<Integer>(a, m));
+  CheckEquals(3, Length(m));
+
+  CheckEquals(3, Length(m[0]));
+  CheckEquals([ 6,  5], m[0, 0]);
+  CheckEquals([ 3,  4], m[0, 1]);
+  CheckEquals([ 2,  1], m[0, 2]);
+
+  CheckEquals(3, Length(m[1]));
+  CheckEquals([12, 11], m[1, 0]);
+  CheckEquals([ 9, 10], m[1, 1]);
+  CheckEquals([ 8,  7], m[1, 2]);
+
+  CheckEquals(3, Length(m[2]));
+  CheckEquals([18, 17], m[2, 0]);
+  CheckEquals([15, 16], m[2, 1]);
+  CheckEquals([14, 13], m[2, 2]);
+end;
+
+procedure TNDIdxSetTests.SwapSlices3DA0A1_ShortExpr;
+var a: INDArray<Integer>;
+    m: TArray<TArray<TArray<Integer>>>;
+begin
+  a := iRng2NDA([3, 3, 2]);
+  a[[NDI([0, 2]), NDI([2, 0])]] := a[[NDI([2, 0]), NDI([0, 2])]];
+
+  CheckTrue(TNDAUt.TryAsDynArray3D<Integer>(a, m));
+  CheckEquals(3, Length(m));
+
+  CheckEquals(3, Length(m[0]));
+  CheckEquals([17, 18], m[0, 0]);
+  CheckEquals([ 3,  4], m[0, 1]);
+  CheckEquals([13, 14], m[0, 2]);
+
+  CheckEquals(3, Length(m[1]));
+  CheckEquals([ 7,  8], m[1, 0]);
+  CheckEquals([ 9, 10], m[1, 1]);
+  CheckEquals([11, 12], m[1, 2]);
+
+  CheckEquals(3, Length(m[2]));
+  CheckEquals([ 5,  6], m[2, 0]);
+  CheckEquals([15, 16], m[2, 1]);
+  CheckEquals([ 1,  2], m[2, 2]);
+end;
+
+{$endregion}
+
 {$region 'TNDAUtTests'}
 
 procedure TNDAUtTests.FullArray2D;
@@ -2891,6 +3166,7 @@ initialization
   RegisterTest(TNDASliceItTests.Suite);
   RegisterTest(TNDASliceItChainTests.Suite);
   RegisterTest(TNDIdxItTests.Suite);
+  RegisterTest(TNDIdxSetTests.Suite);
   RegisterTest(TNDAUtTests.Suite);
   RegisterTest(TBinMapTests.Suite);
   RegisterTest(TNDACvtTests.Suite);

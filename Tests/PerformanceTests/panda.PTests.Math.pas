@@ -27,6 +27,8 @@ type
 
 implementation
 
+{$EXCESSPRECISION OFF} // to prevent Single -> Double conversion by x64 compiler
+
 {$region 'TMathTests'}
 
 procedure TMathTests.Dot_Mat;
@@ -81,15 +83,11 @@ end;
 
 {$region 'TMathPascalImplTests'}
 
-type
-//  TReal = Single; // Single to Double conversion significantly decreases performance
-  TReal = Double;
-
 procedure TMathPascalImplTests.Dot_Mat_Pascal;
-var a, b, c: TArray<TArray<TReal>>;
-    ra, rb: TArray<TReal>;
+var a, b, c: TArray<TArray<Single>>;
+    ra, rb: TArray<Single>;
     I, J, K: Integer;
-    s: TReal;
+    s: Single;
 const N = 500;
 begin
   SetLength(a, N, N);
