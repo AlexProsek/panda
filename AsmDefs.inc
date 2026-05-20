@@ -41,6 +41,13 @@
   {$define OVERFLOWON}
 {$endif}
 
+// defines the word size for multiprecision arithmetic
+{$if defined(ASMx64)}
+  {$define Limb64}
+{$else}
+  {$define Limb32}
+{$endif}
+
 const
 // CPU_X86_V2 expects SSE, SSE2, SSE3, SSSE3, SSE4_1, SSE4_2  (minimal cpu baseline for asm code)
 // CPU_X86_V3 expects CPU_X84_V2, AVX, AVX2

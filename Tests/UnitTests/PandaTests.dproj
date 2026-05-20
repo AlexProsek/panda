@@ -199,6 +199,7 @@
         <DCCReference Include="..\..\panda.Poly.pas"/>
         <DCCReference Include="panda.Tests.Poly.pas"/>
         <DCCReference Include="panda.Tests.DynArrayUtils.pas"/>
+        <DCCReference Include="panda.Tests.ArrCmp.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

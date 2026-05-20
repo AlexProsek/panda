@@ -50,7 +50,8 @@ uses
   panda.MPNums in '..\..\panda.MPNums.pas',
   panda.Poly in '..\..\panda.Poly.pas',
   panda.Tests.Poly in 'panda.Tests.Poly.pas',
-  panda.Tests.DynArrayUtils in 'panda.Tests.DynArrayUtils.pas';
+  panda.Tests.DynArrayUtils in 'panda.Tests.DynArrayUtils.pas',
+  panda.Tests.ArrCmp in 'panda.Tests.ArrCmp.pas';
 
 {$R *.RES}
 

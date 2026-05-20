@@ -29,6 +29,7 @@ type
     procedure AddVecWithSat_UInt8;
     procedure AddVecWithSat_UInt16;
     procedure AndVec;
+    procedure NotVec;
     procedure TestMin_2U8;
     procedure TestMin_3U8;
     procedure TestMin_4U8;
@@ -285,6 +286,18 @@ begin
 
   SWStart;
   VecAnd(PByte(x), PByte(x), PByte(res), N);
+  SWStop;
+end;
+
+procedure TVecMathPerformance.NotVec;
+var x, res: TArray<Byte>;
+const N = 10000000;
+begin
+  SetLength(x, N);
+  SetLength(res, N);
+
+  SWStart;
+  VecNot(PByte(x), PByte(res), N);
   SWStop;
 end;
 

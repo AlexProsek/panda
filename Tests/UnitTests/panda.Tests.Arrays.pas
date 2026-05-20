@@ -85,6 +85,9 @@ type
 
     procedure GetPackedDataPtr1D;
     procedure GetPackedDataPtr2D;
+
+    procedure CConstFlag1D;
+    procedure CConstFlag2D;
   end;
 
   TIndicesTests = class(TNDATestCase)
@@ -1066,6 +1069,39 @@ begin
   CheckEquals(4, buff[2]);
   CheckEquals(6, buff[3]);
   CheckEquals(Pointer(buff), Pointer(pBuff));
+end;
+
+procedure TArrayTests.CConstFlag1D;
+var a, b: INDArray<Byte>;
+begin
+  a := TNDAUt.AsArray<Byte>([[1, 2, 3], [4, 5, 6]]);
+
+  b := a[[NDI(0)]];
+  CheckTrue((b.Flags and NDAF_C_CONTIGUOUS) <> 0);
+
+  b := a[[NDIAll, NDI(0)]];
+  CheckTrue((b.Flags and NDAF_C_CONTIGUOUS) = 0);
+end;
+
+procedure TArrayTests.CConstFlag2D;
+var a, b: INDArray<Integer>;
+begin
+  a := iRng2NDA([3, 2, 3]);
+
+  b := a[[NDI(0)]];
+  CheckTrue((b.Flags and NDAF_C_CONTIGUOUS) <> 0);
+  b := a[[NDI(1)]];
+  CheckTrue((b.Flags and NDAF_C_CONTIGUOUS) <> 0);
+
+  b := a[[NDI(1), NDI(0)]];
+  CheckTrue((b.Flags and NDAF_C_CONTIGUOUS) <> 0);
+
+  b := a[[NDIAll, NDI(0)]];
+  CheckTrue((b.Flags and NDAF_C_CONTIGUOUS) = 0);
+
+  b := a[[NDIAll, NDIAll, NDI(0)]];
+  CheckTrue((b.Flags and NDAF_C_CONTIGUOUS) = 0);
+
 end;
 
 {$endregion}

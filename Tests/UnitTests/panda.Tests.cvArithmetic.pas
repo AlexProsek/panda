@@ -133,9 +133,20 @@ type
     procedure TestVecAnd_3;
     procedure TestVecAnd_4;
     procedure TestVecAnd_5;
+    procedure TestVecAnd_8;
+    procedure TestVecAnd_10;
     procedure TestVecAnd_16;
     procedure TestVecAnd_17;
     procedure TestVecOr_4;
+    procedure TestVecOr_8;
+    procedure TestVecOr_10;
+    procedure TestVecNot_3;
+    procedure TestVecNot_4;
+    procedure TestVecNot_5;
+    procedure TestVecNot_8;
+    procedure TestVecNot_10;
+    procedure TestVecNot_16;
+    procedure TestVecNot_17;
     procedure TestSQDiffs_Double_3;
     procedure TestSQDiffs_Double_4;
     procedure TestSQDiffs_Double_9;
@@ -1669,6 +1680,30 @@ begin
     CheckEquals(x[I] and y[I], res[I]);
 end;
 
+procedure TTestVectorMath.TestVecAnd_8;
+var x, y, res: TArray<Byte>;
+    I: Integer;
+begin
+  x := TArray<Byte>.Create(3, 6, 12, 24, 48, 96, 48, 24);
+  y := TArray<Byte>.Create(1, 2,  4,  8, 16, 32, 16,  8);
+  SetLength(res, Length(x));
+  VecAnd(PByte(x), PByte(y), PByte(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(x[I] and y[I], res[I]);
+end;
+
+procedure TTestVectorMath.TestVecAnd_10;
+var x, y, res: TArray<Byte>;
+    I: Integer;
+begin
+  x := TArray<Byte>.Create(3, 6, 12, 24, 48, 96, 48, 24, 12, 6);
+  y := TArray<Byte>.Create(1, 2,  4,  8, 16, 32, 16,  8,  4, 2);
+  SetLength(res, Length(x));
+  VecAnd(PByte(x), PByte(y), PByte(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(x[I] and y[I], res[I]);
+end;
+
 procedure TTestVectorMath.TestVecAnd_16;
 var x, y, res: TArray<Byte>;
     I: Integer;
@@ -1703,6 +1738,107 @@ begin
   VecOr(PByte(x), PByte(y), PByte(res), Length(x));
   for I := 0 to High(res) do
     CheckEquals(x[I] or y[I], res[I]);
+end;
+
+procedure TTestVectorMath.TestVecOr_8;
+var x, y, res: TArray<Byte>;
+    I: Integer;
+begin
+  x := TArray<Byte>.Create(3, 6, 12, 24, 48, 96, 48, 24);
+  y := TArray<Byte>.Create(1, 2,  4,  8, 16, 32, 16,  8);
+  SetLength(res, Length(x));
+  VecOr(PByte(x), PByte(y), PByte(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(x[I] or y[I], res[I]);
+end;
+
+procedure TTestVectorMath.TestVecOr_10;
+var x, y, res: TArray<Byte>;
+    I: Integer;
+begin
+  x := TArray<Byte>.Create(3, 6, 12, 24, 48, 96, 48, 24, 12, 6);
+  y := TArray<Byte>.Create(1, 2,  4,  8, 16, 32, 16,  8,  4, 2);
+  SetLength(res, Length(x));
+  VecOr(PByte(x), PByte(y), PByte(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(x[I] or y[I], res[I]);
+end;
+
+procedure TTestVectorMath.TestVecNot_3;
+var x, res: TArray<Byte>;
+    I: Integer;
+begin
+  x := TArray<Byte>.Create(3, 6, 12);
+  SetLength(res, Length(x));
+  VecNot(PByte(x), PByte(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(255 xor x[I], res[I]);
+end;
+
+procedure TTestVectorMath.TestVecNot_4;
+var x, res: TArray<Byte>;
+    I: Integer;
+begin
+  x := TArray<Byte>.Create(3, 6, 12, 24);
+  SetLength(res, Length(x));
+  VecNot(PByte(x), PByte(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(255 xor x[I], res[I]);
+end;
+
+procedure TTestVectorMath.TestVecNot_5;
+var x, res: TArray<Byte>;
+    I: Integer;
+begin
+  x := TArray<Byte>.Create(3, 6, 12, 24, 48);
+  SetLength(res, Length(x));
+  VecNot(PByte(x), PByte(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(255 xor x[I], res[I]);
+end;
+
+procedure TTestVectorMath.TestVecNot_8;
+var x, res: TArray<Byte>;
+    I: Integer;
+begin
+  x := TArray<Byte>.Create(3, 6, 12, 24, 48, 96, 48, 24);
+  SetLength(res, Length(x));
+  VecNot(PByte(x), PByte(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(255 xor x[I], res[I]);
+end;
+
+procedure TTestVectorMath.TestVecNot_10;
+var x, res: TArray<Byte>;
+    I: Integer;
+begin
+  x := TArray<Byte>.Create(3, 6, 12, 24, 48, 96, 48, 24, 12, 6);
+  SetLength(res, Length(x));
+  VecNot(PByte(x), PByte(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(255 xor x[I], res[I]);
+end;
+
+procedure TTestVectorMath.TestVecNot_16;
+var x, res: TArray<Byte>;
+    I: Integer;
+begin                    //0  1   2   3   4   5   6   7   8  9  10  11  12  13  14  15
+  x := TArray<Byte>.Create(3, 6, 12, 24, 48, 96, 48, 24, 12, 6,  3,  6, 12, 24, 48, 96);
+  SetLength(res, Length(x));
+  VecNot(PByte(x), PByte(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(255 xor x[I], res[I]);
+end;
+
+procedure TTestVectorMath.TestVecNot_17;
+var x, res: TArray<Byte>;
+    I: Integer;
+begin                    //0  1   2   3   4   5   6   7   8  9  10  11  12  13  14  15  16
+  x := TArray<Byte>.Create(3, 6, 12, 24, 48, 96, 48, 24, 12, 6,  3,  6, 12, 24, 48, 96, 48);
+  SetLength(res, Length(x));
+  VecNot(PByte(x), PByte(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(255 xor x[I], res[I]);
 end;
 
 procedure TTestVectorMath.TestSQDiffs_Double_3;

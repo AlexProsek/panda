@@ -10,12 +10,6 @@ uses
 
 {$I AsmDefs.inc}
 
-{$if defined(ASMx64)}
-  {$define Limb64}
-{$else}
-  {$define Limb32}
-{$endif}
-
 type
 {$ifdef Limb64}
   TLimb = UInt64;
@@ -175,7 +169,6 @@ type
 
     cLCnt = {$ifdef Limb64}2{$else}4{$endif};
   private
-    fLimbs: array [0..1] of UInt64;
     class function AbsCompare(const A, B: TReal128): Integer; static;
     class function AddPositive(const A, B: TReal128): TReal128; static;
     class function SubtractPositive(const A, B: TReal128): TReal128; static;
@@ -190,6 +183,7 @@ type
     procedure SetExponent(aValue: Integer); inline;
   {$endregion}
   public
+    fLimbs: array [0..1] of UInt64;
     procedure Init(const aValue: Double); overload;
     procedure Init(const aLo, aHi: UInt64); overload; inline;
     class operator Implicit(const A: Double): TReal128; overload; inline;
@@ -352,6 +346,13 @@ function _Length(pA: PByte; N: NativeInt): NativeInt;
 
 {$endregion}
 
+{$region 'helper functions'}
+
+function HiLimbBaseQuotient(aValue: TLimb): TLimb; {$ifndef CPUx64}inline;{$endif}
+function IntPwr(A: TLimb; aExponent: Integer): TLimb;
+
+{$endregion}
+
 {$region 'exception helpers'}
 
 procedure RaiseInt128Overflow;
@@ -360,14 +361,18 @@ procedure RaiseInt128Overflow;
 
 implementation
 
+{$region 'exception helpers'}
+
 procedure RaiseInt128Overflow;
 begin
   raise EIntOverflow.Create('TInt128 overflow.');
 end;
 
+{$endregion}
+
 {$region 'helper functions'}
 
-function HiLimbBaseQuotient(aValue: TLimb): TLimb; {$ifndef CPUx64}inline;{$endif}
+function HiLimbBaseQuotient(aValue: TLimb): TLimb;
 {$if defined(ASMx64)}
 asm
   // rcx <- aValue
@@ -386,6 +391,24 @@ begin
   Result := $100000000 div (UInt64(aValue) + 1);
 end;
 {$endif}
+
+function IntPwr(A: TLimb; aExponent: Integer): TLimb;
+var Y, Z: TLimb;
+    N: Integer absolute aExponent;
+    t: Integer;
+begin
+  Assert(aExponent > 0);
+  Y := 1;
+  Z := A;
+  while True do begin
+    t := N and 1;
+    N := N shr 1;
+    if t = 1 then Y := Z * Y;
+    if N = 0 then break;
+    Z := Z * Z;
+  end;
+  Result := Y;
+end;
 
 {$endregion}
 

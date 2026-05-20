@@ -11,12 +11,6 @@ uses
 
 {$I AsmDefs.inc}
 
-{$if defined(ASMx64)}
-  {$define Limb64}
-{$else}
-  {$define Limb32}
-{$endif}
-
 type
   TLowLvlTests = class(TNDATestCase)
   published

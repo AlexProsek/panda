@@ -15,6 +15,11 @@ type
     procedure Total_Single;
     procedure Total_Double;
 
+    procedure Accum_Int32;
+    procedure AccumLoop_Int32;
+    procedure Accum_Single;
+    procedure AccumLoop_Single;
+
     procedure AbsMax_Double;
 
     procedure MinMax_Double;
@@ -53,6 +58,60 @@ begin
 
   SWStart;
   cvTotal(PDouble(x), Length(x));
+  SWStop;
+end;
+
+procedure TCVMathTests.Accum_Int32;
+var x, y: TArray<Integer>;
+    I: Integer;
+const N = 10000000;
+begin
+  SetLength(x, N);
+  SetLength(y, N);
+
+  SWStart;
+  cvAccum(PInteger(x), PInteger(y), Length(x));
+  SWStop;
+end;
+
+procedure TCVMathTests.AccumLoop_Int32;
+var x, y: TArray<Integer>;
+    I: Integer;
+const N = 1000;
+begin
+  SetLength(x, N);
+  SetLength(y, N);
+
+  SWStart;
+  for I := 0 to N - 1 do
+    cvAccum(PInteger(x), PInteger(y), Length(x));
+  SWStop;
+end;
+
+procedure TCVMathTests.Accum_Single;
+var x, y: TArray<Single>;
+    I: Integer;
+const N = 10000000;
+begin
+  SetLength(x, N);
+  SetLength(y, N);
+
+  SWStart;
+  cvAccum(PSingle(x), PSingle(y), Length(x));
+  SWStop;
+end;
+
+procedure TCVMathTests.AccumLoop_Single;
+var x, y: TArray<Single>;
+    I: Integer;
+const N = 1000;
+begin
+  SetLength(x, N);
+  SetLength(y, N);
+
+  SWStart;
+  for I := 0 to N - 1 do
+    cvAccum(PSingle(x), PSingle(y), Length(x));
   SWStop;
 end;
 

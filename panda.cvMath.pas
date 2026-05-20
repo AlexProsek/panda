@@ -23,6 +23,10 @@ function cvTotal(aData: PInteger; aCount: NativeInt): Integer; overload;
 function cvTotal(aData: PSingle; aCount: NativeInt): Single; overload;
 function cvTotal(aData: PDouble; aCount: NativeInt): Double; overload;
 
+procedure cvAccum(aData, aRes: PInteger; aCount: NativeInt); overload;
+procedure cvAccum(aData, aRes: PSingle; aCount: NativeInt); overload;
+procedure cvAccum(aData, aRes: PDouble; aCount: NativeInt); overload;
+
 procedure cvMinMax(pData: PSingle; aCount: NativeInt; var aMin, aMax: Single); overload;
 procedure cvMinMax(pData: PDouble; aCount: NativeInt; var aMin, aMax: Double); overload;
 
@@ -257,6 +261,193 @@ begin
   end;
 end;
 {$endif}
+
+{$endregion}
+
+{$region 'cvAccum'}
+
+procedure cvAccum(aData, aRes: PInteger; aCount: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- aData, RDX <- aRes, R8 <- aCount;
+asm
+  pxor xmm0, xmm0
+  mov r9, r8
+  shr r8, 3
+  jz @rest
+@L:
+{$ifdef AVX}
+  vmovdqu ymm1, [rcx]
+  vpslldq ymm2, ymm1, 4
+  vpaddd ymm1, ymm1, ymm2
+  vpslldq ymm2, ymm1, 8
+  vpaddd ymm1, ymm1, ymm2
+  vextracti128 xmm2, ymm1, 1
+  vpaddd xmm0, xmm0, xmm1
+  movdqu [rdx], xmm0
+  vpshufd xmm0, xmm0, $FF
+  vpaddd xmm0, xmm0, xmm2
+  movdqu [rdx + 16], xmm0
+  vpshufd xmm0, xmm0, $FF
+  add rcx, 32
+  add rdx, 32
+{$else}
+  movdqu xmm1, [rcx]
+  movdqa xmm2, xmm1
+  pslldq xmm2, 4
+  paddd xmm1, xmm2
+  movdqa xmm2, xmm1
+  pslldq xmm2, 8
+  paddd xmm1, xmm2
+  paddd xmm0, xmm1
+  movdqu [rdx], xmm0
+  pshufd xmm0, xmm0, $FF  //xmm0 <- 4 x s[4*I - 1]
+  add rcx, 16
+  add rdx, 16
+
+  movdqu xmm1, [rcx]
+  movdqa xmm2, xmm1
+  pslldq xmm2, 4
+  paddd xmm1, xmm2
+  movdqa xmm2, xmm1
+  pslldq xmm2, 8
+  paddd xmm1, xmm2
+  paddd xmm0, xmm1
+  movdqu [rdx], xmm0
+  pshufd xmm0, xmm0, $FF // xmm0 <- 4 x s[8*I - 1]
+  add rcx, 16
+  add rdx, 16
+{$endif}
+  dec r8
+  jnz @L
+{$ifdef AVX}
+  vzeroupper
+{$endif}
+@rest:
+  and r9, 7
+  jz @end
+  movd eax, xmm0
+@Lrest:
+  add eax, [rcx]
+  mov [rdx], eax
+  add rcx, 4
+  add rdx, 4
+  dec r9
+  jnz @Lrest
+@end:
+end;
+{$else}
+var pEnd: PByte;
+    s: Integer;
+begin
+  pEnd := PByte(aData) + aCount * cI32Sz;
+  s := 0;
+  while PByte(aData) < pEnd do begin
+    Inc(s, aData^);
+    aRes^ := s;
+    Inc(aData);
+    Inc(aRes);
+  end;
+end;
+{$endif}
+
+procedure cvAccum(aData, aRes: PSingle; aCount: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- aData, RDX <- aRes, R8 <- aCount;
+asm
+  pxor xmm0, xmm0
+  mov r9, r8
+  shr r8, 3
+  jz @rest
+@L:
+{$ifdef AVX}
+  vmovups ymm1, [rcx]
+  vpslldq ymm2, ymm1, 4
+  vaddps ymm1, ymm1, ymm2
+  vpslldq ymm2, ymm1, 8
+  vaddps ymm1, ymm1, ymm2
+  vextracti128 xmm2, ymm1, 1
+  vaddps xmm0, xmm0, xmm1
+  movups [rdx], xmm0
+  vpshufd xmm0, xmm0, $FF
+  vaddps xmm0, xmm0, xmm2
+  movups [rdx + 16], xmm0
+  vpshufd xmm0, xmm0, $FF
+  add rcx, 32
+  add rdx, 32
+{$else}
+  movups xmm1, [rcx]
+  movaps xmm2, xmm1
+  pslldq xmm2, 4
+  addps xmm1, xmm2
+
+  movups xmm2, xmm1
+  pslldq xmm2, 8
+  addps xmm1, xmm2
+  addps xmm0, xmm1
+  movups [rdx], xmm0
+  pshufd xmm0, xmm0, $FF  //xmm0 <- 4 x s[4*I - 1]
+  add rcx, 16
+  add rdx, 16
+
+  movups xmm1, [rcx]
+  movaps xmm2, xmm1
+  pslldq xmm2, 4
+  addps xmm1, xmm2
+  movaps xmm2, xmm1
+  pslldq xmm2, 8
+  addps xmm1, xmm2
+  addps xmm0, xmm1
+  movups [rdx], xmm0
+  pshufd xmm0, xmm0, $FF // xmm0 <- 4 x s[8*I - 1]
+  add rcx, 16
+  add rdx, 16
+{$endif}
+  dec r8
+  jnz @L
+{$ifdef AVX}
+  vzeroupper
+{$endif}
+@rest:
+  and r9, 7
+  jz @end
+  movd eax, xmm0
+@Lrest:
+  addss xmm0, [rcx]
+  movss [rdx], xmm0
+  add rcx, 4
+  add rdx, 4
+  dec r9
+  jnz @Lrest
+@end:
+end;
+{$else}
+var pEnd: PByte;
+    s: Single;
+begin
+  pEnd := PByte(aData) + aCount * cF32Sz;
+  s := 0;
+  while PByte(aData) < pEnd do begin
+    s := s + aData^;
+    aRes^ := s;
+    Inc(aData);
+    Inc(aRes);
+  end;
+end;
+{$endif}
+
+procedure cvAccum(aData, aRes: PDouble; aCount: NativeInt);
+var pEnd: PByte;
+    s: Double;
+begin
+  pEnd := PByte(aData) + aCount * cF64Sz;
+  s := 0;
+  while PByte(aData) < pEnd do begin
+    s := s + aData^;
+    aRes^ := s;
+    Inc(aData);
+    Inc(aRes);
+  end;
+end;
 
 {$endregion}
 

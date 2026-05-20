@@ -25,6 +25,11 @@ type
     procedure Total4_Double;
     procedure Total6_Double;
 
+    procedure Accum8_Int32;
+    procedure Accum10_Int32;
+    procedure Accum8_Single;
+    procedure Accum10_Single;
+
     procedure AbsMax1_Double;
     procedure AbsMax2_Double;
     procedure AbsMax4_Double;
@@ -118,6 +123,72 @@ begin
   x := TArray<Double>.Create(1, 2, 3, 4, 5, 6);
   res := cvTotal(PDouble(x), Length(x));
   CheckEquals(21, res);
+end;
+
+procedure TTestVecMath.Accum8_Int32;
+var x, y: TArray<Integer>;
+    I, s: Integer;
+begin
+  x := TArray<Integer>.Create(1, 2, 3, 4, 5, 6, 7, 8);
+  SetLength(y, Length(x));
+
+  cvAccum(PInteger(x), PInteger(y), Length(x));
+
+  s := 0;
+  for I := 0 to High(x) do begin
+    s := s + x[I];
+    CheckEquals(s, y[I]);
+  end;
+end;
+
+procedure TTestVecMath.Accum10_Int32;
+var x, y: TArray<Integer>;
+    I, s: Integer;
+begin
+  x := TArray<Integer>.Create(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+  SetLength(y, Length(x));
+
+  cvAccum(PInteger(x), PInteger(y), Length(x));
+
+  s := 0;
+  for I := 0 to High(x) do begin
+    s := s + x[I];
+    CheckEquals(s, y[I]);
+  end;
+end;
+
+procedure TTestVecMath.Accum8_Single;
+var x, y: TArray<Single>;
+    I: Integer;
+    s: Single;
+begin
+  x := TArray<Single>.Create(1, 2, 3, 4, 5, 6, 7, 8);
+  SetLength(y, Length(x));
+
+  cvAccum(PSingle(x), PSingle(y), Length(x));
+
+  s := 0;
+  for I := 0 to High(x) do begin
+    s := s + x[I];
+    CheckEquals(s, y[I], sTol);
+  end;
+end;
+
+procedure TTestVecMath.Accum10_Single;
+var x, y: TArray<Single>;
+    I: Integer;
+    s: Single;
+begin
+  x := TArray<Single>.Create(1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+  SetLength(y, Length(x));
+
+  cvAccum(PSingle(x), PSingle(y), Length(x));
+
+  s := 0;
+  for I := 0 to High(x) do begin
+    s := s + x[I];
+    CheckEquals(s, y[I], sTol);
+  end;
 end;
 
 procedure TTestVecMath.AbsMax1_Double;

@@ -78,6 +78,10 @@ function CRowsQ(const aMat: TMatSpec): Boolean; inline;
 // Returns True if a matrix has continuous columns
 function CColsQ(const aMat: TMatSpec): Boolean; inline;
 
+procedure Tr4x4_8B(pSrc, pDst: PByte; aSrcStep, aDstStep: NativeInt);
+procedure TrRxC_8B(pSrc, pDst: PByte; aSrcStep, aDstStep: NativeInt; R, C: NativeInt);
+procedure CTr_8B(pSrc, pDst: PByte; aSrcRCnt, aSrcCCnt, aSrcRStep, aDstRStep: NativeInt);
+
 procedure Tr4x4_4B(pSrc, pDst: PByte; aSrcStep, aDstStep: NativeInt);
 procedure TrRxC_4B(pSrc, pDst: PByte; aSrcStep, aDstStep: NativeInt; R, C: NativeInt);
 procedure CTr_4B(pSrc, pDst: PByte; aSrcRCnt, aSrcCCnt, aSrcRStep, aDstRStep: NativeInt);
@@ -108,6 +112,181 @@ end;
 function CColsQ(const aMat: TMatSpec): Boolean;
 begin
   Result := (aMat.ElSize = aMat.RStep);
+end;
+
+procedure Tr4x4_8B(pSrc, pDst: PByte; aSrcStep, aDstStep: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- pSrc, RDX <- pDst, R8 <- aSrcStep, R9 <- aDstStep
+asm
+{$ifdef AVX}
+  sub rsp, 40
+  movdqa [rsp], xmm6
+  movdqa [rsp + 16], xmm7
+
+  // ---- Load rows into YMM registers ----
+
+  vmovupd ymm0, [rcx]    // ymm0 = [a b c d]
+  add rcx, r8
+  vmovupd ymm1, [rcx] // ymm1 = [e f g h]
+  add rcx, r8
+  vmovupd ymm2, [rcx] // ymm2 = [i j k l]
+  add rcx, r8
+  vmovupd ymm3, [rcx] // ymm3 = [m n o p]
+
+  // ---- Transpose ----
+
+  vunpcklpd ymm4, ymm0, ymm1   // a e c g
+  vunpckhpd ymm5, ymm0, ymm1   // b f d h
+  vunpcklpd ymm6, ymm2, ymm3   // i m k o
+  vunpckhpd ymm7, ymm2, ymm3   // j n l p
+
+  vperm2f128 ymm0, ymm4, ymm6, $20   // a e i m
+  vperm2f128 ymm1, ymm5, ymm7, $20   // b f j n
+  vperm2f128 ymm2, ymm4, ymm6, $31   // c g k o
+  vperm2f128 ymm3, ymm5, ymm7, $31   // d h l p
+
+  // ---- Store result ----
+
+  vmovupd [rdx], ymm0
+  add rdx, r9
+  vmovupd [rdx], ymm1
+  add rdx, r9
+  vmovupd [rdx], ymm2
+  add rdx, r9
+  vmovupd [rdx], ymm3
+  add rdx, r9
+
+  vzeroupper
+
+  movdqa xmm7, [rsp + 16]
+  movdqa xmm6, [rsp]
+  add rsp, 40
+{$else}
+  lea r10, [rcx + 16]   // r10 <- @src[0,2]
+  lea r11, [rdx + 2*r9] // r11 <- @dst[2,0]
+
+  // Tr(src[0:1, 0:1])
+  movupd xmm0, [rcx]
+  movupd xmm1, [rcx + r8]
+  movupd xmm2, xmm0
+  unpcklpd xmm0, xmm1
+  unpckhpd xmm2, xmm1
+  movupd [rdx], xmm0
+  movupd [rdx + r9], xmm2
+
+  // Tr(src[0:1, 2:3])
+  movupd xmm0, [r10]
+  movupd xmm1, [r10 + r8]
+  movupd xmm2, xmm0
+  unpcklpd xmm0, xmm1
+  unpckhpd xmm2, xmm1
+  movupd [r11], xmm0
+  movupd [r11 + r9], xmm2
+
+  // Tr(src[2:3, 0:1])
+  lea rcx, [rcx + 2*r8]
+  add rdx, 16
+  movupd xmm0, [rcx]
+  movupd xmm1, [rcx + r8]
+  movupd xmm2, xmm0
+  unpcklpd xmm0, xmm1
+  unpckhpd xmm2, xmm1
+  movupd [rdx], xmm0
+  movupd [rdx + r9], xmm2
+
+  // Tr(src[2:3, 2:3])
+  add rcx, 16
+  add r11, 16
+  movupd xmm0, [rcx]
+  movupd xmm1, [rcx + r8]
+  movupd xmm2, xmm0
+  unpcklpd xmm0, xmm1
+  unpckhpd xmm2, xmm1
+  movupd [r11], xmm0
+  movupd [r11 + r9], xmm2
+{$endif}
+end;
+{$else}
+begin
+  PDouble(pDst)^              := PDouble(pSrc)^;
+  PDouble(pDst + aDstStep)^   := PDouble(pSrc + cF64Sz)^;
+  PDouble(pDst + 2*aDstStep)^ := PDouble(pSrc + 2*cF64Sz)^;
+  PDouble(pDst + 3*aDstStep)^ := PDouble(pSrc + 3*cF64Sz)^;
+
+  Inc(pSrc, aSrcStep);
+  Inc(pDst, cF64Sz);
+
+  PDouble(pDst)^              := PDouble(pSrc)^;
+  PDouble(pDst + aDstStep)^   := PDouble(pSrc + cF64Sz)^;
+  PDouble(pDst + 2*aDstStep)^ := PDouble(pSrc + 2*cF64Sz)^;
+  PDouble(pDst + 3*aDstStep)^ := PDouble(pSrc + 3*cF64Sz)^;
+
+  Inc(pSrc, aSrcStep);
+  Inc(pDst, cF64Sz);
+
+  PDouble(pDst)^              := PDouble(pSrc)^;
+  PDouble(pDst + aDstStep)^   := PDouble(pSrc + cF64Sz)^;
+  PDouble(pDst + 2*aDstStep)^ := PDouble(pSrc + 2*cF64Sz)^;
+  PDouble(pDst + 3*aDstStep)^ := PDouble(pSrc + 3*cF64Sz)^;
+
+  Inc(pSrc, aSrcStep);
+  Inc(pDst, cF64Sz);
+
+  PDouble(pDst)^              := PDouble(pSrc)^;
+  PDouble(pDst + aDstStep)^   := PDouble(pSrc + cF64Sz)^;
+  PDouble(pDst + 2*aDstStep)^ := PDouble(pSrc + 2*cF64Sz)^;
+  PDouble(pDst + 3*aDstStep)^ := PDouble(pSrc + 3*cF64Sz)^;
+end;
+{$endif}
+
+procedure TrRxC_8B(pSrc, pDst: PByte; aSrcStep, aDstStep: NativeInt; R, C: NativeInt);
+var I: NativeInt;
+    pEnd: PByte;
+begin
+  pEnd := pSrc + R * aSrcStep;
+  while pSrc < pEnd do begin
+    for I := 0 to C - 1 do
+      PDouble(pDst + I*aDstStep)^ := PDouble(pSrc + I*cF64Sz)^;
+    Inc(pSrc, aSrcStep);
+    Inc(pDst, cF64Sz);
+  end;
+end;
+
+procedure CTr_8B(pSrc, pDst: PByte; aSrcRCnt, aSrcCCnt, aSrcRStep, aDstRStep: NativeInt);
+var pEnd, pSrcBlock, pDstBlock, pRowEnd: PByte;
+    RRest, CRest, srcRWb: NativeInt;
+const cBlockSz = 4;
+begin
+  srcRWb := ((aSrcCCnt shr 3) shl 3) * cF64Sz;
+  CRest := aSrcCCnt and (cBlockSz - 1);
+  RRest := aSrcRcnt and (cBlockSz - 1);
+  pEnd := pSrc + ((aSrcRCnt shr 2) shl 2) * aSrcRStep;
+  while pSrc < pEnd do begin
+    pRowEnd := pSrc + srcRWb;
+    pSrcBlock := pSrc;
+    pDstBlock := pDst;
+    while pSrcBlock < pRowEnd do begin
+      Tr4x4_8B(pSrcBlock, pDstBlock, aSrcRStep, aDstRStep);
+      Inc(pDstBlock, 4 * aDstRStep);
+      Inc(pSrcBlock, 32);
+    end;
+    // remaining right block transposition
+    if CRest > 0 then
+      TrRxC_8B(pSrcBlock, pDstBlock, aSrcRStep, aDstRStep, 4, CRest);
+    Inc(pSrc, 4 * aSrcRStep);
+    Inc(pDst, 32);
+  end;
+  // remaining bottom blocks transposition
+  if RRest > 0 then begin
+    pRowEnd := pSrc + srcRWb;
+    while pSrc < pRowEnd do begin
+      TrRxC_8B(pSrc, pDst, aSrcRStep, aDstRStep, RRest, 4);
+      Inc(pDst, 4 * aDstRStep);
+      Inc(pSrc, 32);
+    end;
+    // right-bottom corner transposition
+    TrRxC_8B(pSrc, pDst, aSrcRStep, aDstRStep, RRest, CRest);
+  end;
 end;
 
 procedure Tr4x4_4B(pSrc, pDst: PByte; aSrcStep, aDstStep: NativeInt);

@@ -6,6 +6,7 @@ uses
     TestFramework
   , panda.Tests.NDATestCase
   , panda.MPNums
+  , panda.NumsAP
   ;
 
 type
@@ -19,7 +20,14 @@ type
     procedure MulReal128;
   end;
 
+  TLowLvlFuncTests = class(TNDAPerformanceTestCase)
+  published
+    procedure BigIntDec;
+  end;
+
 implementation
+
+{$region 'TMPNumTests'}
 
 procedure TMPNumTests.AddInt128;
 var a, b, c: TInt128;
@@ -118,8 +126,27 @@ begin
   SWStop;
 end;
 
+{$endregion}
+
+{$region 'TLowLvlFuncTests'}
+
+procedure TLowLvlFuncTests.BigIntDec;
+var a, b: TLimbArray;
+const N = 1000000;
+begin
+  SetLength(a, N);
+  SetLength(b, N);
+
+  SWStart;
+  DoTestLoop(procedure begin _Dec(PByte(a), PByte(b), N); end, 40);
+  SWStop;
+end;
+
+{$endregion}
+
 initialization
 
   RegisterTest(TMPNumTests.Suite);
+  RegisterTest(TLowLvlFuncTests.Suite);
 
 end.

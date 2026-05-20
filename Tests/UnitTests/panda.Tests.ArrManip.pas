@@ -13,6 +13,9 @@ uses
 type
   TArrManipLowLvlTests = class(TNDATestCase)
   published
+    procedure BlockTr4x4_8B;
+    procedure BlockTr10x10_8B;
+
     procedure BlockTr4x4_4B;
     procedure BlockTr8x8_4B;
     procedure BlockTr4x6_4B;
@@ -80,13 +83,48 @@ uses
 
 {$region 'TArrManipLowLvlTests'}
 
+procedure TArrManipLowLvlTests.BlockTr4x4_8B;
+var a, b: array [0..3, 0..3] of Double;
+    I, J: Integer;
+begin
+  for I := 0 to 3 do
+    for J := 0 to 3 do begin
+      a[I, J] := 4*I + J;
+      b[J, I] := 0;
+    end;
+
+  Tr4x4_8B(@a, @b, 32, 32);
+
+  for I := 0 to 3 do
+    for J := 0 to 3 do
+      CheckEquals(a[I, J], b[J, I]);
+end;
+
+procedure TArrManipLowLvlTests.BlockTr10x10_8B;
+var a: array [0..9, 0..9] of Double;
+    b: array [0..9, 0..9] of Double;
+    I, J: Integer;
+begin
+  for I := 0 to 9 do
+    for J := 0 to 9 do begin
+      a[I, J] := 10*I + J;
+      b[J, I] := 0;
+    end;
+
+  CTr_8B(@a, @b, 10, 10, 80, 80);
+
+  for I := 0 to 9 do
+    for J := 0 to 9 do
+      CheckEquals(a[I, J], b[J, I]);
+end;
+
 procedure TArrManipLowLvlTests.BlockTr4x4_4B;
 var a, b: array [0..3, 0..3] of Single;
     I, J: Integer;
 begin
   for I := 0 to 3 do
     for J := 0 to 3 do begin
-      a[I, J] := 3*I + J;
+      a[I, J] := 4*I + J;
       b[J, I] := 0;
     end;
 
@@ -103,7 +141,7 @@ var a, b: array [0..7, 0..7] of Single;
 begin
   for I := 0 to 7 do
     for J := 0 to 7 do begin
-      a[I, J] := 7*I + J;
+      a[I, J] := 8*I + J;
       b[J, I] := 0;
     end;
 

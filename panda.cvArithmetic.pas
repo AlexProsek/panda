@@ -50,6 +50,7 @@ procedure VecMul(pA: PSingle; B: Single; pRes: PSingle; aCount: NativeInt); over
 procedure VecMul(pA: PDouble; const B: Double; pRes: PDouble; aCount: NativeInt); overload;
 procedure VecMul(pA: PCmplx128; const B: TCmplx128; pRes: PCmplx128; aCount: NativeInt); overload;
 
+procedure VecDiv(pA, pB, pRes: PSingle; aCount: NativeInt); overload;
 procedure VecDiv(pA, pB, pRes: PCmplx128; aCount: NativeInt); overload;
 
 procedure VecAddWithSat(pA, pB, pRes: PUInt8; aCount: NativeInt); overload;
@@ -64,6 +65,7 @@ procedure VecSubWithSat(pA: PUInt16; B: UInt16; pRes: PUInt16; aCount: NativeInt
 
 procedure VecAnd(pA, pB, pRes: PByte; aCount: NativeInt); overload;
 procedure VecOr(pA, pB, pRes: PByte; aCount: NativeInt); overload;
+procedure VecXor(pA, pB, pRes: PByte; aCount: NativeInt); overload;
 procedure VecNot(pA, pRes: PByte; aCount: NativeInt); overload;
 
 function SatAdd_U8(a, b: UInt8): UInt8; inline;
@@ -538,27 +540,27 @@ asm
   mov [ebp + 8], ecx
   shr ecx, 2
   jz @rest
-@mainLoop:
+@L:
   movups xmm0, [eax]
   addps xmm0, xmm1
   movups [edx], xmm0
   add eax, 16
   add edx, 16
   dec ecx
-  jnz @mainLoop
+  jnz @L
 
 @rest:
   mov ecx, [ebp + 8]
   and ecx, 3
   jz @end
-@restLoop:
+@Lrest:
   movd xmm0, [eax]
   addss xmm0, xmm1
   movd [edx], xmm0
   add eax, 4
   add edx, 4
   dec ecx
-  jnz @restLoop
+  jnz @Lrest
 @end:
 end;
 {$elseif defined(ASMx64)}
@@ -571,27 +573,27 @@ asm
   mov rcx, r9
   shr rcx, 2
   jz @rest
-@mainLoop:
+@L:
   movups xmm0, [rax]
   addps xmm0, xmm1
   movups [rdx], xmm0
   add rax, 16
   add rdx, 16
   dec rcx
-  jnz @mainLoop
+  jnz @L
 
 @rest:
   mov rcx, r9
   and rcx, 3
   jz @end
-@restLoop:
+@Lrest:
   movd xmm0, [rax]
   addss xmm0, xmm1
   movd [rdx], xmm0
   add rax, 4
   add rdx, 4
   dec rcx
-  jnz @restLoop
+  jnz @Lrest
 @end:
 end;
 {$else}
@@ -895,7 +897,7 @@ asm
   mov ecx, [ebp + 8]
   shr ecx, 3
   jz @rest
-@mainLoop:
+@L:
   movups xmm0, [eax]
   movups xmm1, [edx]
   subps xmm0, xmm1
@@ -911,13 +913,13 @@ asm
   add edx, 16
   add edi, 16
   dec ecx
-  jnz @mainLoop
+  jnz @L
 
 @rest:
   mov ecx, [ebp + 8]
   and ecx, 7
   jz @end
-@restLoop:
+@Lrest:
   movd xmm0, [eax]
   movd xmm1, [edx]
   subss xmm0, xmm1
@@ -926,7 +928,7 @@ asm
   add edx, 4
   add edi, 4
   dec ecx
-  jnz @restLoop
+  jnz @Lrest
 @end:
   pop edi
 end;
@@ -938,7 +940,7 @@ asm
   shr rcx, 3
   jz @rest
 
-@mainLoop:
+@L:
 {$ifdef AVX}
   vmovups ymm0, [rax]
   vmovups ymm1, [rdx]
@@ -964,7 +966,7 @@ asm
   add r8, 16
 {$endif}
   dec rcx
-  jnz @mainLoop
+  jnz @L
 
 {$ifdef AVX}
   vzeroupper
@@ -974,7 +976,7 @@ asm
   and rcx, 7
   jz @end
 
-@restLoop:
+@Lrest:
   movd xmm0, [rax]
   movd xmm1, [rdx]
   subss xmm0, xmm1
@@ -983,7 +985,7 @@ asm
   add rdx, 4
   add r8, 4
   dec rcx
-  jnz @restLoop
+  jnz @Lrest
 
 @end:
 end;
@@ -1664,27 +1666,27 @@ asm
   mov [ebp + 8], ecx
   shr ecx, 2
   jz @rest
-@mainLoop:
+@L:
   movups xmm0, [eax]
   mulps xmm0, xmm1
   movups [edx], xmm0
   add eax, 16
   add edx, 16
   dec ecx
-  jnz @mainLoop
+  jnz @L
 
 @rest:
   mov ecx, [ebp + 8]
   and ecx, 3
   jz @end
-@restLoop:
+@Lrest:
   movd xmm0, [eax]
   mulss xmm0, xmm1
   movd [edx], xmm0
   add eax, 4
   add edx, 4
   dec ecx
-  jnz @restLoop
+  jnz @Lrest
 @end:
 end;
 {$elseif defined(ASMx64)}
@@ -1697,27 +1699,27 @@ asm
   mov rcx, r9
   shr rcx, 2
   jz @rest
-@mainLoop:
+@L:
   movups xmm0, [rax]
   mulps xmm0, xmm1
   movups [rdx], xmm0
   add rax, 16
   add rdx, 16
   dec rcx
-  jnz @mainLoop
+  jnz @L
 
 @rest:
   mov rcx, r9
   and rcx, 3
   jz @end
-@restLoop:
+@Lrest:
   movd xmm0, [rax]
   mulss xmm0, xmm1
   movd [rdx], xmm0
   add rax, 4
   add rdx, 4
   dec rcx
-  jnz @restLoop
+  jnz @Lrest
 @end:
 end;
 {$else}
@@ -1824,6 +1826,60 @@ begin
     end;
     Inc(pRes);
     Inc(pA);
+  end;
+end;
+{$endif}
+
+procedure VecDiv(pA, pB, pRes: PSingle; aCount: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- pA, RDX <- pB, R8 <- pRes, R9 <- aCount
+asm
+  mov r10, r9
+  shr r9, 3
+  jz @rest
+@L:
+  movups xmm0, [rcx]
+  movups xmm1, [rdx]
+  divps xmm0, xmm1
+  movups  [r8], xmm0
+  add rcx, 16
+  add rdx, 16
+  add r8, 16
+
+  movups xmm0, [rcx]
+  movups xmm1, [rdx]
+  divps xmm0, xmm1
+  movups  [r8], xmm0
+  add rcx, 16
+  add rdx, 16
+  add r8, 16
+
+  dec r9
+  jnz @L
+@rest:
+  and r10, 7
+  jz @end
+@Lrest:
+  movss xmm0, [rcx]
+  movss xmm1, [rdx]
+  divss xmm0, xmm1
+  movss [r8], xmm0
+  add rcx, 4
+  add rdx, 4
+  add r8, 4
+  dec r10
+  jnz @Lrest
+@end:
+end;
+{$else}
+var pEnd: PByte;
+begin
+  pEnd := PByte(pA) + aCount * cF32Sz;
+  while PByte(pA) < pEnd do begin
+    pRes^ := pA^ / pB^;
+    Inc(pRes);
+    Inc(pA);
+    Inc(pB);
   end;
 end;
 {$endif}
@@ -2453,7 +2509,7 @@ asm
   mov ecx, [ebp + 8]
   shr ecx, 4
   jz @rest
-@loop:
+@L:
   movupd xmm0, [eax]
   movupd xmm1, [edx]
   andpd xmm0, xmm1
@@ -2462,7 +2518,7 @@ asm
   add edx, 16
   add edi, 16
   dec ecx
-  jnz @loop
+  jnz @L
 
 @rest:
   mov ecx, [ebp + 8]
@@ -2471,7 +2527,7 @@ asm
   push ebx
   push esi
   mov esi, eax
-@restloop:
+@Lrest:
   mov al, [esi]
   mov bl, [edx]
   and al, bl
@@ -2480,12 +2536,53 @@ asm
   inc edx
   inc edi
   dec ecx
-  jnz @restloop
+  jnz @Lrest
 
   pop esi
   pop ebx
 @end:
   pop edi
+end;
+{$elseif defined(ASMx64)}
+// RCX <- pA, RDX <- pB, R8 <- pRes, R9 <- aCount
+asm
+  mov r10, r9
+  shr r9, 4
+  jz @rest15
+@L:
+  movdqu xmm0, [rcx]
+  pand xmm0, [rdx]
+  movdqu [r8], xmm0
+  add rcx, 16
+  add rdx, 16
+  add r8, 16
+  dec r9
+  jnz @L
+@rest15:
+  and r10, 15
+  jz @end
+  mov r9, r10
+  shr r9, 3
+  jz @rest7
+  mov rax, [rcx]
+  and rax, [rdx]
+  mov [r8], rax
+  add rcx, 8
+  add rdx, 8
+  add r8, 8
+@rest7:
+  and r10, 7
+  jz @end
+@Lrest:
+  mov al, [rcx]
+  and al, [rdx]
+  mov [r8], al
+  inc rcx
+  inc rdx
+  inc r8
+  dec r10
+  jnz @Lrest
+@end:
 end;
 {$else}
 var pEnd: PByte;
@@ -2511,6 +2608,48 @@ end;
 {$endif}
 
 procedure VecOr(pA, pB, pRes: PByte; aCount: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- pA, RDX <- pB, R8 <- pRes, R9 <- aCount
+asm
+  mov r10, r9
+  shr r9, 4
+  jz @rest15
+@L:
+  movdqu xmm0, [rcx]
+  por xmm0, [rdx]
+  movdqu [r8], xmm0
+  add rcx, 16
+  add rdx, 16
+  add r8, 16
+  dec r9
+  jnz @L
+@rest15:
+  and r10, 15
+  jz @end
+  mov r9, r10
+  shr r9, 3
+  jz @rest7
+  mov rax, [rcx]
+  or rax, [rdx]
+  mov [r8], rax
+  add rcx, 8
+  add rdx, 8
+  add r8, 8
+@rest7:
+  and r10, 7
+  jz @end
+@Lrest:
+  mov al, [rcx]
+  or al, [rdx]
+  mov [r8], al
+  inc rcx
+  inc rdx
+  inc r8
+  dec r10
+  jnz @Lrest
+@end:
+end;
+{$else}
 var pEnd: PByte;
 const
   cMask = {$if SizeOf(NativeInt) = 4}3{$else}7{$endif};
@@ -2531,8 +2670,114 @@ begin
     Inc(pB);
   end;
 end;
+{$endif}
+
+procedure VecXor(pA, pB, pRes: PByte; aCount: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- pA, RDX <- pB, R8 <- pRes, R9 <- aCount
+asm
+  mov r10, r9
+  shr r9, 4
+  jz @rest15
+@L:
+  movdqu xmm0, [rcx]
+  pxor xmm0, [rdx]
+  movdqu [r8], xmm0
+  add rcx, 16
+  add rdx, 16
+  add r8, 16
+  dec r9
+  jnz @L
+@rest15:
+  and r10, 15
+  jz @end
+  mov r9, r10
+  shr r9, 3
+  jz @rest7
+  mov rax, [rcx]
+  xor rax, [rdx]
+  mov [r8], rax
+  add rcx, 8
+  add rdx, 8
+  add r8, 8
+@rest7:
+  and r10, 7
+  jz @end
+@Lrest:
+  mov al, [rcx]
+  xor al, [rdx]
+  mov [r8], al
+  inc rcx
+  inc rdx
+  inc r8
+  dec r10
+  jnz @Lrest
+@end:
+end;
+{$else}
+var pEnd: PByte;
+const
+  cMask = {$if SizeOf(NativeInt) = 4}3{$else}7{$endif};
+begin
+  pEnd := pA + aCount and (not NativeInt(cMask));
+  while pA < pEnd do begin
+    PNativeInt(pRes)^ := PNativeInt(pA)^ xor PNativeInt(pB)^;
+    Inc(pRes, SizeOf(NativeInt));
+    Inc(pA, SizeOf(NativeInt));
+    Inc(pB, SizeOf(NativeInt));
+  end;
+
+  pEnd := pA + (aCount and cMask);
+  while pA < pEnd do begin
+    pRes^ := pA^ xor pB^;
+    Inc(pRes);
+    Inc(pA);
+    Inc(pB);
+  end;
+end;
+{$endif}
 
 procedure VecNot(pA, pRes: PByte; aCount: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- pA, RDX <- pRes, R8 <- aCount
+asm
+  mov r9, r8
+  shr r8, 4
+  jz @rest15
+  pcmpeqd xmm1, xmm1
+@L:
+  movdqu xmm0, [rcx]
+  pxor xmm0, xmm1
+  movdqu [rdx], xmm0
+  add rcx, 16
+  add rdx, 16
+  dec r8
+  jnz @L
+@rest15:
+  and r9, 15
+  jz @end
+  mov r8, r9
+  shr r8, 3
+  jz @rest7
+  mov rax, [rcx]
+  not rax
+  mov [rdx], rax
+  add rcx, 8
+  add rdx, 8
+@rest7:
+  and r9, 7
+  jz @end
+@Lrest:
+  mov al, [rcx]
+  not al
+  mov [rdx], al
+  inc rcx
+  inc rdx
+  dec r9
+  jnz @Lrest
+@end:
+end;
+{$else}
 var pEnd: PByte;
 const
   cMask = {$if SizeOf(NativeInt) = 4}3{$else}7{$endif};
@@ -2551,6 +2796,7 @@ begin
     Inc(pA);
   end;
 end;
+{$endif}
 
 {$ifdef RANGEON}
    {$R-}

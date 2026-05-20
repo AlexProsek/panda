@@ -25,13 +25,14 @@ uses
   panda.PTests.cvMath in 'panda.PTests.cvMath.pas',
   panda.PTests.cvCvt in 'panda.PTests.cvCvt.pas',
   panda.cvCvt in '..\..\panda.cvCvt.pas',
-  panda.PTests.Experiments in 'panda.PTests.Experiments.pas',
   panda.PTests.Conv in 'panda.PTests.Conv.pas',
   panda.BLASInit in '..\..\panda.BLASInit.pas',
   panda.PTests.MPNums in 'panda.PTests.MPNums.pas',
   panda.PTests.Nums in 'panda.PTests.Nums.pas',
   panda.PTests.Poly in 'panda.PTests.Poly.pas',
-  panda.PTests.ArrManip in 'panda.PTests.ArrManip.pas';
+  panda.PTests.ArrManip in 'panda.PTests.ArrManip.pas',
+  panda.PTests.DynArrUtils in 'panda.PTests.DynArrUtils.pas',
+  panda.PTests.Sorting in 'panda.PTests.Sorting.pas';
 
 {$R *.RES}
 

@@ -60,7 +60,8 @@ type
   protected
     fIdxs: TArray<NativeInt>;
   public
-    constructor Create(const aIdxs: array of NativeInt);
+    constructor Create(const aIdxs: array of NativeInt); overload;
+    constructor Create(const aIdxs: TArray<NativeInt>); overload;
     function IndexType: TNDIndexType; override;
     function RawIndexData: PByte; override;
     function GetItem(I: NativeInt): NativeInt;
@@ -563,8 +564,8 @@ type
   function AxesPermQ(const aAxes: array of Integer): Boolean;
   function IdPermQ(const aAxes: array of Integer): Boolean;
   function GetItemSize(aType: PTypeInfo): Integer;
-  function GetSize(const aDims: array of NativeInt): NativeInt; overload;
-  function GetSize(const aArr: INDArray): NativeInt; overload; inline;
+  function GetSize(const aDims: array of NativeInt; aStartLvl: Integer = 0): NativeInt; overload;
+  function GetSize(const aArr: INDArray; aStartLvl: Integer = 0): NativeInt; overload; inline;
   function NBytes(const aArr: INDArray): NativeInt; inline;
   function ScalarQ(const aArr: INDArray): Boolean; inline;
   function VectorQ(const aArr: INDArray): Boolean; inline;
@@ -781,19 +782,19 @@ begin
   end;
 end;
 
-function GetSize(const aDims: array of NativeInt): NativeInt;
+function GetSize(const aDims: array of NativeInt; aStartLvl: Integer = 0): NativeInt;
 var I: Integer;
 begin
   Result := 1;
-  for I := 0 to High(aDims) do begin
+  for I := aStartLvl to High(aDims) do begin
     Assert(aDims[I] > 0);
     Result := Result * aDims[I];
   end;
 end;
 
-function GetSize(const aArr: INDArray): NativeInt;
+function GetSize(const aArr: INDArray; aStartLvl: Integer = 0): NativeInt;
 begin
-  Result := GetSize(aArr.Shape);
+  Result := GetSize(aArr.Shape, aStartLvl);
 end;
 
 function NBytes(const aArr: INDArray): NativeInt;
@@ -1431,6 +1432,12 @@ begin
   Assert(Length(aIdxs) > 0);
   SetLength(fIdxs, Length(aIdxs));
   Move(aIdxs[0], fIdxs[0], Length(aIdxs) * cNISz);
+end;
+
+constructor TNDSetIdx.Create(const aIdxs: TArray<NativeInt>);
+begin
+  Assert(Length(aIdxs) > 0);
+  fIdxs := aIdxs;
 end;
 
 function TNDSetIdx.IndexType: TNDIndexType;
@@ -2133,8 +2140,8 @@ begin
   SetLength(aStrides, nDim);
   dim := 0;
   aOffset := 0;
-  J := Min(High(aIdx), nDim - 1);
-  bCCont := (arrStrides[J] = aArray.ItemSize);
+  J := High(aIdx);
+  bCCont := (arrStrides[J] = aArray.ItemSize * GetSize(arrShape, J + 1));
   for I := 0 to J do begin
     case aIdx[I].IndexType of
       nditSpan: begin
