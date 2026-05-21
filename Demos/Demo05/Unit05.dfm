@@ -42,22 +42,13 @@ object Form5: TForm5
       TabOrder = 0
       OnClick = Button1Click
     end
-    object cbGrayscale: TCheckBox
-      Left = 384
-      Top = 39
-      Width = 97
-      Height = 17
-      Caption = 'Grayscale'
-      TabOrder = 1
-      OnClick = cbGrayscaleClick
-    end
     object TrackBar1: TTrackBar
       Left = 194
       Top = 8
       Width = 150
       Height = 45
       Position = 5
-      TabOrder = 2
+      TabOrder = 1
       OnChange = TrackBar1Change
     end
     object cbInterpMethod: TComboBox
@@ -67,11 +58,26 @@ object Form5: TForm5
       Height = 23
       Style = csDropDownList
       ItemIndex = 1
-      TabOrder = 3
+      TabOrder = 2
       Text = 'bilinear interpolation'
       Items.Strings = (
         'nearest neighbor'
         'bilinear interpolation')
+    end
+    object cbClrChannels: TComboBox
+      Left = 535
+      Top = 9
+      Width = 145
+      Height = 23
+      Style = csDropDownList
+      ItemIndex = 0
+      TabOrder = 3
+      Text = 'Original image'
+      OnChange = cbClrChannelsChange
+      Items.Strings = (
+        'Original image'
+        'Grayscale'
+        'Hue')
     end
   end
   object ScrollBox1: TScrollBox

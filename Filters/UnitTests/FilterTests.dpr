@@ -22,7 +22,14 @@ uses
   panda.ImgProc.Types in '..\..\ImgProc\panda.ImgProc.Types.pas',
   panda.Filters.OrderStatFilters in '..\panda.Filters.OrderStatFilters.pas',
   panda.Filters.Tests.OrdStatFilters in 'panda.Filters.Tests.OrdStatFilters.pas',
-  panda.Tests.NDATestCase in '..\..\Tests\panda.Tests.NDATestCase.pas';
+  panda.Tests.NDATestCase in '..\..\Tests\panda.Tests.NDATestCase.pas',
+  panda.Filters.Tests.BoxFilter in 'panda.Filters.Tests.BoxFilter.pas',
+  panda.ImgProc.Images in '..\..\ImgProc\panda.ImgProc.Images.pas',
+  panda.ImgProc.CSCvt in '..\..\ImgProc\panda.ImgProc.CSCvt.pas',
+  panda.ImgProc.VCLImages in '..\..\ImgProc\panda.ImgProc.VCLImages.pas',
+  panda.ImgProc.RLE in '..\..\ImgProc\panda.ImgProc.RLE.pas',
+  panda.Filters.BoxFilter in '..\panda.Filters.BoxFilter.pas',
+  panda.Filters.GuidedFilter in '..\panda.Filters.GuidedFilter.pas';
 
 {$R *.RES}
 

@@ -3,10 +3,13 @@ unit panda.ImgProc.Filters;
 interface
 
 uses
-    panda.ImgProc.Types
+    panda.Intfs
+  , panda.ImgProc.Types
   , panda.ImgProc.Images
   , panda.Filters.OrderStatFilters
   , panda.Filters.TVFilter
+  , panda.Filters.BoxFilter
+  , panda.Filters.GuidedFilter
   , System.SysUtils
   ;
 
@@ -29,8 +32,16 @@ procedure MaxFilter(const aSrc: IImage<Byte>; var aDst: IImage<Byte>;
 procedure MedianFilter(const aSrc: IImage<Byte>; var aDst: IImage<Byte>;
   aHRadius: Integer; aVRadius: Integer = -1; aFlags: Cardinal = 0); overload;
 
+procedure MeanFilter(const aSrc: IImage<Single>; var aDst: IImage<Single>;
+  aHRadius: Integer; aVRadius: Integer = -1; aFlags: Cardinal = 0); overload;
+
+procedure GuidedFilter(const aSrc: IImage<Single>; var aDst: IImage<Single>;
+  aRadius: Integer; aEps: Single); overload;
+
 procedure TotalVariationFilter(const aSrc: IImage<Single>; var aDst: IImage<Single>;
   aIterCount: Integer; aLambda: Single);
+
+procedure IntegralImage(const aSrc: IImage<Single>; var aDst: IImage<Single>); overload;
 
 {$region 'low-level functions'}
 
@@ -155,7 +166,7 @@ begin
   Assert(Assigned(aSrc) and (aHRadius > 0));
 
   if not Assigned(aDst) then
-    aDst := TNDAImg<Byte>.Create(aSrc.Width, aDst.Width);
+    aDst := TNDAImg<Byte>.Create(aSrc.Width, aSrc.Height);
   if aVRadius < 0 then
     aVRadius := aHRadius;
 
@@ -163,6 +174,52 @@ begin
   try
     f.HRadius := aHRadius;
     f.VRadius := aVRadius;
+    f.Execute(aSrc.Data, aDst.Data, aSrc.WidthStep, aDst.WidthStep, aSrc.Width, aSrc.Height);
+  finally
+    f.Free;
+  end;
+end;
+
+procedure MeanFilter(const aSrc: IImage<Single>; var aDst: IImage<Single>;
+  aHRadius, aVRadius: Integer; aFlags: Cardinal);
+var f: TBoxFilter2DF32;
+begin
+  Assert(Assigned(aSrc) and (aHRadius > 0));
+
+  if not Assigned(aDst) then
+    aDst := TNDAImg<Single>.Create(aSrc.Width, aSrc.Height);
+  if aVRadius < 0 then
+    aVRadius := aHRadius;
+
+  f := TBoxFilter2DF32.Create;
+  try
+    f.HRadius := aHRadius;
+    f.VRadius := aVRadius;
+    f.Execute(aSrc.Data, aDst.Data, aSrc.WidthStep, aDst.WidthStep, aSrc.Width, aSrc.Height);
+  finally
+    f.Free;
+  end;
+end;
+
+procedure GuidedFilter(const aSrc: IImage<Single>; var aDst: IImage<Single>;
+  aRadius: Integer; aEps: Single);
+var f: TGuidedFilter2DF32;
+    guide: INDArray<Single>;
+begin
+  Assert(Assigned(aSrc) and (aRadius > 0));
+
+  if not Assigned(aDst) then
+    aDst := TNDAImg<Single>.Create(aSrc.Width, aSrc.Height);
+
+  f := TGuidedFilter2DF32.Create;
+  try
+    f.HRadius := aRadius;
+    f.VRadius := aRadius;
+    f.Epsilon := aEps;
+
+    guide := TImgUt.AsArray<Single>(aSrc);
+    f.Init(guide);
+
     f.Execute(aSrc.Data, aDst.Data, aSrc.WidthStep, aDst.WidthStep, aSrc.Width, aSrc.Height);
   finally
     f.Free;
@@ -187,6 +244,19 @@ begin
   finally
     f.Free;
   end;
+end;
+
+procedure IntegralImage(const aSrc: IImage<Single>; var aDst: IImage<Single>);
+var src, dst: INDArray<Single>;
+begin
+  Assert(Assigned(aSrc));
+
+  if not Assigned(aDst) then
+    aDst := TNDAImg<Single>.Create(aSrc.Width, aSrc.Height);
+
+  src := TImgUt.AsArray<Single>(aSrc);
+  dst := TImgUt.AsArray<Single>(aDst);
+  Integral2D(src, dst);
 end;
 
 end.

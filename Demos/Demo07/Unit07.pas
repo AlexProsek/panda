@@ -16,7 +16,7 @@ uses
   , panda.ImgProc.Filters
   , panda.ImgProc.io
   , System.Diagnostics
-  , System.UITypes
+  , System.UITypes, Vcl.Menus
   ;
 
 type
@@ -40,11 +40,15 @@ type
     lbLambda: TLabel;
     edLambda: TEdit;
     btAddNoise: TButton;
+    miSaveImg: TMenuItem;
+    FileSaveDialog1: TFileSaveDialog;
+    ImgPopupMenu: TPopupMenu;
     procedure btApplyClick(Sender: TObject);
     procedure Button1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure cbFilterSelect(Sender: TObject);
     procedure btAddNoiseClick(Sender: TObject);
+    procedure miSaveImgClick(Sender: TObject);
   private
     { Private declarations }
     fSrcImg: IImage<Byte>;
@@ -57,12 +61,15 @@ type
     procedure ShowMinMaxFilterControls(aShow: Boolean);
     procedure ShowMedianFilterControls(aShow: Boolean);
     procedure ShowTVFilterControls(aShow: Boolean);
+    procedure ShowGuideFilterControls(aShow: Boolean);
   public
     { Public declarations }
     procedure ApplyMinFilter;
     procedure ApplyMaxFilter;
     procedure ApplyMedianFilter;
     procedure ApplyTVFilter;
+    procedure ApplyMeanFilter;
+    procedure ApplyGuidedFilter;
   end;
 
 var
@@ -78,6 +85,8 @@ const
   FIDX_MAX_FILTER     = 1;
   FIDX_MEDIAN_FILTER  = 2;
   FIDX_TV_FILTER      = 3;
+  FIDX_MEAN_FILTER    = 4;
+  FIDX_GUIDED_FILTER  = 5;
 
   // kernel indices
   KIDX_BOX            = 0;
@@ -137,6 +146,8 @@ begin
     Add('Max filter');
     Add('Median filter');
     Add('Total variation filter');
+    Add('Mean filter');
+    Add('Guided filter');
   end;
   cbFilter.ItemIndex := FIDX_MIN_FILTER;
 
@@ -239,6 +250,42 @@ begin
   ShowImage(dstui8);
 end;
 
+procedure TForm7.ApplyMeanFilter;
+var src, dst: IImage<Single>;
+    dstui8: IImage<Byte>;
+begin
+  src := TNDAImg<Single>.Create(fSrcImg.Width, fSrcImg.Height);
+  ColorConvert(fSrcImg, src);
+
+  SWStart;
+  MeanFilter(src, dst, edRadius.Value);
+  SWStop;
+
+  ColorConvert(dst, dstui8);
+  ShowImage(dstui8);
+end;
+
+procedure TForm7.ApplyGuidedFilter;
+var src, dst: IImage<Single>;
+    dstui8: IImage<Byte>;
+    eps: Single;
+begin
+  if not (TryStrToFloat(edLambda.Text, eps) and (eps > 0)) then begin
+    MessageDlg('Epsilon parameter has to be positive real number.', mtError, [mbOk], 0);
+    exit;
+  end;
+
+  src := TNDAImg<Single>.Create(fSrcImg.Width, fSrcImg.Height);
+  ColorConvert(fSrcImg, src);
+
+  SWStart;
+  GuidedFilter(src, dst, edRadius.Value, eps);
+  SWStop;
+
+  ColorConvert(dst, dstui8);
+  ShowImage(dstui8);
+end;
+
 procedure TForm7.btApplyClick(Sender: TObject);
 begin
   case cbFilter.ItemIndex of
@@ -246,6 +293,8 @@ begin
     FIDX_MAX_FILTER:    ApplyMaxFilter;
     FIDX_MEDIAN_FILTER: ApplyMedianFilter;
     FIDX_TV_FILTER:     ApplyTVFilter;
+    FIDX_MEAN_FILTER:   ApplyMeanFilter;
+    FIDX_GUIDED_FILTER: ApplyGuidedFilter;
   end;
 end;
 
@@ -336,6 +385,7 @@ begin
     ShowImage(fSrcImg);
     btApply.Enabled := True;
     btAddNoise.Enabled := True;
+    miSaveImg.Enabled := True;
   end;
 end;
 
@@ -362,23 +412,70 @@ begin
   edLambda.Visible := aShow;
 end;
 
+procedure TForm7.miSaveImgClick(Sender: TObject);
+var fn: String;
+    bmp: TBitmap;
+begin
+  if FileSaveDialog1.Execute then begin
+    fn := FileSaveDialog1.FileName;
+    case FileSaveDialog1.FileTypeIndex of
+      1: if not fn.ToLower.EndsWith('.bmp') then
+          fn := fn + '.bmp';
+    else
+      MessageDlg('Unexpected file format.', mtError, [mbOk], 0);
+      exit;
+    end;
+    bmp := Image1.Picture.Bitmap;
+    if not Assigned(bmp) then begin
+      MessageDlg('No image to export', mtInformation, [mbOk], 0);
+      exit;
+    end;
+    SaveBitmapToFile(fn, bmp);
+  end;
+end;
+
+procedure TForm7.ShowGuideFilterControls(aShow: Boolean);
+begin
+  if aShow then begin
+    lbLambda.Caption := 'Epsilon';
+    edLambda.Text := '1e-2';
+  end else begin
+    lbLambda.Caption := 'Lambda';
+    edLambda.Text := '1';
+  end;
+
+  lbRadius.Visible := aShow;
+  edRadius.Visible := aShow;
+  lbLambda.Visible := aShow;
+  edLambda.Visible := aShow;
+end;
+
 procedure TForm7.cbFilterSelect(Sender: TObject);
 begin
   case cbFilter.ItemIndex of
     FIDX_MIN_FILTER, FIDX_MAX_FILTER: begin
       ShowTVFilterControls(False);
       ShowMedianFilterControls(False);
+      ShowGuideFilterControls(False);
       ShowMinMaxFilterControls(True);
     end;
-    FIDX_MEDIAN_FILTER: begin
+    FIDX_MEDIAN_FILTER, FIDX_MEAN_FILTER: begin
       ShowMinMaxFilterControls(False);
       ShowTVFilterControls(False);
+      ShowGuideFilterControls(False);
       ShowMedianFilterControls(True);
     end;
     FIDX_TV_FILTER: begin
       ShowMinMaxFilterControls(False);
       ShowMedianFilterControls(False);
+      ShowGuideFilterControls(False);
       ShowTVFilterControls(True);
+    end;
+    FIDX_GUIDED_FILTER: begin
+      ShowMinMaxFilterControls(False);
+      ShowMedianFilterControls(False);
+      ShowTVFilterControls(False);
+      ShowGuideFilterControls(True);
     end;
   end;
 end;

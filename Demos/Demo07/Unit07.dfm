@@ -19,7 +19,6 @@ object Form7: TForm7
     Height = 121
     Align = alTop
     TabOrder = 0
-    ExplicitWidth = 863
     DesignSize = (
       865
       121)
@@ -86,7 +85,6 @@ object Form7: TForm7
       Enabled = False
       TabOrder = 2
       OnClick = btApplyClick
-      ExplicitLeft = 775
     end
     object edRadius: TSpinEdit
       Left = 262
@@ -149,14 +147,14 @@ object Form7: TForm7
     Width = 865
     Height = 406
     Align = alClient
+    PopupMenu = ImgPopupMenu
     TabOrder = 1
-    ExplicitWidth = 863
-    ExplicitHeight = 398
     object Image1: TImage
       Left = 0
       Top = 0
       Width = 313
       Height = 217
+      PopupMenu = ImgPopupMenu
     end
   end
   object StatusBar1: TStatusBar
@@ -169,8 +167,6 @@ object Form7: TForm7
         Text = 'Elapsed time:'
         Width = 50
       end>
-    ExplicitTop = 519
-    ExplicitWidth = 863
   end
   object FileOpenDialog1: TFileOpenDialog
     FavoriteLinks = <>
@@ -182,5 +178,26 @@ object Form7: TForm7
     Options = []
     Left = 632
     Top = 152
+  end
+  object ImgPopupMenu: TPopupMenu
+    Left = 384
+    Top = 233
+    object miSaveImg: TMenuItem
+      Caption = 'Save image'
+      Enabled = False
+      ShortCut = 16467
+      OnClick = miSaveImgClick
+    end
+  end
+  object FileSaveDialog1: TFileSaveDialog
+    FavoriteLinks = <>
+    FileTypes = <
+      item
+        DisplayName = 'Bitmap image'
+        FileMask = '*.bmp'
+      end>
+    Options = []
+    Left = 624
+    Top = 225
   end
 end

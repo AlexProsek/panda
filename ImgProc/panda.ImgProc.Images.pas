@@ -72,6 +72,7 @@ type
     class function TryAsArray<T>(const aImg: IImage; out aArr: INDArray<T>): Boolean; inline;
     class function AsImage<T>(const aItems: TNDAUt.TOArray2D<T>): IImage<T>; overload; inline;
     class function AsImage<T>(const aArr: INDArray<T>): IImage<T>; overload; inline;
+    class function AsImage<T>(aData: PByte; aW, aH: NativeInt; aWidthStep: NativeInt = -1): IImage<T>; overload;
     class function AsDynArray<T>(const aImg: IImage<T>): TArray<TArray<T>>; inline;
     class function ConstantImage<T>(aW, aH: NativeInt; const aValue: T): IImage<T>; inline;
     class procedure CopyTo<T>(const aSrc: IImage<T>; var aDst: IImage<T>); inline;
@@ -243,6 +244,19 @@ begin
   if aArr.NDim <> 2 then
     raise ENDAShapeError.Create('An image must have dimension 2.');
   Result := TNDArrAsImg<T>.Create(TNDAUt.AsContiguousArray<T>(aArr));
+end;
+
+class function TImgUt.AsImage<T>(aData: PByte; aW, aH, aWidthStep: NativeInt): IImage<T>;
+var arr: INDArray<T>;
+    sh, st: TArray<NativeInt>;
+begin
+  if aWidthStep <= 0 then aWidthStep := aW * SizeOf(T);
+  Assert(aWidthStep >= aW * SizeOf(T));
+
+  sh := TArray<NativeInt>.Create(aH, aW);
+  st := TArray<NativeInt>.Create(aWidthStep, SizeOf(T));
+  arr := TNDArray<T>.Create(aData, sh, st);
+  Result := TNDArrAsImg<T>.Create(arr);
 end;
 
 class function TImgUt.AsDynArray<T>(const aImg: IImage<T>): TArray<TArray<T>>;

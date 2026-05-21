@@ -6,8 +6,10 @@ uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ExtCtrls, Vcl.StdCtrls, Vcl.ComCtrls
 
+  , panda.Arithmetic
   , panda.ImgProc.Types
   , panda.ImgProc.VCLImages
+  , panda.ImgProc.Images
   , panda.ImgProc.CSCvt
   , panda.ImgProc.ImgResize
   , panda.ImgProc.io
@@ -22,14 +24,14 @@ type
     Image1: TImage;
     Button1: TButton;
     FileOpenDialog1: TFileOpenDialog;
-    cbGrayscale: TCheckBox;
     StatusBar1: TStatusBar;
     TrackBar1: TTrackBar;
     lbScale: TLabel;
     cbInterpMethod: TComboBox;
     Label1: TLabel;
+    cbClrChannels: TComboBox;
     procedure Button1Click(Sender: TObject);
-    procedure cbGrayscaleClick(Sender: TObject);
+    procedure cbClrChannelsChange(Sender: TObject);
     procedure TrackBar1Change(Sender: TObject);
   private
     fImg: IImage<TRGB24>;
@@ -83,7 +85,7 @@ begin
     im := imBilinear;
   end;
 
-  if cbGrayscale.Checked then begin
+  if cbClrChannels.ItemIndex > 0 then begin
     if r <> 1 then begin
       imgi8 := TBmpUI8.Create(w, h);
 
@@ -136,22 +138,40 @@ begin
     Image1.SetBounds(0, 0, bmp.Width, bmp.Height);
     Image1.Picture.Assign(bmp);
     fImg := TBmpRGB24.Create(bmp);
-    cbGrayscale.Checked := False;
+    cbClrChannels.ItemIndex := 0;
   end;
 end;
 
-procedure TForm5.cbGrayscaleClick(Sender: TObject);
+procedure TForm5.cbClrChannelsChange(Sender: TObject);
+var h, s, v: IImage<Single>;
 begin
-  if cbGrayscale.Checked then begin
-    fImgi8 := TBmpUI8.Create(fImg.Width, fImg.Height);
+  case cbClrChannels.ItemIndex of
+    0:  ShowImage(fImg);
 
-    SWStart;
-    ColorConvert(fImg, fImgi8);
-    SWStop;
+    1: begin
+      fImgi8 := TBmpUI8.Create(fImg.Width, fImg.Height);
 
-    ShowImage(fImgi8);
-  end else
-    ShowImage(fImg);
+      SWStart;
+      ColorConvert(fImg, fImgi8);
+      SWStop;
+
+      ShowImage(fImgi8);
+    end;
+
+    2: begin
+      fImgi8 := TBmpUI8.Create(fImg.Width, fImg.Height);
+
+      SWStart;
+      HueSeparate(fImg, h);
+//      HSVSeparate(fImg, h, s, v);
+      SWStop;
+
+      h := TImgUt.AsImage<Single>(TTensorF32(TImgUt.AsArray<Single>(h)) / 360.0);
+      ColorConvert(h, fImgi8);
+
+      ShowImage(fImgi8);
+    end;
+  end;
 
   TrackBar1.Position := 5;
 end;
