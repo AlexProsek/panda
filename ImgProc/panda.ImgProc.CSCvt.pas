@@ -3,7 +3,9 @@ unit panda.ImgProc.CSCvt;
 interface
 
 uses
-    panda.Intfs
+    Math
+  , panda.Intfs
+  , panda.Nums
   , panda.Arrays
   , panda.ImgProc.Types
   , panda.ImgProc.Images
@@ -20,6 +22,8 @@ uses
   procedure HueSeparate(const aSrc: IImage<TRGB24>; var aDst: IImage<Single>); overload;
   procedure HSVSeparate(const aSrc: IImage<TRGB24>; var H, S, V: IImage<Single>); overload;
 
+  procedure HSVCombine(const aHue, aSat, aVal: IImage<Single>; var aDst: IImage<TRGB24>);
+
 type
   TCSUt = class
   public
@@ -31,6 +35,9 @@ type
 type
   TVec16UI8 = array [0..15] of UInt8;
   PVec16UI8 = ^TVec16UI8;
+
+  TVec4F32 = array [0..3] of Single;
+  PVec4F32 = ^TVec4F32;
 
   TVec16F32 = array [0..15] of Single;
   PVec16F32 = ^TVec16F32;
@@ -55,12 +62,16 @@ procedure cscvtF32ToUI8(pSrc, pDst: PByte; aCount: NativeInt);
 // RGB separation
 procedure cssepRGB24ToHSV(pSrc, pH, pS, pV: PByte; aCount: NativeInt);
 
-
 // creates a linear combination of 3 channels:
 // pDst[I] := aC[0] * pSrc[3*I] + aC[1] * pSrc[3*I + 1] + aC[2] * pSrc[3*I + 2]
 procedure _combineUI8C3ToF32(pSrc, pDst: PByte; aCount: NativeInt; aC: PSingle);
 procedure _combineUI8C3ToUI8(pSrc, pDst: PByte; aCount: NativeInt; aC: PSingle);
 
+procedure _interleaveUI8C3(pCh0, pCh1, pCh2, pDst: PByte; aCount: NativeInt);
+
+procedure _combineHSVToRGB24(pH, pS, pV, pDst: PByte; aCount: NativeInt);
+
+procedure cscvtHSVToRGB(pH, pS, pV, pR, pG, pB: PSingle; aCount: NativeInt);
 
 {$if defined(ASMx64)}
 
@@ -457,6 +468,347 @@ begin
   end;
 end;
 {$endif}
+
+procedure _interleaveUI8C3(pCh0, pCh1, pCh2, pDst: PByte; aCount: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- pCh0, RDX <- pCh1, R8 <- pCh2, R9 <- pDst, [RBP + $30] <- aCount
+const
+  cCh0: array [0..15] of Byte = (  0,$80,$80,  1,$80,$80,  2,$80,$80,  3,$80,$80,$80,$80,$80,$80);
+  cCh1: array [0..15] of Byte = ($80,  0,$80,$80,  1,$80,$80,  2,$80,$80,  3,$80,$80,$80,$80,$80);
+  cCh2: array [0..15] of Byte = ($80,$80,  0,$80,$80,  1,$80,$80,  2,$80,$80,  3,$80,$80,$80,$80);
+asm
+  mov r10, [rbp + $30]
+  shr r10, 2
+  jz @rest
+  movupd xmm3, cCh0
+  movupd xmm4, cCh1
+  movupd xmm5, cCh2
+@L:
+  movd xmm0, [rcx]
+  pshufb xmm0, xmm3
+  movd xmm1, [rdx]
+  pshufb xmm1, xmm4
+  por xmm0, xmm1
+  movd xmm1, [r8]
+  pshufb xmm1, xmm5
+  por xmm0, xmm1
+  add rcx, 4
+  add rdx, 4
+  add r8, 4
+  movq [r9], xmm0
+  add r9, 8
+  movhlps xmm0, xmm0
+  movd dword ptr [r9], xmm0
+  add r9, 4
+  dec r10
+  jnz @L
+@rest:
+  mov r10, [rbp + $30]
+  and r10, 3
+  jz @end
+@Lrest:
+  mov al, [rcx]
+  mov [r9], al
+  inc r9
+  mov al, [rdx]
+  mov [r9], al
+  inc r9
+  mov al, [r8]
+  mov [r9], al
+  inc r9
+  inc rcx
+  inc rdx
+  inc r8
+  dec r10
+  jnz @Lrest
+@end:
+end;
+{$else}
+var pEnd: PByte;
+begin
+  pEnd := pCh0 + aCount;
+  while pCh0 < pEnd do begin
+    pDst[0] := pCh0^;
+    pDst[1] := pCh1^;
+    pDst[2] := pCh2^;
+    Inc(pDst, 3);
+    Inc(pCh0);
+    Inc(pCh1);
+    Inc(pCh2);
+  end;
+end;
+{$endif}
+
+procedure cscvtHSVToRGB(pH, pS, pV, pR, pG, pB: PSingle; aCount: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- pH, RDX <- pS, R8 <- pV,
+// R9 <- pR, [RBP + $30] <- pG, [RBP + $38] <- pB, [RBP + $40] <- aCount
+const
+  c1: array [0..3] of Single = (1, 1, 1, 1);
+  c2: array [0..3] of Single = (2, 2, 2, 2);
+  c6: array [0..3] of Single = (6, 6, 6, 6);
+  c60r: array [0..3] of Single = (1/60, 1/60, 1/60, 1/60);
+  cAbsMask: UInt64 = $7FFFFFFF7FFFFFFF;
+asm
+  sub rsp, 96 // 80 for xmm6..xmm10 backup + 8 for R12 + 8 stack alignment
+  movdqa [rsp], xmm6
+  movdqa [rsp + 16], xmm7
+  movdqa [rsp + 32], xmm8
+  movdqa [rsp + 48], xmm9
+  movdqa [rsp + 64], xmm10
+  mov [rsp + 80], r12
+
+  xorps xmm5, xmm5
+  movups xmm6, c1
+  movups xmm7, c2
+  movddup xmm8, cAbsMask
+
+  mov r10, [rbp + $30]        // r10 <- pG
+  mov r11, [rbp + $38]        // r11 <- pB
+  mov r12, [rbp + $40]        // r12 <- aCount
+  shr r12, 2
+  jz @rest
+@L:
+  movups xmm0, [rcx]          // xmm0 <- H
+  movups xmm1, c60r
+  mulps xmm0, xmm1            // xmm0 <- h6 := H/60
+  movups xmm2, c6
+  movaps xmm1, xmm0
+  divps xmm1, xmm2
+  cvttps2dq xmm1, xmm1
+  cvtdq2ps xmm1, xmm1         // xmm1 <- Single(Trunc(h6/6))
+  mulps xmm1, xmm2            // xmm1 <- Trunc(h6/6)*6
+  subps xmm0, xmm1            // xmm0 <- h6 - 6*Trunc(h6/6) (values lie in a range [0, 6))
+
+  movups xmm9, c1
+  movups xmm10, [rdx]         // xmm2 <- S
+  subps xmm9, xmm10           // xmm1 <- 1 - S
+  movups xmm3, [r8]           // xmm3 <- V
+  mulps xmm9, xmm3            // xmm9 <- p := V*(1-S)
+  mulps xmm10, xmm3           // xmm10 <- q := V*S
+
+  // R channel
+  movaps xmm1, xmm0
+  pand xmm1, xmm8
+  movaps xmm2, xmm7
+  subps xmm2, xmm1            // xmm2 <- 2 - Abs(h6)
+  maxps xmm2, xmm5
+  minps xmm2, xmm6            // xmm2 <- Min(Max(2 - Abs(h6), 0, 1)
+
+  movaps xmm1, xmm0
+  movups xmm3, c6
+  subps xmm1, xmm3
+  pand  xmm1, xmm8            // xmm1 <- Abs(h6 - 6)
+  movaps xmm3, xmm7
+  subps xmm3, xmm1            // xmm3 <- 2 - Abs(h6 - 6)
+  maxps xmm3, xmm5
+  minps xmm3, xmm6            // xmm3 <- Min(Max(2 - Abs(h6 - 6), 0, 1)
+
+  addps xmm2, xmm3
+  mulps xmm2, xmm10
+  addps xmm2, xmm9            // xmm2 <- R := p + q*R'
+  movups [r9], xmm2
+  add r9, 16
+
+  // G channel
+  movaps xmm1, xmm0
+  subps xmm1, xmm7
+  pand xmm1, xmm8             // xmm1 <- Abs(h6 - 2)
+  movaps xmm2, xmm7
+  subps xmm2, xmm1            // xmm2 <- 2 - Abs(h6 - 2)
+  maxps xmm2, xmm5
+  minps xmm2, xmm6            // xmm2 <- G' = Min(Max(2 - Abs(h6 - 2), 0, 1)
+
+  mulps xmm2, xmm10
+  addps xmm2, xmm9
+  movups [r10], xmm2
+  add r10, 16
+
+  // B channel
+  movaps xmm1, xmm0
+  subps xmm1, xmm7
+  subps xmm1, xmm7
+  pand xmm1, xmm8
+  movaps xmm2, xmm7
+  subps xmm2, xmm1            // xmm2 <- 2 - Abs(h6 - 4)
+  maxps xmm2, xmm5
+  minps xmm2, xmm6            // xmm2 <- B' = Min(Max(2 - Abs(h6 - 2), 0, 1)
+
+  mulps xmm2, xmm10
+  addps xmm2, xmm9
+  movups [r11], xmm2
+  add r11, 16
+
+  add rcx, 16
+  add rdx, 16
+  add r8, 16
+  dec r12
+  jnz @L
+
+@rest:
+  mov r12, [rbp + $40]
+  and r12, 3
+  jz @end
+@Lrest:
+  movss xmm0, [rcx]           // xmm0 <- H
+  movups xmm1, c60r
+  mulss xmm0, xmm1            // xmm0 <- h6 := H/60
+  movups xmm2, c6
+  movss xmm1, xmm0
+  divss xmm1, xmm2
+  cvttps2dq xmm1, xmm1
+  cvtdq2ps xmm1, xmm1         // xmm1 <- Single(Trunc(h6/6))
+  mulss xmm1, xmm2            // xmm1 <- Trunc(h6/6)*6
+  subss xmm0, xmm1            // xmm0 <- h6 - 6*Trunc(h6/6) (values lie in a range [0, 6))
+
+  movups xmm9, c1
+  movss xmm10, [rdx]          // xmm2 <- S
+  subss xmm9, xmm10           // xmm1 <- 1 - S
+  movss xmm3, [r8]            // xmm3 <- V
+  mulss xmm9, xmm3            // xmm9 <- p := V*(1-S)
+  mulss xmm10, xmm3           // xmm10 <- q := V*S
+
+  // R channel
+  movaps xmm1, xmm0
+  pand xmm1, xmm8
+  movaps xmm2, xmm7
+  subss xmm2, xmm1            // xmm2 <- 2 - Abs(h6)
+  maxss xmm2, xmm5
+  minss xmm2, xmm6            // xmm2 <- Min(Max(2 - Abs(h6), 0, 1)
+
+  movaps xmm1, xmm0
+  movups xmm3, c6
+  subss xmm1, xmm3
+  pand  xmm1, xmm8            // xmm1 <- Abs(h6 - 6)
+  movaps xmm3, xmm7
+  subss xmm3, xmm1            // xmm3 <- 2 - Abs(h6 - 6)
+  maxss xmm3, xmm5
+  minss xmm3, xmm6            // xmm3 <- Min(Max(2 - Abs(h6 - 6), 0, 1)
+
+  addss xmm2, xmm3
+  mulss xmm2, xmm10
+  addss xmm2, xmm9            // xmm2 <- R := p + q*R'
+  movss [r9], xmm2
+  add r9, 4
+
+  // G channel
+  movaps xmm1, xmm0
+  subss xmm1, xmm7
+  pand xmm1, xmm8             // xmm1 <- Abs(h6 - 2)
+  movaps xmm2, xmm7
+  subss xmm2, xmm1            // xmm2 <- 2 - Abs(h6 - 2)
+  maxss xmm2, xmm5
+  minss xmm2, xmm6            // xmm2 <- G' = Min(Max(2 - Abs(h6 - 2), 0, 1)
+
+  mulss xmm2, xmm10
+  addss xmm2, xmm9
+  movss [r10], xmm2
+  add r10, 4
+
+  // B channel
+  movaps xmm1, xmm0
+  subss xmm1, xmm7
+  subss xmm1, xmm7
+  pand xmm1, xmm8
+  movaps xmm2, xmm7
+  subss xmm2, xmm1            // xmm2 <- 2 - Abs(h6 - 4)
+  maxss xmm2, xmm5
+  minss xmm2, xmm6            // xmm2 <- B' = Min(Max(2 - Abs(h6 - 2), 0, 1)
+
+  mulss xmm2, xmm10
+  addss xmm2, xmm9
+  movss [r11], xmm2
+  add r11, 4
+
+  add rcx, 4
+  add rdx, 4
+  add r8, 4
+  dec r12
+  jnz @Lrest
+
+@end:
+  movdqa xmm6, [rsp]
+  movdqa xmm7, [rsp + 16]
+  movdqa xmm8, [rsp + 32]
+  movdqa xmm9, [rsp + 48]
+  movdqa xmm10, [rsp + 64]
+  mov r12, [rsp + 80]
+  add rsp, 96
+end;
+{$else}
+var hi: Integer;
+    h, h6, v, s, f, p, q, t: Single;
+    pEnd: PByte;
+begin
+  pEnd := PByte(pH) + aCount * SizeOf(Single);
+  while PByte(pH) < pEnd do begin
+    h := pH^;
+    s := pS^;
+    v := pV^;
+    h6 := h/60;
+
+    hi := Trunc(h6);
+    f := h6 - hi;
+    hi := hi mod 6;
+    p := v * (1 - s);
+    q := v * (1 - f * s);
+    t := v * (1 - (1 - f) * s);
+    case hi of
+      0: begin pR^ := v; pG^ := t; pB^ := p; end;
+      1: begin pR^ := q; pG^ := v; pB^ := p; end;
+      2: begin pR^ := p; pG^ := v; pB^ := t; end;
+      3: begin pR^ := p; pG^ := q; pB^ := v; end;
+      4: begin pR^ := t; pG^ := p; pB^ := v; end;
+      5: begin pR^ := v; pG^ := p; pB^ := q; end;
+    end;
+
+//    p := v * (1 - s);
+//    q := v * s;
+//    pR^ := p + q*Min(Max(2 - Abs(h6), 0), 1) + Min(Max(2 - Abs(h6 - 6), 0), 1);
+//    pG^ := p + q*Min(Max(2 - Abs(h6 - 2), 0), 1);
+//    pB^ := p + q*Min(Max(2 - Abs(h6 - 4), 0), 1);
+
+    Inc(pH);
+    Inc(pS);
+    Inc(pV);
+    Inc(pR);
+    Inc(pG);
+    Inc(pB);
+  end;
+end;
+{$endif}
+
+procedure _combineHSVToRGB24(pH, pS, pV, pDst: PByte; aCount: NativeInt);
+var pEnd: PByte;
+    buff: TArray<Byte>;
+    pR, pG, pB: PSingle;
+    restSz: Integer;
+const cBlockSz = 64;
+begin
+  SetLength(buff, 3 * cBlockSz * cF32Sz);
+  pR := @buff[0];
+  pG := @buff[cBlockSz * cF32Sz];
+  pB := @buff[2 * cBlockSz * cF32Sz];
+  pEnd := pH + (aCount div cBlockSz) * cBlockSz * cF32Sz;
+  while pH < pEnd do begin
+    cscvtHSVToRGB(PSingle(pH), PSingle(pS), PSingle(pV), PSingle(pR), PSingle(pG), PSingle(pB), cBlockSz);
+    Inc(pH, cBlockSz * cF32Sz);
+    Inc(pS, cBlockSz * cF32Sz);
+    Inc(pV, cBlockSz * cF32Sz);
+    cscvtF32ToUI8(PByte(buff), PByte(buff), 3*cBlockSz);
+    _interleaveUI8C3(@buff[2*cBlockSz], @buff[cBlockSz], @buff[0], pDst, cBlockSz);
+    Inc(pDst, cBlockSz * SizeOf(TRGB24));
+  end;
+
+  restSz := aCount mod cBlockSz;
+  if restSz > 0 then begin
+    pG := @buff[restSz * cF32Sz];
+    pB := @buff[2 * restSz * cF32Sz];
+    cscvtHSVToRGB(PSingle(pH), PSingle(pS), PSingle(pV), PSingle(pR), PSingle(pG), PSingle(pB), restSz);
+    cscvtF32ToUI8(PByte(buff), PByte(buff), 3*restSz);
+    _interleaveUI8C3(@buff[2*restSz], @buff[restSz], @buff[0], pDst, restSz);
+  end;
+end;
 
 procedure cscvtRGB24ToUI8(pSrc, pDst: PByte; aCount: NativeInt);
 begin
@@ -1530,6 +1882,40 @@ begin
   if not Assigned(V) then
     V := TNDAImg<Single>.Create(aSrc.Width, aSrc.Height);
   _CSSepC3(cssepRGB24ToHSV, aSrc, H, S, V);
+end;
+
+procedure HSVCombine(const aHue, aSat, aVal: IImage<Single>; var aDst: IImage<TRGB24>);
+var I, w, h: NativeInt;
+    hWs, sWs, vWs, dstWs: NativeInt;
+    pH, pS, pV, pDst: PByte;
+begin
+  Assert(Assigned(aHue) and Assigned(aSat) and Assigned(aVal));
+
+  w := aHue.Width;
+  h := aHue.Height;
+
+  Assert((w = aSat.Width) and (w = aVal.Width) and (h = aSat.Height) and (h = aVal.Height));
+
+  if not Assigned(aDst) then
+    aDst := TNDAImg<TRGB24>.Create(w, h);
+  Assert((w = aDst.Width) and (h = aDst.Height));
+
+  pH := aHue.Data;
+  pS := aSat.Data;
+  pV := aVal.Data;
+  pDst := aDst.Data;
+  hWs := aHue.WidthStep;
+  sWs := aSat.WidthStep;
+  vWs := aVal.WidthStep;
+  dstWs := aDst.WidthStep;
+
+  for I := 0 to h - 1 do begin
+    _combineHSVToRGB24(pH, pS, pV, pDst, w);
+    Inc(pDst, dstWs);
+    Inc(pH, hWs);
+    Inc(pS, sWs);
+    Inc(pV, vWs);
+  end;
 end;
 
 {$endregion}

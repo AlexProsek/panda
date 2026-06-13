@@ -24,16 +24,45 @@ type
     class function AllClose<T>(const aA, aB: INDArray<T>; aCmp: TNDAEqComparer<T>; const aTol: T): Boolean; overload; static;
   end;
 
+  TTensorBool = record
+  private
+    fArr: INDArray<Boolean>;
+    function GetPart(const aIdx: INDIndexSeq): TTensorBool; inline;
+    procedure SetPart(const aIdx: INDIndexSeq; const aValue: TTensorBool); inline;
+    function GetShape: TNDAShape; inline;
+  public
+    class operator Implicit(const aArr: INDArray<Boolean>): TTensorBool;
+    class operator Implicit(const aArr: TTensorBool): INDArray<Boolean>;
+//    class operator Implicit(const aArr: TTensorBool): INDMaskIndex;
+    class operator LogicalAnd(const A, B: TTensorBool): TTensorBool;
+    class operator LogicalOr(const A, B: TTensorBool): TTensorBool;
+    class operator LogicalXor(const A, B: TTensorBool): TTensorBool;
+    class operator LogicalNot(const A: TTensorBool): TTensorBool;
+
+    property NDA: INDArray<Boolean> read fArr;
+    property Shape: TNDAShape read GetShape;
+    property Part[const aIdx: INDIndexSeq]: TTensorBool read GetPart write SetPart; default;
+  end;
+
   TTensorI32 = record
   private
     fArr: INDArray<Integer>;
     function GetShape: TNDAShape; inline;
   public
-    class operator Implicit(const aArr: INDArray<Integer>): TTensorI32;
-    class operator Implicit(const aArr: TTensorI32): INDArray<Integer>;
+    class operator Implicit(const aArr: INDArray<Integer>): TTensorI32; inline;
+    class operator Implicit(const aArr: TTensorI32): INDArray<Integer>; inline;
     class operator Add(const A, B: TTensorI32): TTensorI32;
     class operator Subtract(const A, B: TTensorI32): TTensorI32;
     class operator Multiply(const A, B: TTensorI32): TTensorI32;
+    class operator Equal(const A, B: TTensorI32): TTensorBool;
+    class operator NotEqual(const A, B: TTensorI32): TTensorBool;
+    class operator GreaterThan(const A, B: TTensorI32): TTensorBool;
+    class operator GreaterThan(const A: TTensorI32; B: Integer): TTensorBool;
+    class operator GreaterThanOrEqual(const A, B: TTensorI32): TTensorBool;
+    class operator LessThan(const A, B: TTensorI32): TTensorBool;
+    class operator LessThan(const A: TTensorI32; B: Integer): TTensorBool;
+    class operator LessThanOrEqual(const A, B: TTensorI32): TTensorBool;
+    procedure MaskBy(const aMask: TTensorBool);
 
     property NDA: INDArray<Integer> read fArr;
     property Shape: TNDAShape read GetShape;
@@ -42,8 +71,8 @@ type
   TTensorI64 = record
   private
     fArr: INDArray<Int64>;
-    function GetPart(const aIdx: INDIndexSeq): TTensorI64;
-    procedure SetPart(const aIdx: INDIndexSeq; const aValue: TTensorI64);
+    function GetPart(const aIdx: INDIndexSeq): TTensorI64; inline;
+    procedure SetPart(const aIdx: INDIndexSeq; const aValue: TTensorI64); inline;
     function GetShape: TNDAShape; inline;
   public
     class operator Implicit(const aArr: INDArray<Int64>): TTensorI64;
@@ -60,8 +89,8 @@ type
   TTensorF32 = record
   private
     fArr: INDArray<Single>;
-    function GetPart(const aIdx: INDIndexSeq): TTensorF32;
-    procedure SetPart(const aIdx: INDIndexSeq; const aValue: TTensorF32);
+    function GetPart(const aIdx: INDIndexSeq): TTensorF32; inline;
+    procedure SetPart(const aIdx: INDIndexSeq; const aValue: TTensorF32); inline;
     function GetShape: TNDAShape; inline;
   public
     class operator Implicit(const aArr: INDArray<Single>): TTensorF32;
@@ -96,8 +125,8 @@ type
   TTensorF64 = record
   private
     fArr: INDArray<Double>;
-    function GetPart(const aIdx: INDIndexSeq): TTensorF64;
-    procedure SetPart(const aIdx: INDIndexSeq; const aValue: TTensorF64);
+    function GetPart(const aIdx: INDIndexSeq): TTensorF64; inline;
+    procedure SetPart(const aIdx: INDIndexSeq; const aValue: TTensorF64); inline;
     function GetShape: TNDAShape; inline;
   public
     class operator Implicit(const aArr: INDArray<Double>): TTensorF64;
@@ -126,8 +155,8 @@ type
   TTensorC128 = record
   private
     fArr: INDArray<TCmplx128>;
-    function GetPart(const aIdx: INDIndexSeq): TTensorC128;
-    procedure SetPart(const aIdx: INDIndexSeq; const aValue: TTensorC128);
+    function GetPart(const aIdx: INDIndexSeq): TTensorC128; inline;
+    procedure SetPart(const aIdx: INDIndexSeq; const aValue: TTensorC128); inline;
     function GetShape: TNDAShape; inline;
   public
     class operator Implicit(const aArr: INDArray<TCmplx128>): TTensorC128;
@@ -175,8 +204,42 @@ implementation
 
 uses
     panda.cvArithmetic
+  , panda.cvCmp
   , System.Math
   ;
+
+{$region 'Common masking functions'}
+
+// L <- L and R
+procedure MaskR_4B(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+var pEnd: PByte;
+begin
+  if IncR = 0 then begin
+    if not PBoolean(R)^ then begin
+      if IncL = cI32Sz then begin
+        FillChar(L^, N * cI32Sz, 0);
+        exit;
+      end;
+
+      pEnd := L + N * IncL;
+      while L < pEnd do begin
+        PInteger(L)^ := 0;
+        Inc(L, IncL);
+      end;
+    end;
+    exit;
+  end;
+
+  pEnd := L + N * IncL;
+  while L < pEnd do begin
+    if not PBoolean(R)^ then
+      PInteger(L)^ := 0;
+    Inc(L, IncL);
+    Inc(R, IncR);
+  end;
+end;
+
+{$endregion}
 
 {$region 'TNDAArith'}
 
@@ -333,6 +396,180 @@ end;
 
 {$endregion}
 
+{$region 'TTensorBool'}
+
+{$region 'LR functions'}
+
+procedure AndL_Bool(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+var pEnd: PByte;
+begin
+  if IncL = 0 then begin
+    // R <- l and R
+    if not PBoolean(L)^ then begin
+      pEnd := R + N * IncR;
+      while R < pEnd do begin
+        PBoolean(R)^ := False;
+        Inc(R, IncR);
+      end;
+    end;
+    exit;
+  end;
+
+  // R <- L and R
+  if (IncR = 1) and (IncL = 1) then begin
+    VecAnd(R, L, R, N);
+    exit;
+  end;
+
+  pEnd := R + N * IncR;
+  while R < pEnd do begin
+    PBoolean(R)^ := PBoolean(L)^ and PBoolean(R)^;
+    Inc(L, IncL);
+    Inc(R, IncR);
+  end;
+end;
+
+procedure AndR_Bool(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+begin
+  AndL_Bool(N, R, IncR, L, IncL);
+end;
+
+procedure OrL_Bool(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+var pEnd: PByte;
+begin
+  if IncL = 0 then begin
+    // R <- l or R
+    if PBoolean(L)^ then begin
+      pEnd := R + N * IncR;
+      while R < pEnd do begin
+        PBoolean(R)^ := True;
+        Inc(R, IncR);
+      end;
+    end;
+    exit;
+  end;
+
+  // R <- L or R
+  if (IncR = 1) and (IncL = 1) then begin
+    VecOr(R, L, R, N);
+    exit;
+  end;
+
+  pEnd := R + N * IncR;
+  while R < pEnd do begin
+    PBoolean(R)^ := PBoolean(L)^ or PBoolean(R)^;
+    Inc(L, IncL);
+    Inc(R, IncR);
+  end;
+end;
+
+procedure OrR_Bool(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+begin
+  OrL_Bool(N, R, IncR, L, IncL);
+end;
+
+procedure XorL_Bool(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+var pEnd: PByte;
+begin
+  if IncL = 0 then begin
+    // R <- l xor R
+    if PBoolean(L)^ then begin
+      pEnd := R + N * IncR;
+      while R < pEnd do begin
+        PBoolean(R)^ := not PBoolean(R)^;
+        Inc(R, IncR);
+      end;
+    end;
+    exit;
+  end;
+
+  // R <- L xor R
+  if (IncR = 1) and (IncL = 1) then begin
+    VecXor(R, L, R, N);
+    exit;
+  end;
+
+  pEnd := R + N * IncR;
+  while R < pEnd do begin
+    PBoolean(R)^ := PBoolean(L)^ xor PBoolean(R)^;
+    Inc(L, IncL);
+    Inc(R, IncR);
+  end;
+end;
+
+procedure XorR_Bool(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+begin
+  XorL_Bool(N, R, IncR, L, IncL);
+end;
+
+procedure NotR_Bool(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+var pEnd: PByte;
+begin
+  if IncL = 1 then begin
+    VecBoolNot(L, L, N);
+    exit;
+  end;
+
+  pEnd := L + N * IncL;
+  while L < pEnd do begin
+    PBoolean(L)^ := not PBoolean(L)^;
+    Inc(L);
+  end;
+end;
+
+{$endregion}
+
+class operator TTensorBool.Implicit(const aArr: INDArray<Boolean>): TTensorBool;
+begin
+  Result.fArr := aArr;
+end;
+
+class operator TTensorBool.Implicit(const aArr: TTensorBool): INDArray<Boolean>;
+begin
+  Result := aArr.fArr;
+end;
+
+class operator TTensorBool.LogicalAnd(const A, B: TTensorBool): TTensorBool;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Boolean>(A, B, Result.fArr, AndL_Bool, AndR_Bool);
+end;
+
+class operator TTensorBool.LogicalOr(const A, B: TTensorBool): TTensorBool;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Boolean>(A, B, Result.fArr, OrL_Bool, OrR_Bool);
+end;
+
+class operator TTensorBool.LogicalXor(const A, B: TTensorBool): TTensorBool;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Boolean>(A, B, Result.fArr, XorL_Bool, XorR_Bool);
+end;
+
+class operator TTensorBool.LogicalNot(const A: TTensorBool): TTensorBool;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Boolean>(A, A, Result.fArr, nil, NotR_Bool);
+end;
+
+function TTensorBool.GetPart(const aIdx: INDIndexSeq): TTensorBool;
+begin
+  Result := fArr[aIdx];
+end;
+
+procedure TTensorBool.SetPart(const aIdx: INDIndexSeq; const aValue: TTensorBool);
+begin
+  fArr[aIdx] := aValue;
+end;
+
+function TTensorBool.GetShape: TNDAShape;
+begin
+  Result := fArr.Shape;
+end;
+
+{$endregion}
+
 {$region 'TTensorI32'}
 
 {$region 'LR functions'}
@@ -447,6 +684,300 @@ begin
   MulL_I32(N, R, IncR, L, IncL);
 end;
 
+procedure Equal_I32(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt;
+  Y: PByte; IncY: NativeInt);
+var pEnd: PByte;
+    s: Integer;
+begin
+  pEnd := Y + N * IncY;
+  if IncL = 0 then begin
+    // Y <- l = R
+    s := PInteger(L)^;
+    while Y < pEnd do begin
+      PBoolean(Y)^ := (s = PInteger(R)^);
+      Inc(R, IncR);
+      Inc(Y, IncY);
+    end;
+
+    exit;
+  end;
+
+  if IncR = 0 then begin
+    // Y <- L = r
+    s := PInteger(R)^;
+    while Y < pEnd do begin
+      PBoolean(Y)^ := (PInteger(L)^ = s);
+      Inc(L, IncL);
+      Inc(Y, IncY);
+    end;
+
+    exit;
+  end;
+
+  // Y <- L = R
+  while Y < pEnd do begin
+    PBoolean(Y)^ := (PInteger(L)^ = PInteger(R)^);
+    Inc(L, IncL);
+    Inc(R, IncR);
+    Inc(Y, IncY);
+  end;
+end;
+
+procedure NotEqual_I32(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt;
+  Y: PByte; IncY: NativeInt);
+var pEnd: PByte;
+    s: Integer;
+begin
+  pEnd := Y + N * IncY;
+  if IncL = 0 then begin
+    // Y <- l <> R
+    s := PInteger(L)^;
+    while Y < pEnd do begin
+      PBoolean(Y)^ := (s <> PInteger(R)^);
+      Inc(R, IncR);
+      Inc(Y, IncY);
+    end;
+
+    exit;
+  end;
+
+  if IncR = 0 then begin
+    // Y <- L <> r
+    s := PInteger(R)^;
+    while Y < pEnd do begin
+      PBoolean(Y)^ := (PInteger(L)^ <> s);
+      Inc(L, IncL);
+      Inc(Y, IncY);
+    end;
+
+    exit;
+  end;
+
+  // Y <- L <> R
+  while Y < pEnd do begin
+    PBoolean(Y)^ := (PInteger(L)^ <> PInteger(R)^);
+    Inc(L, IncL);
+    Inc(R, IncR);
+    Inc(Y, IncY);
+  end;
+end;
+
+procedure GT_I32(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt;
+  Y: PByte; IncY: NativeInt);
+var pEnd: PByte;
+    s: Integer;
+begin
+  pEnd := Y + N * IncY;
+  if IncL = 0 then begin
+    // Y <- l > R
+    s := PInteger(L)^;
+    if (IncR = cI32Sz) and (IncY = cBoolSz) then begin
+      CmpLT(PInteger(R), s, PBoolean(Y), N);
+      exit;
+    end;
+
+    while Y < pEnd do begin
+      PBoolean(Y)^ := (s > PInteger(R)^);
+      Inc(R, IncR);
+      Inc(Y, IncY);
+    end;
+
+    exit;
+  end;
+
+  if IncR = 0 then begin
+    // Y <- L > r
+    s := PInteger(R)^;
+    if (IncL = cI32Sz) and (IncY = cBoolSz) then begin
+      CmpGT(PInteger(L), s, PBoolean(Y), N);
+      exit;
+    end;
+
+    while Y < pEnd do begin
+      PBoolean(Y)^ := (PInteger(L)^ > s);
+      Inc(L, IncL);
+      Inc(Y, IncY);
+    end;
+
+    exit;
+  end;
+
+  // Y <- L > R
+  if (IncL = cI32Sz) and (IncR = cI32Sz) and (IncY = cBoolSz) then begin
+    CmpGT(PInteger(L), PInteger(R), PBoolean(Y), N);
+    exit;
+  end;
+
+  while Y < pEnd do begin
+    PBoolean(Y)^ := (PInteger(L)^ > PInteger(R)^);
+    Inc(L, IncL);
+    Inc(R, IncR);
+    Inc(Y, IncY);
+  end;
+end;
+
+procedure GTE_I32(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt;
+  Y: PByte; IncY: NativeInt);
+var pEnd: PByte;
+    s: Integer;
+begin
+  pEnd := Y + N * IncY;
+  if IncL = 0 then begin
+    // Y <- l >= R
+    s := PInteger(L)^;
+    if (IncR = cI32Sz) and (IncY = cBoolSz) then begin
+      CmpLTE(PInteger(R), s, PBoolean(Y), N);
+      exit;
+    end;
+
+    while Y < pEnd do begin
+      PBoolean(Y)^ := (s >= PInteger(R)^);
+      Inc(R, IncR);
+      Inc(Y, IncY);
+    end;
+
+    exit;
+  end;
+
+  if IncR = 0 then begin
+    // Y <- L >= r
+    s := PInteger(R)^;
+    if (IncL = cI32Sz) and (IncY = cBoolSz) then begin
+      CmpGTE(PInteger(L), s, PBoolean(Y), N);
+      exit;
+    end;
+
+    while Y < pEnd do begin
+      PBoolean(Y)^ := (PInteger(L)^ >= s);
+      Inc(L, IncL);
+      Inc(Y, IncY);
+    end;
+
+    exit;
+  end;
+
+  // Y <- L >= R
+  if (IncL = cI32Sz) and (IncR = cI32Sz) and (IncY = cBoolSz) then begin
+    CmpGTE(PInteger(L), PInteger(R), PBoolean(Y), N);
+    exit;
+  end;
+
+  while Y < pEnd do begin
+    PBoolean(Y)^ := (PInteger(L)^ >= PInteger(R)^);
+    Inc(L, IncL);
+    Inc(R, IncR);
+    Inc(Y, IncY);
+  end;
+end;
+
+procedure LT_I32(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt;
+  Y: PByte; IncY: NativeInt);
+var pEnd: PByte;
+    s: Integer;
+begin
+  pEnd := Y + N * IncY;
+  if IncL = 0 then begin
+    // Y <- l < R
+    s := PInteger(L)^;
+    if (IncR = cI32Sz) and (IncY = cBoolSz) then begin
+      CmpGT(PInteger(R), s, PBoolean(Y), N); // R > l
+      exit;
+    end;
+
+    while Y < pEnd do begin
+      PBoolean(Y)^ := (s < PInteger(R)^);
+      Inc(R, IncR);
+      Inc(Y, IncY);
+    end;
+
+    exit;
+  end;
+
+  if IncR = 0 then begin
+    // Y <- L < r
+    s := PInteger(R)^;
+    if (IncL = cI32Sz) and (IncY = cBoolSz) then begin
+      CmpLT(PInteger(L), s, PBoolean(Y), N);
+      exit;
+    end;
+
+    while Y < pEnd do begin
+      PBoolean(Y)^ := (PInteger(L)^ < s);
+      Inc(L, IncL);
+      Inc(Y, IncY);
+    end;
+
+    exit;
+  end;
+
+  // Y <- L < R
+  if (IncL = cI32Sz) and (IncR = cI32Sz) and (IncY = cBoolSz) then begin
+    CmpLT(PInteger(L), PInteger(R), PBoolean(Y), N);
+    exit;
+  end;
+
+  while Y < pEnd do begin
+    PBoolean(Y)^ := (PInteger(L)^ < PInteger(R)^);
+    Inc(L, IncL);
+    Inc(R, IncR);
+    Inc(Y, IncY);
+  end;
+end;
+
+procedure LTE_I32(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt;
+  Y: PByte; IncY: NativeInt);
+var pEnd: PByte;
+    s: Integer;
+begin
+  pEnd := Y + N * IncY;
+  if IncL = 0 then begin
+    // Y <- l <= R
+    s := PInteger(L)^;
+    if (IncR = cI32Sz) and (IncY = cBoolSz) then begin
+      CmpGTE(PInteger(R), s, PBoolean(Y), N);
+      exit;
+    end;
+
+    while Y < pEnd do begin
+      PBoolean(Y)^ := (s <= PInteger(R)^);
+      Inc(R, IncR);
+      Inc(Y, IncY);
+    end;
+
+    exit;
+  end;
+
+  if IncR = 0 then begin
+    // Y <- L <= r
+    s := PInteger(R)^;
+    if (IncL = cI32Sz) and (IncY = cBoolSz) then begin
+      CmpLTE(PInteger(L), s, PBoolean(Y), N);
+      exit;
+    end;
+
+    while Y < pEnd do begin
+      PBoolean(Y)^ := (PInteger(L)^ <= s);
+      Inc(L, IncL);
+      Inc(Y, IncY);
+    end;
+
+    exit;
+  end;
+
+  // Y <- L <= R
+  if (IncL = cI32Sz) and (IncR = cI32Sz) and (IncY = cBoolSz) then begin
+    CmpLTE(PInteger(L), PInteger(R), PBoolean(Y), N);
+    exit;
+  end;
+
+  while Y < pEnd do begin
+    PBoolean(Y)^ := (PInteger(L)^ <= PInteger(R)^);
+    Inc(L, IncL);
+    Inc(R, IncR);
+    Inc(Y, IncY);
+  end;
+end;
+
 {$endregion}
 
 class operator TTensorI32.Implicit(const aArr: INDArray<Integer>): TTensorI32;
@@ -475,6 +1006,59 @@ class operator TTensorI32.Multiply(const A, B: TTensorI32): TTensorI32;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Integer>(A, B, Result.fArr, MulL_I32, MulR_I32);
+end;
+
+class operator TTensorI32.Equal(const A, B: TTensorI32): TTensorBool;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Integer, Integer, Boolean>(A, B, Result.fArr, Equal_I32);
+end;
+
+class operator TTensorI32.NotEqual(const A, B: TTensorI32): TTensorBool;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Integer, Integer, Boolean>(A, B, Result.fArr, NotEqual_I32);
+end;
+
+class operator TTensorI32.GreaterThan(const A, B: TTensorI32): TTensorBool;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Integer, Integer, Boolean>(A, B, Result.fArr, GT_I32);
+end;
+
+class operator TTensorI32.GreaterThan(const A: TTensorI32; B: Integer): TTensorBool;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Integer, Integer, Boolean>(A, B, Result.fArr, GT_I32);
+end;
+
+class operator TTensorI32.GreaterThanOrEqual(const A, B: TTensorI32): TTensorBool;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Integer, Integer, Boolean>(A, B, Result.fArr, GTE_I32);
+end;
+
+class operator TTensorI32.LessThan(const A, B: TTensorI32): TTensorBool;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Integer, Integer, Boolean>(A, B, Result.fArr, LT_I32);
+end;
+
+class operator TTensorI32.LessThan(const A: TTensorI32; B: Integer): TTensorBool;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Integer, Integer, Boolean>(A, B, Result.fArr, LT_I32);
+end;
+
+class operator TTensorI32.LessThanOrEqual(const A, B: TTensorI32): TTensorBool;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Integer, Integer, Boolean>(A, B, Result.fArr, LTE_I32);
+end;
+
+procedure TTensorI32.MaskBy(const aMask: TTensorBool);
+begin
+  TNDAArith.MapR(fArr, aMask.fArr, MaskR_4B);
 end;
 
 function TTensorI32.GetShape: TNDAShape;

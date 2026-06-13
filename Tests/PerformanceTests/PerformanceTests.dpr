@@ -32,7 +32,8 @@ uses
   panda.PTests.Poly in 'panda.PTests.Poly.pas',
   panda.PTests.ArrManip in 'panda.PTests.ArrManip.pas',
   panda.PTests.DynArrUtils in 'panda.PTests.DynArrUtils.pas',
-  panda.PTests.Sorting in 'panda.PTests.Sorting.pas';
+  panda.PTests.Sorting in 'panda.PTests.Sorting.pas',
+  panda.PTests.cvCmp in 'panda.PTests.cvCmp.pas';
 
 {$R *.RES}
 

@@ -147,6 +147,11 @@ type
     procedure TestVecNot_10;
     procedure TestVecNot_16;
     procedure TestVecNot_17;
+    procedure TestVecBoolNot_3;
+    procedure TestVecBoolNot_8;
+    procedure TestVecBoolNot_10;
+    procedure TestVecBoolNot_16;
+    procedure TestVecBoolNot_17;
     procedure TestSQDiffs_Double_3;
     procedure TestSQDiffs_Double_4;
     procedure TestSQDiffs_Double_9;
@@ -1839,6 +1844,67 @@ begin                    //0  1   2   3   4   5   6   7   8  9  10  11  12  13  
   VecNot(PByte(x), PByte(res), Length(x));
   for I := 0 to High(res) do
     CheckEquals(255 xor x[I], res[I]);
+end;
+
+procedure TTestVectorMath.TestVecBoolNot_3;
+var x, res: TArray<Boolean>;
+    I: Integer;
+begin
+  x := TArray<Boolean>.Create(True, False, True);
+  SetLength(res, Length(x));
+  VecBoolNot(PByte(x), PByte(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(not x[I], res[I]);
+end;
+
+procedure TTestVectorMath.TestVecBoolNot_8;
+var x, res: TArray<Boolean>;
+    I: Integer;
+begin
+  x := TArray<Boolean>.Create(True, False, True, False, False, True, False, True);
+  SetLength(res, Length(x));
+  VecBoolNot(PByte(x), PByte(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(not x[I], res[I]);
+end;
+
+procedure TTestVectorMath.TestVecBoolNot_10;
+var x, res: TArray<Boolean>;
+    I: Integer;
+begin
+  x := TArray<Boolean>.Create(True, False, True, False, False, True, False, True, True, False);
+  SetLength(res, Length(x));
+  VecBoolNot(PByte(x), PByte(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(not x[I], res[I]);
+end;
+
+procedure TTestVectorMath.TestVecBoolNot_16;
+var x, res: TArray<Boolean>;
+    I: Integer;
+begin
+  x := TArray<Boolean>.Create(
+    True, False, True, False, True, False, True, False,
+    False, True, False, True, False, True, False, True
+  );
+  SetLength(res, Length(x));
+  VecBoolNot(PByte(x), PByte(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(not x[I], res[I]);
+end;
+
+procedure TTestVectorMath.TestVecBoolNot_17;
+var x, res: TArray<Boolean>;
+    I: Integer;
+begin
+  x := TArray<Boolean>.Create(
+    True, False, True, False, True, False, True, False,
+    False, True, False, True, False, True, False, True, False
+  );
+  SetLength(res, Length(x));
+  VecBoolNot(PByte(x), PByte(res), Length(x));
+  for I := 0 to High(res) do
+    CheckEquals(not x[I], res[I]);
 end;
 
 procedure TTestVectorMath.TestSQDiffs_Double_3;

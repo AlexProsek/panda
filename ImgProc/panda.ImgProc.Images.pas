@@ -65,6 +65,44 @@ type
 //  end;
 
 type
+  // RC means Row-Column coordinates
+  //    o------> C
+  //    |
+  //    |
+  //    V R
+  TRCImagePixels<T> = record
+  private
+    fImg: IImage<T>;
+    fData: PByte;
+    fW, fH, fWS: NativeInt;
+    function GetPixelValue(R, C: NativeInt): T; inline;
+    procedure SetPixelValue(R, C: NativeInt; const aValue: T); inline;
+  public
+    class operator Implicit(const aImg: IImage<T>): TRCImagePixels<T>;
+
+    property PixelValue[R, C: NativeInt]: T read GetPixelValue write SetPixelValue; default;
+    property Image: IImage<T> read fImg;
+  end;
+
+  // XY refers to standard euclidian coordinates orientation
+  //    A  Y
+  //    |
+  //    |
+  //    o------> X
+  TXYImagePixels<T> = record
+  private
+    fImg: IImage<T>;
+    fData: PByte;
+    fW, fH, fWS: NativeInt;
+    function GetPixelValue(X, Y: NativeInt): T; inline;
+    procedure SetPixelValue(X, Y: NativeInt; const aValue: T); inline;
+  public
+    class operator Implicit(const aImg: IImage<T>): TXYImagePixels<T>;
+
+    property PixelValue[X, Y: NativeInt]: T read GetPixelValue write SetPixelValue; default;
+    property Image: IImage<T> read fImg;
+  end;
+
   TImgUt = class
   public
     class function AsArray<T>(const aImg: IImage<T>): INDArray<T>; overload; inline;
@@ -76,6 +114,7 @@ type
     class function AsDynArray<T>(const aImg: IImage<T>): TArray<TArray<T>>; inline;
     class function ConstantImage<T>(aW, aH: NativeInt; const aValue: T): IImage<T>; inline;
     class procedure CopyTo<T>(const aSrc: IImage<T>; var aDst: IImage<T>); inline;
+    class function PositionWithin(const aImg: IImage; X, Y: NativeInt): Boolean; inline;
   end;
 
 function SameSizeQ(const aImg0, aImg1: IImage): Boolean; inline;
@@ -215,6 +254,69 @@ end;
 
 {$endregion}
 
+{$region 'TRCImagePixels<T>'}
+
+class operator TRCImagePixels<T>.Implicit(const aImg: IImage<T>): TRCImagePixels<T>;
+begin
+  Assert(Assigned(aImg));
+  with Result do begin
+    fImg := aImg;
+    fData := fImg.Data;
+    fW := aImg.Width;
+    fH := aImg.Height;
+    fWS := aImg.WidthStep;
+  end;
+end;
+
+function TRCImagePixels<T>.GetPixelValue(R, C: NativeInt): T;
+begin
+  Assert((0 <= R) and (R < fH) and (0 <= C) and (C < fW));
+  Result := TNDA<T>.PT(fData + R * fWS + C * SizeOf(T))^;
+end;
+
+procedure TRCImagePixels<T>.SetPixelValue(R, C: NativeInt; const aValue: T);
+begin
+  Assert(
+    (0 <= R) and (R < fH) and (0 <= C) and (C < fW) and
+    ((fImg.Flags and NDAF_WRITEABLE) <> 0)
+  );
+  TNDA<T>.PT(fData + R * fWS + C * SizeOf(T))^ := aValue;
+end;
+
+{$endregion}
+
+{$region 'TXYImagePixels<T>'}
+
+class operator TXYImagePixels<T>.Implicit(const aImg: IImage<T>): TXYImagePixels<T>;
+begin
+  Assert(Assigned(aImg));
+  with Result do begin
+    fImg := aImg;
+    fW := aImg.Width;
+    fH := aImg.Height;
+    fWS := aImg.WidthStep;
+    fData := fImg.Data + (fH - 1) * fWS;
+    fWS := -fWS;
+  end;
+end;
+
+function TXYImagePixels<T>.GetPixelValue(X, Y: NativeInt): T;
+begin
+  Assert((0 <= Y) and (Y < fH) and (0 <= X) and (X < fW));
+  Result := TNDA<T>.PT(fData + Y * fWS + X * SizeOf(T))^;
+end;
+
+procedure TXYImagePixels<T>.SetPixelValue(X, Y: NativeInt; const aValue: T);
+begin
+  Assert(
+    (0 <= Y) and (Y < fH) and (0 <= X) and (X < fW) and
+    ((fImg.Flags and NDAF_WRITEABLE) <> 0)
+  );
+  TNDA<T>.PT(fData + Y * fWS + X * SizeOf(T))^ := aValue;
+end;
+
+{$endregion}
+
 {$region 'TImgUt'}
 
 class function TImgUt.AsArray<T>(const aImg: IImage<T>): INDArray<T>;
@@ -274,7 +376,12 @@ end;
 class procedure TImgUt.CopyTo<T>(const aSrc: IImage<T>; var aDst: IImage<T>);
 begin
   Assert(Assigned(aSrc) and Assigned(aDst) and SameSizeQ(aSrc, aDst));
-  TNDAUt.Fill<T>(AsArray<T>(aSrc), AsArray<T>(aDst));
+  TNDAUt.Fill<T>(AsArray<T>(aDst), AsArray<T>(aSrc));
+end;
+
+class function TImgUt.PositionWithin(const aImg: IImage; X, Y: NativeInt): Boolean;
+begin
+  Result := (0 <= X) and (X < aImg.Width) and (0 <= Y) and (Y < aImg.Height);
 end;
 
 {$endregion}

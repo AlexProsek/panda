@@ -56,6 +56,8 @@ type
   PCmplx128 = ^TCmplx128;
 
 const
+  cBoolSz = SizeOf(Boolean);
+  cI8Sz   = SizeOf(Int8);
   cI32Sz  = SizeOf(Integer);
   cI64Sz  = SizeOf(Int64);
   cNISz   = SizeOf(NativeInt);

@@ -25,6 +25,11 @@ type
   end;
   PRGB32 = ^TRGB32;
 
+  TRGBAF32 = record
+    B, G, R, A: Single;
+  end;
+  PRGBAF32 = ^TRGBAF32;
+
   IImage = interface
   ['{04B438CC-D398-4467-9978-C5DCDB87D91E}']
     function GetWidth: NativeInt;

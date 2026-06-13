@@ -489,13 +489,21 @@ type
     // R <- aLFnc(L, R)
     class procedure MapL(const L, R: INDArray; aLFnc: TIPProcVV); overload; static;
 
-    class procedure MapR<T>(const L: INDArray<T>; const R: T; aRFnc: TIPProcVV); overload; static;
-    class procedure MapL<T>(const L: T; const R: INDArray<T>; aLFnc :TIPProcVV); overload; static;
+    class procedure MapFSS(const L, R, aRes: INDArray; aFnc: TFuncVV); overload; static;
+    class procedure MapFSS(const L, R, aRes: INDArray; aFnc: TFuncVV; aCLvl: Integer; aCSz: NativeInt); overload; static;
+    // Res <- aFnc(L, R)
+    class procedure MapF(const L, R, aRes: INDArray; aFnc: TFuncVV); overload; static;
+    class procedure MapF(pL: PByte; const R, aRes: INDArray; aFnc: TFuncVV); overload; static;
+    class procedure MapF(const L: INDArray; pR: PByte; aRes: INDArray; aFnc: TFuncVV); overload; static;
+
+    class procedure MapR<T>(const L: INDArray<T>; const R: T; aRFnc: TIPProcVV); overload; static; inline;
+    class procedure MapL<T>(const L: T; const R: INDArray<T>; aLFnc :TIPProcVV); overload; static; inline;
 
     class procedure Copy<T>(aSrc, aDst: PByte; aCount: NativeInt); overload; static;
     class procedure Copy<T>(aSrc, aDst: PByte; aCount, aStep: NativeInt); overload; static;
     class procedure Copy<T>(const aArr: INDArray; aDst: PByte); overload; static;
     class function Permute<T>(const aData: TArray<T>; const aIndices: array of Integer): TArray<T>;
+    class procedure AdjustBuffer<T>(const aShape: TNDAShape; var aBuff: INDArray<T>); static;
 
     class function _ToUntypedArrays<T>(const aArrs: array of INDArray<T>): TArray<INDArray>;
   public
@@ -538,12 +546,15 @@ type
     /// <param name="aFunc">aFunc(aRowIdx, aColIdx: NativeInt): T</param>
     class function Table2D<T>(const aFunc: TFunc<NativeInt, NativeInt, T>; aLoX, aHiX, aLoY, aHiY: NativeInt): INDArray<T>; static;
 
-    class procedure Map<T, U, V>(const L: INDArray<T>; const R: U; var aRes: INDArray<V>; aRFnc: TIPProcVV); overload; static;
-    class procedure Map<T, U, V>(const L: T; const R: INDArray<U>; var aRes: INDArray<V>; aLFnc: TIPProcVV); overload; static;
+    class procedure Map<T, U, V>(const L: INDArray<T>; const R: U; var aRes: INDArray<V>; aRFnc: TIPProcVV); overload; static; inline;
+    class procedure Map<T, U, V>(const L: T; const R: INDArray<U>; var aRes: INDArray<V>; aLFnc: TIPProcVV); overload; static; inline;
     class procedure Map<T, U, V>(const L: INDArray<T>; const R: INDArray<U>; var aRes: INDArray<V>; aLFnc, aRFnc: TIPProcVV); overload; static;
-    class procedure Map<T>(const L: INDArray<T>; const R: T; var aRes: INDArray<T>; aRFnc: TIPProcVV); overload; static;
-    class procedure Map<T>(const L: T; const R: INDArray<T>; var aRes: INDArray<T>; aLFnc: TIPProcVV); overload; static;
-    class procedure Map<T>(const L: INDArray<T>; const R: INDArray<T>; var aRes: INDArray<T>; aLFnc, aRFnc: TIPProcVV); overload; static;
+    class procedure Map<T, U, V>(const L: INDArray<T>; const R: U; var aRes: INDArray<V>; aFnc: TFuncVV); overload; static; inline;
+    class procedure Map<T, U, V>(const L: T; const R: INDArray<U>; var aRes: INDArray<V>; aFnc: TFuncVV); overload; static; inline;
+    class procedure Map<T, U, V>(const L: INDArray<T>; const R: INDArray<U>; var aRes: INDArray<V>; aFnc: TFuncVV); overload; static;
+    class procedure Map<T>(const L: INDArray<T>; const R: T; var aRes: INDArray<T>; aRFnc: TIPProcVV); overload; static; inline;
+    class procedure Map<T>(const L: T; const R: INDArray<T>; var aRes: INDArray<T>; aLFnc: TIPProcVV); overload; static; inline;
+    class procedure Map<T>(const L: INDArray<T>; const R: INDArray<T>; var aRes: INDArray<T>; aLFnc, aRFnc: TIPProcVV); overload; static; inline;
 
     class procedure Fill<T>(const aArr: INDArray<T>; const aValue: T); overload; static;
     class procedure Fill<T>(const aArr: INDArray<T>; const aValue: INDArray<T>); overload; static;
@@ -2827,11 +2838,21 @@ begin
   pEnd := L + N * IncL;
   if IncR = 0 then begin
     s := PT(R)^;
+//    if (not IsManagedType(T)) and (IncL = SizeOf(T)) then begin
+//      FillByScalar<T>(L, N, s);
+//      exit;
+//    end;
+
     while L < pEnd do begin
       PT(L)^ := s;
       Inc(L, IncL);
     end;
   end else begin
+    if (not IsManagedType(T)) and (IncL = SizeOf(T)) and (IncR = SizeOf(T)) then begin
+      Move(R^, L^, N * SizeOf(T));
+      exit;
+    end;
+
     while L < pEnd do begin
       PT(L)^ := PT(R)^;
       Inc(L, IncL);
@@ -3466,6 +3487,237 @@ begin
   );
 end;
 
+class procedure TNDAUt.MapFSS(const L, R, aRes: INDArray; aFnc: TFuncVV);
+var cLvl1, cLvl2: Integer;
+    cSz1, cSz2: NativeInt;
+begin
+  if not SameShapeQ(L, R) then
+    raise ENDAMapError.CreateFmt(csBroadcastErr,
+      [ShapeToStr(L), ShapeToStr(R)]);
+
+  if not SameShapeQ(L, aRes) then
+    raise ENDAMapError.CreateFmt(csBroadcastErr,
+      [ShapeToStr(L), ShapeToStr(aRes)]);
+
+  if (L.Flags and R.Flags and aRes.Flags and NDAF_C_CONTIGUOUS) <> 0 then begin
+    aFnc(L.Size, L.Data, L.ItemSize, R.Data, R.ItemSize, aRes.Data, aRes.ItemSize);
+    exit;
+  end;
+
+  cLvl1 := GetCommonCContLvl(L, R, cSz1);
+  cLvl2 := GetCommonCContLvl(L, aRes, cSz2);
+  MapFSS(L, R, aRes, aFnc, Max(cLvl1, cLvl2), Min(cSz1, cSz2));
+end;
+
+class procedure TNDAUt.MapFSS(const L, R, aRes: INDArray; aFnc: TFuncVV; aCLvl: Integer; aCSz: NativeInt);
+var itL, itR, itRes: TNDAIt;
+    szL, szR, szRes, cnt: NativeInt;
+begin
+  if aCLvl = 0 then begin
+    aFnc(L.Size, L.Data, L.ItemSize, R.Data, R.ItemSize, aRes.Data, aRes.ItemSize);
+    exit;
+  end;
+
+  if aCLvl = L.NDim then begin // there are no continuous blocks -> loop over vectors
+    Dec(aCLvl);
+    aCSz := L.Strides[aCLvl];
+    szR := R.Strides[aCLvl];
+    szRes := aRes.Strides[aCLvl];
+    if aCLvl = 0 then begin // 1D case
+      aFnc(L.Size, L.Data, aCSz, R.Data, szR, aRes.Data, szRes);
+      exit;
+    end;
+
+    itL := TNDAIt.Create(L, 0, aCLvl - 1);
+    itR := TNDAIt.Create(R, 0, aCLvl - 1);
+    itRes := TNDAIt.Create(aRes, 0, aCLvl - 1);
+    try
+      cnt := L.Shape[aCLvl];
+      while itL.MoveNext do begin
+        itR.MoveNext;
+        itRes.MoveNext;
+        aFnc(cnt, itL.Current, aCSz, itR.Current, szR, itRes.Current, szRes);
+      end;
+    finally
+      itL.Free;
+      itR.Free;
+      itRes.Free;
+    end;
+  end else begin
+    itL := TNDAIt.Create(L, 0, aCLvl - 1);
+    itR := TNDAIt.Create(R, 0, aCLvl - 1);
+    itRes := TNDAIt.Create(aRes, 0, aCLvl - 1);
+    try
+      szL := L.ItemSize;
+      szR := R.ItemSize;
+      szRes := aRes.ItemSize;
+      cnt := aCSz div szL;
+      while itL.MoveNext do begin
+        itR.MoveNext;
+        itRes.MoveNext;
+        aFnc(cnt, itL.Current, szL, itR.Current, szR, itRes.Current, szRes);
+      end;
+    finally
+      itL.Free;
+      itR.Free;
+      itRes.Free;
+    end;
+  end;
+end;
+
+class procedure TNDAUt.MapF(const L, R, aRes: INDArray; aFnc: TFuncVV);
+var dimL, dimR: Integer;
+    it, itRes: TNDASliceIt;
+begin
+  dimL := L.NDim;
+  dimR := R.NDim;
+
+  if dimL = 0 then begin
+    if dimR = 0 then begin
+      if not WriteableQ(aRes) then
+        raise ENDAWriteError.Create(csNotWriteable);
+
+      aFnc(1, L.Data, L.ItemSize, R.Data, R.ItemSize, aRes.Data, aRes.ItemSize);
+      exit;
+    end;
+    MapF(L.Data, R, aRes, aFnc);
+    exit;
+  end;
+
+  if dimR = 0 then begin
+    MapF(L, R.Data, aRes, aFnc);
+    exit;
+  end;
+
+  if dimL = dimR then begin
+    if not WriteableQ(aRes) then
+      raise ENDAWriteError.Create(csNotWriteable);
+
+    MapFSS(L, R, aRes, aFnc);
+    exit;
+  end;
+
+  if L.NDim < R.NDim then begin
+    it := TNDASliceIt.Create(R, L.NDim - 1);
+    itRes := TNDASliceIt.Create(aRes, L.NDim - 1);
+    try
+      while it.MoveNext and itRes.MoveNext do
+        MapF(L, it.CurrentSlice, itRes.CurrentSlice, aFnc);
+    finally
+      it.Free;
+      itRes.Free;
+    end;
+  end else begin
+    it := TNDASliceIt.Create(L, R.NDim - 1);
+    itRes := TNDASliceIt.Create(aRes, R.NDim - 1);
+    try
+      while it.MoveNext and itRes.MoveNext do
+        MapF(it.CurrentSlice, R, itRes.CurrentSlice, aFnc);
+    finally
+      it.Free;
+      itRes.Free;
+    end;
+  end;
+end;
+
+class procedure TNDAUt.MapF(pL: PByte; const R, aRes: INDArray; aFnc: TFuncVV);
+var cLvl: Integer;
+    sz, count, rSz, resSz: NativeInt;
+    it, itRes: TNDAIt;
+begin
+  if not WriteableQ(aRes) then
+    raise ENDAWriteError.Create(csNotWriteable);
+
+  rSz := R.ItemSize;
+  resSz := aRes.ItemSize;
+  if CContiguousQ(R) and CContiguousQ(aRes) then begin
+    aFnc(R.Size, pL, 0, R.Data, rSz, aRes.Data, resSz);
+    exit;
+  end;
+
+  cLvl := GetCommonCContLvl(R, aRes, sz);
+  if sz = Min(rSz, resSz) then begin
+    Dec(cLvl);
+    sz := R.Strides[cLvl];
+    resSz := aRes.Strides[cLvl];
+    if cLvl = 0 then begin
+      aFnc(R.Size, pL, 0, R.Data, sz, aRes.Data, resSz);
+      exit;
+    end;
+
+    count := R.Shape[cLvl];
+    it := TNDAIt.Create(R, cLvl - 1);
+    itRes := TNDAIt.Create(aRes, cLvl - 1);
+    try
+      while it.MoveNext and itRes.MoveNext do
+        aFnc(count, pL, 0, it.Current, sz, itRes.Current, resSz);
+    finally
+      it.Free;
+      itRes.Free;
+    end;
+  end else begin
+    count := sz div rSz;
+    it := TNDAIt.Create(R, cLvl - 1);
+    itRes := TNDAIt.Create(aRes, cLvl - 1);
+    try
+      while it.MoveNext and itRes.MoveNext do
+        aFnc(count, pL, 0, it.Current, rSz, itRes.Current, resSz);
+    finally
+      it.Free;
+      itRes.Free;
+    end;
+  end;
+end;
+
+class procedure TNDAUt.MapF(const L: INDArray; pR: PByte; aRes: INDArray; aFnc: TFuncVV);
+var cLvl: Integer;
+    sz, count, lSz, resSz: NativeInt;
+    it, itRes: TNDAIt;
+begin
+  if not WriteableQ(aRes) then
+    raise ENDAWriteError.Create(csNotWriteable);
+
+  lSz := L.ItemSize;
+  resSz := aRes.ItemSize;
+  if CContiguousQ(L) and CContiguousQ(aRes) then begin
+    aFnc(L.Size, L.Data, lSz, pR, 0, aRes.Data, resSz);
+    exit;
+  end;
+
+  cLvl := GetCommonCContLvl(L, aRes, sz);
+  if sz = Min(lSz, resSz) then begin
+    Dec(cLvl);
+    sz := L.Strides[cLvl];
+    resSz := aRes.Strides[cLvl];
+    if cLvl = 0 then begin
+      aFnc(L.Size, L.Data, sz, pR, 0, aRes.Data, resSz);
+      exit;
+    end;
+
+    count := L.Shape[cLvl];
+    it := TNDAIt.Create(L, cLvl - 1);
+    itRes := TNDAIt.Create(aRes, cLvl - 1);
+    try
+      while it.MoveNext and itRes.MoveNext do
+        aFnc(count, it.Current, sz, pR, 0, itRes.Current, resSz);
+    finally
+      it.Free;
+      itRes.Free;
+    end;
+  end else begin
+    count := sz div lSz;
+    it := TNDAIt.Create(L, cLvl - 1);
+    itRes := TNDAIt.Create(aRes, cLvl - 1);
+    try
+      while it.MoveNext and itRes.MoveNext do
+        aFnc(count, it.Current, lSz, pR, 0, itRes.Current, resSz);
+    finally
+      it.Free;
+      itRes.Free;
+    end;
+  end;
+end;
+
 class procedure TNDAUt.MapR<T>(const L: INDArray<T>; const R: T; aRFnc: TIPProcVV);
 begin
   MapR(L, @R, aRFnc);
@@ -3500,6 +3752,32 @@ begin
     TryAsType<V>(R, aRes, True);
     MapL(L, aRes, aLFnc);
   end;
+end;
+
+class procedure TNDAUt.Map<T, U, V>(const L: INDArray<T>; const R: U;
+  var aRes: INDArray<V>; aFnc: TFuncVV);
+var s: INDArray<U>;
+begin
+  s := Scalar<U>(R);
+  Map<T, U, V>(L, s, aRes, aFnc);
+end;
+
+class procedure TNDAUt.Map<T, U, V>(const L: T; const R: INDArray<U>;
+  var aRes: INDArray<V>; aFnc: TFuncVV);
+var s: INDArray<T>;
+begin
+  s := Scalar<T>(L);
+  Map<T, U, V>(s, R, aRes, aFnc);
+end;
+
+class procedure TNDAUt.Map<T, U, V>(const L: INDArray<T>; const R: INDArray<U>;
+  var aRes: INDArray<V>; aFnc: TFuncVV);
+begin
+  if L.NDim >= R.NDim then
+    AdjustBuffer<V>(L.Shape, aRes)
+  else
+    AdjustBuffer<V>(R.Shape, aRes);
+  MapF(L, R, aRes, aFnc);
 end;
 
 class procedure TNDAUt.Map<T>(const L: INDArray<T>; const R: T; var aRes: INDArray<T>; aRFnc: TIPProcVV);
@@ -3627,6 +3905,15 @@ begin
   SetLength(Result, count);
   for I := 0 to High(Result) do
     Result[I] := aData[aIndices[I]];
+end;
+
+class procedure TNDAUt.AdjustBuffer<T>(const aShape: TNDAShape; var aBuff: INDArray<T>);
+begin
+  if Assigned(aBuff) then begin
+    if SameQ(aShape, aBuff.Shape) then exit;
+    raise ENDAShapeError.Create('Buffer size doesn''t match.');
+  end;
+  aBuff := Empty<T>(aShape);
 end;
 
 class function TNDAUt._ToUntypedArrays<T>(const aArrs: array of INDArray<T>): TArray<INDArray>;

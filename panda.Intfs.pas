@@ -151,9 +151,14 @@ type
     CIdx: Nativeint;
   end;
 
+  // In place procedure types X <- F(X)
+  TIPProcV = procedure (N: NativeInt; X: PByte; IncX: NativeInt);
   // In place procedure types ( X <- F(X, Y) or Y <- F(X, Y) )
   TIPProcVS<T> = procedure (N: NativeInt; X: PByte; IncX: NativeInt; const Y: T);
   TIPProcVV = procedure (N: NativeInt; X: PByte; IncX: NativeInt; Y: PByte; IncY: NativeInt);
+  // function type Z <- F(X, Y)
+  TFuncVV = procedure (N: NativeInt; X: PByte; IncX: NativeInt; Y: PByte; IncY: NativeInt;
+    Z: PByte; IncZ: NativeInt);
 
   TNDAFuncNS<T> = procedure (const aArr: INDArray<T>; var aRes: T);
   TNDAFuncNS<T, U> = procedure (const aArr: INDArray<T>; var aRes: U);

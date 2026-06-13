@@ -5,3 +5,4 @@ Demo04 - Gaussian blur
 Demo05 - image resizing, RGB -> gray color space conversion
 Demo06 - array of double filtering 
 Demo07 - image filtering
+Demo08 - image thresholding + morphology

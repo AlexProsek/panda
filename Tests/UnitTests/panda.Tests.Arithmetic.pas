@@ -42,6 +42,14 @@ type
     procedure SubFrom_2D1D_Single;
   end;
 
+  TBoolArithmeticTests = class(TNDATestCase)
+  published
+    procedure BoolAnd1D;
+    procedure BoolOr1D;
+    procedure BoolXor1D;
+    procedure BoolNot1D;
+  end;
+
 implementation
 
 {$region 'TArithmeticTests'}
@@ -320,8 +328,65 @@ end;
 
 {$endregion}
 
+{$region 'TBoolArithmeticTests'}
+
+procedure TBoolArithmeticTests.BoolAnd1D;
+var a, b: TTensorBool;
+    v: TArray<Boolean>;
+begin
+  a := TNDAUt.AsArray<Boolean>([True, True, False, False]);
+  b := TNDAUt.AsArray<Boolean>([True, False, True, False]);
+
+  a := a and b;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Boolean>(a, v));
+  CheckEquals([True, False, False, False], v);
+end;
+
+procedure TBoolArithmeticTests.BoolOr1D;
+var a, b: TTensorBool;
+    v: TArray<Boolean>;
+begin
+  a := TNDAUt.AsArray<Boolean>([True, True, False, False]);
+  b := TNDAUt.AsArray<Boolean>([True, False, True, False]);
+
+  a := a or b;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Boolean>(a, v));
+  CheckEquals([True, True, True, False], v);
+end;
+
+procedure TBoolArithmeticTests.BoolXor1D;
+var a, b: TTensorBool;
+    v: TArray<Boolean>;
+begin
+  a := TNDAUt.AsArray<Boolean>([True, True, False, False]);
+  b := TNDAUt.AsArray<Boolean>([True, False, True, False]);
+
+  a := a xor b;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Boolean>(a, v));
+  CheckEquals([False, True, True, False], v);
+end;
+
+procedure TBoolArithmeticTests.BoolNot1D;
+var a: TTensorBool;
+    v: TArray<Boolean>;
+begin
+  a := TNDAUt.AsArray<Boolean>([True, False, True, False]);
+
+  a := not a;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Boolean>(a, v));
+  CheckEquals([False, True, False, True], v);
+end;
+
+
+{$endregion}
+
 initialization
 
   RegisterTest(TArithmeticTests.Suite);
+  RegisterTest(TBoolArithmeticTests.Suite);
 
 end.

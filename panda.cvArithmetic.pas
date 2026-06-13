@@ -63,10 +63,13 @@ procedure VecSubWithSat(pA, pB, pRes: PUInt16; aCount: NativeInt); overload;
 procedure VecSubWithSat(pA: PUInt8; B: UInt8; pRes: PUInt8; aCount: NativeInt); overload;
 procedure VecSubWithSat(pA: PUInt16; B: UInt16; pRes: PUInt16; aCount: NativeInt); overload;
 
+// bitwise bit oprations
 procedure VecAnd(pA, pB, pRes: PByte; aCount: NativeInt); overload;
 procedure VecOr(pA, pB, pRes: PByte; aCount: NativeInt); overload;
 procedure VecXor(pA, pB, pRes: PByte; aCount: NativeInt); overload;
 procedure VecNot(pA, pRes: PByte; aCount: NativeInt); overload;
+
+procedure VecBoolNot(pA, pRes: PByte; aCount: NativeInt); overload;
 
 function SatAdd_U8(a, b: UInt8): UInt8; inline;
 function SatSub_U8(a, b: UInt8): UInt8; inline;
@@ -2241,7 +2244,7 @@ asm
   mov ecx, [ebp + 8]
   shr ecx, 4
   jz @rest
-@loop:
+@L:
   movupd xmm0, [eax]
   movupd xmm1, [edx]
   psubusb xmm0, xmm1
@@ -2250,7 +2253,7 @@ asm
   add edx, 16
   add edi, 16
   dec ecx
-  jnz @loop
+  jnz @L
 
 @rest:
   mov ecx, [ebp + 8]
@@ -2259,7 +2262,7 @@ asm
   push ebx
   push esi
   mov esi, eax
-@restloop:
+@Lrest:
   mov bl, 0
   mov al, [esi]
   sub al, [edx]
@@ -2274,12 +2277,50 @@ asm
   inc edx
   inc edi
   dec ecx
-  jnz @restloop
+  jnz @Lrest
 
   pop esi
   pop ebx
 @end:
   pop edi
+end;
+{$elseif defined(ASMx64)}
+// RCX <- pA, RDX <- pB, R8 <- pRes, R9 <- aCount
+asm
+  mov r10, r9
+  shr r9, 4
+  jz @rest
+@L:
+  movupd xmm0, [rcx]
+  movupd xmm1, [rdx]
+  psubusb xmm0, xmm1
+  movupd [r8], xmm0
+  add rcx, 16
+  add rdx, 16
+  add r8, 16
+  dec r9
+  jnz @L
+
+@rest:
+  and r10, 15
+  jz @end
+@Lrest:
+  mov r11b, 0
+  mov al, [rcx]
+  sub al, [rdx]
+  adc r11b, 0
+  jnz @sat
+  mov [r8], al
+  jmp @testEnd
+@sat:
+  mov byte ptr [r8], 0
+@testEnd:
+  inc rcx
+  inc rdx
+  inc r8
+  dec r10
+  jnz @Lrest
+@end:
 end;
 {$else}
 var pEnd: PByte;
@@ -2792,6 +2833,81 @@ begin
   pEnd := pA + (aCount and cMask);
   while pA < pEnd do begin
     pRes^ := not pA^;
+    Inc(pRes);
+    Inc(pA);
+  end;
+end;
+{$endif}
+
+procedure VecBoolNot(pA, pRes: PByte; aCount: NativeInt);
+{$if defined(ASMx64)}
+const
+  cMask: array [0..15] of Byte = (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1);
+// RCX <- pA, RDX <- pRes, R8 <- aCount
+asm
+  movdqu xmm2, cMask
+  mov r9, r8
+  shr r8, 4
+  jz @rest15
+  pcmpeqd xmm1, xmm1
+@L:
+  movdqu xmm0, [rcx]
+  pxor xmm0, xmm1
+  pand xmm0, xmm2
+  movdqu [rdx], xmm0
+  add rcx, 16
+  add rdx, 16
+  dec r8
+  jnz @L
+@rest15:
+  and r9, 15
+  jz @end
+  mov r8, r9
+  shr r8, 3
+  jz @rest7
+  lea r8, cMask
+  mov r8, [r8]
+  mov rax, [rcx]
+  not rax
+  and rax, r8
+  mov [rdx], rax
+  add rcx, 8
+  add rdx, 8
+@rest7:
+  and r9, 7
+  jz @end
+@Lrest:
+  mov al, [rcx]
+  not al
+  and al, 1
+  mov [rdx], al
+  inc rcx
+  inc rdx
+  dec r9
+  jnz @Lrest
+@end:
+end;
+{$else}
+var pEnd: PByte;
+const
+{$if SizeOf(NativeInt) = 4}
+  cBitMask = $01010101;
+  cCntMask = 3;
+{$else}
+  cBitMask = $0101010101010101;
+  cCntMask = 7;
+{$endif}
+begin
+  pEnd := pA + aCount and (not NativeInt(cCntMask));
+  while pA < pEnd do begin
+    PNativeInt(pRes)^ := (not PNativeInt(pA)^) and cBitMask;
+    Inc(pRes, SizeOf(NativeInt));
+    Inc(pA, SizeOf(NativeInt));
+  end;
+
+  pEnd := pA + (aCount and cCntMask);
+  while pA < pEnd do begin
+    pRes^ := (not pA^) and 1;
     Inc(pRes);
     Inc(pA);
   end;

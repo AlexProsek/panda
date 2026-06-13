@@ -170,6 +170,7 @@
         <DCCReference Include="panda.PTests.ArrManip.pas"/>
         <DCCReference Include="panda.PTests.DynArrUtils.pas"/>
         <DCCReference Include="panda.PTests.Sorting.pas"/>
+        <DCCReference Include="panda.PTests.cvCmp.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

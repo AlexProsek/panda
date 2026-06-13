@@ -37,6 +37,7 @@ type
   {$endif}
     function GetTestDataPath(const aFileName: String): String;
   public
+    procedure CheckEquals(const aExpected, aValue: array of Boolean); overload;
     procedure CheckEquals(const aExpected, aValue: array of Byte); overload;
     procedure CheckEquals(const aExpected, aValue: array of Int64); overload;
     procedure CheckEquals(const aExpected, aValue: array of Integer); overload;
@@ -123,6 +124,14 @@ begin
   CheckEquals(Length(aExpected), Length(aValue));
   for I := 0 to High(aExpected) do
     CheckEquals(NativeInt(aExpected[I]), NativeInt(aValue[I]));
+end;
+
+procedure TNDATestCase.CheckEquals(const aExpected, aValue: array of Boolean);
+var I: Integer;
+begin
+  CheckEquals(Length(aExpected), Length(aValue));
+  for I := 0 to High(aExpected) do
+    CheckEquals(aExpected[I], aValue[I]);
 end;
 
 procedure TNDATestCase.CheckEquals(const aExpected, aValue: array of Int64);

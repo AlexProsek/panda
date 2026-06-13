@@ -16,6 +16,9 @@ procedure cvRange(aData: PInt64; aCount: NativeInt; aLo, aStep: Int64); overload
 procedure cvRange(aData: PSingle; aCount: NativeInt; aLo, aStep: Single); overload;
 procedure cvRange(aData: PDouble; aCount: NativeInt; aLo, aStep: Double); overload;
 
+procedure cvSqrt(aData: PSingle; aCount: NativeInt); overload;
+procedure cvSqrt(aData: PDouble; aCount: NativeInt); overload;
+
 procedure cvExp(aData: PSingle; aCount: NativeInt); overload;
 procedure cvExp(aData: PDouble; aCount: NativeInt); overload;
 
@@ -90,6 +93,88 @@ end;
 {$endregion}
 
 {$region 'cvExp'}
+
+procedure cvSqrt(aData: PSingle; aCount: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- aData, RDX <- aCount
+asm
+  mov r8, rdx
+  shr rdx, 3
+  jz @rest
+@L:
+  movups xmm0, [rcx]
+  sqrtps xmm0, xmm0
+  movups [rcx], xmm0
+  add rcx, 16
+  movups xmm0, [rcx]
+  sqrtps xmm0, xmm0
+  movups [rcx], xmm0
+  add rcx, 16
+  dec rdx
+  jnz @L
+@rest:
+  and r8, 7
+  jz @end
+@Lrest:
+  movss xmm0, [rcx]
+  sqrtss xmm0, xmm0
+  movss [rcx], xmm0
+  add rcx, 4
+  dec r8
+  jnz @Lrest
+@end:
+end;
+{$else}
+var pEnd: PByte;
+begin
+  pEnd := PByte(aData) + aCount * cF32Sz;
+  while PByte(aData) < pEnd do begin
+    aData^ := Sqrt(aData^);
+    Inc(aData);
+  end;
+end;
+{$endif}
+
+procedure cvSqrt(aData: PDouble; aCount: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- aData, RDX <- aCount
+asm
+  mov r8, rdx
+  shr rdx, 2
+  jz @rest
+@L:
+  movupd xmm0, [rcx]
+  sqrtpd xmm0, xmm0
+  movupd [rcx], xmm0
+  add rcx, 16
+  movupd xmm0, [rcx]
+  sqrtpd xmm0, xmm0
+  movupd [rcx], xmm0
+  add rcx, 16
+  dec rdx
+  jnz @L
+@rest:
+  and r8, 3
+  jz @end
+@Lrest:
+  movsd xmm0, [rcx]
+  sqrtsd xmm0, xmm0
+  movsd [rcx], xmm0
+  add rcx, 8
+  dec r8
+  jnz @Lrest
+@end:
+end;
+{$else}
+var pEnd: PByte;
+begin
+  pEnd := PByte(aData) + aCount * cF32Sz;
+  while PByte(aData) < pEnd do begin
+    aData^ := Sqrt(aData^);
+    Inc(aData);
+  end;
+end;
+{$endif}
 
 procedure cvExp(aData: PSingle; aCount: NativeInt);
 var pEnd: PByte;

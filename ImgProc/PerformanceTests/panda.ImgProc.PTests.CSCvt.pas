@@ -21,6 +21,11 @@ type
     procedure TestRGB24ToHue;
     procedure TestRGB24ToHSV;
     procedure TestRGB24ToHue_Red;
+
+    procedure TestInterleaveUI8C3;
+
+    procedure CvtHSVToRGB;
+    procedure CombineHSVToRGB24;
   end;
 
 implementation
@@ -153,6 +158,65 @@ begin
 
   SWStart;
   cscvtRGB24ToHue(PByte(src), PByte(h), N);
+  SWStop;
+end;
+
+procedure TCsCvtTests.TestInterleaveUI8C3;
+var ch0, ch1, ch2, res: TArray<Byte>;
+const N = 10000000;
+begin
+  SetLength(ch0, N);
+  SetLength(ch1, N);
+  SetLength(ch2, N);
+  SetLength(res, 3*N);
+
+  SWStart;
+  _interleaveUI8C3(PByte(ch0), PByte(ch1), PByte(ch2), PByte(res), N);
+  SWStop;
+end;
+
+procedure TCsCvtTests.CvtHSVToRGB;
+var h, s, v, r, g, b: TArray<Single>;
+    I: Integer;
+const N = 1000000;
+begin
+  SetLength(h, N);
+  SetLength(s, N);
+  SetLength(v, N);
+  SetLength(r, N);
+  SetLength(g, N);
+  SetLength(b, N);
+  RandSeed := 1234;
+  for I := 0 to High(h) do begin
+    h[I] := Random();
+    s[I] := Random();
+    v[I] := Random();
+  end;
+
+  SWStart;
+  cscvtHSVToRGB(PSingle(h), PSingle(s), PSingle(v), PSingle(r), PSingle(g), PSingle(b), N);
+  SWStop;
+end;
+
+procedure TCsCvtTests.CombineHSVToRGB24;
+var h, s, v: TArray<Single>;
+    rgb: TArray<TRGB24>;
+    I: Integer;
+const N = 1000000;
+begin
+  SetLength(h, N);
+  SetLength(s, N);
+  SetLength(v, N);
+  SetLength(rgb, N);
+  RandSeed := 1234;
+  for I := 0 to High(h) do begin
+    h[I] := Random();
+    s[I] := Random();
+    v[I] := Random();
+  end;
+
+  SWStart;
+  _combineHSVToRGB24(PByte(h), PByte(s), PByte(v), PByte(rgb), N);
   SWStop;
 end;
 

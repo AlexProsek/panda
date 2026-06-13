@@ -35,6 +35,9 @@ type
     procedure TestF32ToUI8_8;
     procedure TestF32ToUI8_10;
 
+    procedure TestInterleaveUI8C3_8;
+    procedure TestInterleaveUI8C3_10;
+
     procedure TestRGB24ToHue;
     procedure TestRGB24ToHSV_RndSample;
   {$if defined(ASMx64)}
@@ -58,6 +61,17 @@ type
     procedure TestSV16_V0;
     procedure TestSV16_R239G223B46;
   {$endif}
+
+    procedure CvtHSV2RGB_Red;
+    procedure CvtHSV2RGB_Yellow;
+    procedure CvtHSV2RGB_Green;
+    procedure CvtHSV2RGB_Cyan;
+    procedure CvtHSV2RGB_Blue;
+    procedure CvtHSV2RGB_Magenta;
+    procedure CvtHSV2RGB_H360;
+    procedure CvtHSV2RGB_YellowPlus360;
+
+    procedure CvtHSV2RGB24;
   end;
 
 implementation
@@ -300,6 +314,42 @@ begin
 
   for I := 0 to High(dst) do
     CheckEquals(Round(Max(0, Min(255, 255*src[I]))), dst[I]);
+end;
+
+procedure TCSCvtTests.TestInterleaveUI8C3_8;
+var ch0, ch1, ch2, res: TArray<Byte>;
+    I: Integer;
+begin
+  ch0 := TArray<Byte>.Create( 1,  2,  3,  4,  5,  6,  7,  8);
+  ch1 := TArray<Byte>.Create(11, 12, 13, 14, 15, 16, 17, 18);
+  ch2 := TArray<Byte>.Create(21, 22, 23, 24, 25, 26, 27, 28);
+  SetLength(res, 3*Length(ch0));
+
+  _interleaveUI8C3(PByte(ch0), PByte(ch1), PByte(ch2), PByte(res), Length(ch0));
+
+  for I := 0 to High(ch0) do begin
+    CheckEquals(ch0[I], res[3*I]);
+    CheckEquals(ch1[I], res[3*I + 1]);
+    CheckEquals(ch2[I], res[3*I + 2]);
+  end;
+end;
+
+procedure TCSCvtTests.TestInterleaveUI8C3_10;
+var ch0, ch1, ch2, res: TArray<Byte>;
+    I: Integer;
+begin
+  ch0 := TArray<Byte>.Create( 1,  2,  3,  4,  5,  6,  7,  8,  9, 10);
+  ch1 := TArray<Byte>.Create(11, 12, 13, 14, 15, 16, 17, 18, 19, 20);
+  ch2 := TArray<Byte>.Create(21, 22, 23, 24, 25, 26, 27, 28, 29, 30);
+  SetLength(res, 3*Length(ch0));
+
+  _interleaveUI8C3(PByte(ch0), PByte(ch1), PByte(ch2), PByte(res), Length(ch0));
+
+  for I := 0 to High(ch0) do begin
+    CheckEquals(ch0[I], res[3*I]);
+    CheckEquals(ch1[I], res[3*I + 1]);
+    CheckEquals(ch2[I], res[3*I + 2]);
+  end;
 end;
 
 procedure TCSCvtTests.TestRGB24ToHue;
@@ -674,6 +724,139 @@ begin
 end;
 
 {$endif}
+
+procedure HSVToRGB(const h, s, v: Single; out r, g, b: Single); inline;
+begin
+  cscvtHSVToRGB(
+    PSingle(@h), PSingle(@s), PSingle(@v),
+    PSingle(@r), PSingle(@g), PSingle(@b),
+    1
+  );
+end;
+
+procedure TCSCvtTests.CvtHSV2RGB_Red;
+var h, s, v, r, g, b: Single;
+begin
+  h := 0; s := 1; v := 1;
+  r := 0; g := 0; b := 0;
+  HSVToRGB(h, s, v, r, g, b);
+  CheckEquals(1, r, sTol);
+  CheckEquals(0, g, sTol);
+  CheckEquals(0, b, sTol);
+end;
+
+procedure TCSCvtTests.CvtHSV2RGB_Yellow;
+var h, s, v, r, g, b: Single;
+begin
+  h := 60; s := 1; v := 1;
+  r := 0; g := 0; b := 0;
+  HSVToRGB(h, s, v, r, g, b);
+  CheckEquals(1, r, sTol);
+  CheckEquals(1, g, sTol);
+  CheckEquals(0, b, sTol);
+end;
+
+procedure TCSCvtTests.CvtHSV2RGB_Green;
+var h, s, v, r, g, b: Single;
+begin
+  h := 120; s := 1; v := 1;
+  r := 0; g := 0; b := 0;
+  HSVToRGB(h, s, v, r, g, b);
+  CheckEquals(0, r, sTol);
+  CheckEquals(1, g, sTol);
+  CheckEquals(0, b, sTol);
+end;
+
+procedure TCSCvtTests.CvtHSV2RGB_Cyan;
+var h, s, v, r, g, b: Single;
+begin
+  h := 180; s := 1; v := 1;
+  r := 0; g := 0; b := 0;
+  HSVToRGB(h, s, v, r, g, b);
+  CheckEquals(0, r, sTol);
+  CheckEquals(1, g, sTol);
+  CheckEquals(1, b, sTol);
+end;
+
+procedure TCSCvtTests.CvtHSV2RGB_Blue;
+var h, s, v, r, g, b: Single;
+begin
+  h := 240; s := 1; v := 1;
+  r := 0; g := 0; b := 0;
+  HSVToRGB(h, s, v, r, g, b);
+  CheckEquals(0, r, sTol);
+  CheckEquals(0, g, sTol);
+  CheckEquals(1, b, sTol);
+end;
+
+procedure TCSCvtTests.CvtHSV2RGB_Magenta;
+var h, s, v, r, g, b: Single;
+begin
+  h := 300; s := 1; v := 1;
+  r := 0; g := 0; b := 0;
+  HSVToRGB(h, s, v, r, g, b);
+  CheckEquals(1, r, sTol);
+  CheckEquals(0, g, sTol);
+  CheckEquals(1, b, sTol);
+end;
+
+procedure TCSCvtTests.CvtHSV2RGB_H360;
+var h, s, v, r, g, b: Single;
+begin
+  h := 360; s := 1; v := 1;
+  r := 0; g := 0; b := 0;
+  HSVToRGB(h, s, v, r, g, b);
+  CheckEquals(1, r, sTol);
+  CheckEquals(0, g, sTol);
+  CheckEquals(0, b, sTol);
+end;
+
+procedure TCSCvtTests.CvtHSV2RGB_YellowPlus360;
+var h, s, v, r, g, b: Single;
+begin
+  h := 60 + 360; s := 1; v := 1;
+  r := 0; g := 0; b := 0;
+  HSVToRGB(h, s, v, r, g, b);
+  CheckEquals(1, r, sTol);
+  CheckEquals(1, g, sTol);
+  CheckEquals(0, b, sTol);
+end;
+
+procedure TCSCvtTests.CvtHSV2RGB24;
+var h, s, v: TArray<Single>;
+    rgb: TArray<TRGB24>;
+begin
+  h := TArray<Single>.Create(0, 60, 120, 180, 240, 300);
+  s := TArray<Single>.Create(1, 1, 1, 1, 1, 1);
+  v := TArray<Single>.Create(1, 1, 1, 1, 1, 1);
+  SetLength(rgb, Length(h));
+
+  _combineHSVToRGB24(PByte(h), PByte(s), PByte(v), PByte(rgb), Length(h));
+
+  CheckEquals(255, rgb[0].R);
+  CheckEquals(0,   rgb[0].G);
+  CheckEquals(0,   rgb[0].B);
+
+  CheckEquals(255, rgb[1].R);
+  CheckEquals(255, rgb[1].G);
+  CheckEquals(0,   rgb[1].B);
+
+  CheckEquals(0,   rgb[2].R);
+  CheckEquals(255, rgb[2].G);
+  CheckEquals(0,   rgb[2].B);
+
+  CheckEquals(0,   rgb[3].R);
+  CheckEquals(255, rgb[3].G);
+  CheckEquals(255, rgb[3].B);
+
+  CheckEquals(0,   rgb[4].R);
+  CheckEquals(0,   rgb[4].G);
+  CheckEquals(255, rgb[4].B);
+
+  CheckEquals(255, rgb[5].R);
+  CheckEquals(0,   rgb[5].G);
+  CheckEquals(255, rgb[5].B);
+end;
 
 {$endregion}
 

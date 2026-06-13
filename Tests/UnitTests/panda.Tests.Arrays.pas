@@ -241,6 +241,16 @@ type
     procedure Arr1D_Arr2DInv;
   end;
 
+  TFncMapTests = class(TNDATestCase)
+  published
+    procedure Scalar_Arr2D;
+    procedure Scalar_CArr2D;
+    procedure Arr2D_Scalar;
+    procedure Add2D_Arr2D;
+    procedure Arr1D_Arr2D;
+    procedure Arr2D_Arr1D;
+  end;
+
   TNDACvtTests = class(TNDATestCase)
   published
     procedure CvtF32F64;
@@ -3126,6 +3136,148 @@ end;
 
 {$endregion}
 
+{$region 'TFncMapTests'}
+
+// Res <- F2(A, B) = 2*A < B
+procedure F2(N: NativeInt; A: PByte; IncA: NativeInt; B: PByte; IncB: NativeInt;
+  Res: PByte; IncRes: NativeInt);
+var pEnd: PByte;
+    s: Integer;
+begin
+  if IncA = 0 then begin
+    s := PInteger(A)^;
+    pEnd := B + N * IncB;
+    while B < pEnd do begin
+      PBoolean(Res)^  := 2*s < PInteger(B)^;
+      Inc(B, IncB);
+      Inc(Res, IncRes);
+    end;
+
+    exit;
+  end;
+
+  if IncB = 0 then begin
+    s := PInteger(B)^;
+    pEnd := A + N * IncA;
+    while A < pEnd do begin
+      PBoolean(Res)^ := 2*PInteger(A)^ < s;
+      Inc(A, IncA);
+      Inc(Res, IncRes);
+    end;
+
+    exit;
+  end;
+
+  pEnd := A + N * IncA;
+  while A < pEnd do begin
+    PBoolean(Res)^ := 2*PInteger(A)^ < PInteger(B)^;
+    Inc(A, IncA);
+    Inc(B, IncB);
+    Inc(Res, IncRes);
+  end;
+end;
+
+procedure TFncMapTests.Scalar_Arr2D;
+var a: INDArray<Integer>;
+    c, res: INDArray<Boolean>;
+    m: TArray<TArray<Boolean>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+  c := TNDAUt.Full<Boolean>([3, 3], False);
+  res := c[[NDIAll(2), NDIAll(2)]];
+
+  TNDAUt.Map<Integer, Integer, Boolean>(1, a[[NDIAll(2), NDIAll(2)]], res, F2);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Boolean>(res, m));
+  CheckEquals([False, True], m[0]);
+  CheckEquals([True,  True], m[1]);
+end;
+
+procedure TFncMapTests.Scalar_CArr2D;
+var a: INDArray<Integer>;
+    res: INDArray<Boolean>;
+    m: TArray<TArray<Boolean>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2], [3, 4]]);
+  res := TNDAUt.Full<Boolean>([2, 2], False);
+
+  TNDAUt.Map<Integer, Integer, Boolean>(1, a, res, F2);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Boolean>(res, m));
+  CheckEquals([False, False], m[0]);
+  CheckEquals([True,  True ], m[1]);
+end;
+
+
+procedure TFncMapTests.Arr2D_Scalar;
+var a: INDArray<Integer>;
+    c, res: INDArray<Boolean>;
+    m: TArray<TArray<Boolean>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+  c := TNDAUt.Full<Boolean>([3, 3], False);
+  res := c[[NDIAll(2), NDIAll(2)]];
+
+  TNDAUt.Map<Integer, Integer, Boolean>(a[[NDIAll(2), NDIAll(2)]], 10, res, F2);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Boolean>(res, m));
+  CheckEquals([True,  True ], m[0]);
+  CheckEquals([False, False], m[1]);
+end;
+
+procedure TFncMapTests.Add2D_Arr2D;
+var a, b: INDArray<Integer>;
+    c, res: INDArray<Boolean>;
+    m: TArray<TArray<Boolean>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+  b := TNDAUt.AsArray<Integer>([[1, 4, 9], [4, 10, 18], [7, 16, 27]]);
+  c := TNDAUt.Full<Boolean>([3, 3], False);
+  res := c[[NDIAll(2), NDIAll(2)]];
+
+  TNDAUt.Map<Integer, Integer, Boolean>(a[[NDIAll(2), NDIAll(2)]], b[[NDIAll(2), NDIAll(2)]], res, F2);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Boolean>(res, m));
+  CheckEquals([False, True], m[0]);
+  CheckEquals([False, True], m[1]);
+end;
+
+procedure TFncMapTests.Arr1D_Arr2D;
+var a, b: INDArray<Integer>;
+    c, res: INDArray<Boolean>;
+    m: TArray<TArray<Boolean>>;
+begin
+  a := TNDAUt.AsArray<Integer>([1, 2, 3]);
+  b := TNDAUt.AsArray<Integer>([[1, 4, 9], [4, 10, 18], [7, 16, 27]]);
+  c := TNDAUt.Full<Boolean>([3, 3], False);
+  res := c[[NDIAll(2), NDIAll(2)]];
+
+  TNDAUt.Map<Integer, Integer, Boolean>(a[[NDIAll(2)]], b[[NDIAll(2), NDIAll(2)]], res, F2);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Boolean>(res, m));
+  CheckEquals([False, True], m[0]);
+  CheckEquals([True,  True], m[1]);
+end;
+
+procedure TFncMapTests.Arr2D_Arr1D;
+var a, b: INDArray<Integer>;
+    c, res: INDArray<Boolean>;
+    m: TArray<TArray<Boolean>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+  b := TNDAUt.AsArray<Integer>([9, 8, 7]);
+  c := TNDAUt.Full<Boolean>([3, 3], False);
+  res := c[[NDIAll(2), NDIAll(2)]];
+
+  TNDAUt.Map<Integer, Integer, Boolean>(a[[NDIAll(2), NDIAll(2)]], b[[NDIAll(2)]], res, F2);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Boolean>(res, m));
+  CheckEquals([True,  True ], m[0]);
+  CheckEquals([False, False], m[1]);
+end;
+
+{$endregion}
+
 {$region 'TNDACvtTests'}
 
 procedure TNDACvtTests.CvtF32F64;
@@ -3205,6 +3357,7 @@ initialization
   RegisterTest(TNDIdxSetTests.Suite);
   RegisterTest(TNDAUtTests.Suite);
   RegisterTest(TBinMapTests.Suite);
+  RegisterTest(TFncMapTests.Suite);
   RegisterTest(TNDACvtTests.Suite);
 
 end.
