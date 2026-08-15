@@ -6,3 +6,4 @@ Demo05 - image resizing, RGB -> gray color space conversion
 Demo06 - array of double filtering 
 Demo07 - image filtering
 Demo08 - image thresholding + morphology
+Demo09 - 1D FFT
