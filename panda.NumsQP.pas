@@ -1,4 +1,4 @@
-unit panda.MPNums;
+unit panda.NumsQP;
 
 interface
 
@@ -6,69 +6,10 @@ uses
     System.Math
   , System.SysUtils
   , panda.Nums
+  , panda.NumsLowLvl
   ;
 
 {$I AsmDefs.inc}
-
-type
-{$ifdef Limb64}
-  TLimb = UInt64;
-{$else}
-  TLimb = Cardinal;
-{$endif}
-  PLimb = ^TLimb;
-  TLimbArray = TArray<TLimb>;
-
-const
-  I64_HI_BIT    = $8000000000000000;
-  I64_SIGN_BIT  = I64_HI_BIT;
-  I64_MASK      = $FFFFFFFFFFFFFFFF;
-  I64_BIT_COUNT = 64;
-
-  I32_HI_BIT    = $80000000;
-  I32_SIGN_BIT  = I32_HI_BIT;
-  I32_MASK      = $FFFFFFFF;
-  I32_BIT_COUNT = 32;
-
-{$ifdef Limb64}
-  W_HI_BIT          = I64_HI_BIT;
-  W_BIT_COUNT       = I64_BIT_COUNT;
-  W_LOG2_BITS       = 6; // Log2(W_BIT_COUNT)
-  W_LOG2_BYTES      = 3;
-  W_MASK            = I64_MASK;
-  W_HI_MASK         = $FFFFFFFF00000000;
-  W_LO_MASK         = $00000000FFFFFFFF;
-{$else}
-  W_HI_BIT          = I32_HI_BIT;
-  W_BIT_COUNT       = I32_BIT_COUNT;
-  W_LOG2_BITS       = 5;
-  W_LOG2_BYTES      = 2;
-  W_MASK            = I32_MASK;
-  W_HI_MASK         = $FFFF0000;
-  W_LO_MASK         = $0000FFFF;
-{$endif}
-  W_SIGN_BIT        = W_HI_BIT;
-  W_BYTE_COUNT      = W_BIT_COUNT div 8;
-
-  cBit32  = UInt32(1) shl 31;
-  cBit64  = UInt64(1) shl 63;
-
-  cLimbSize     = SizeOf(TLimb);
-{$ifdef Limb64}
-  cLimbBits     = 64;
-  cTopBitIdx    = 63;
-  cTopBit       = UInt64(1) shl 63;
-  cLimbRemMask  = $3f;
-{$else}
-  cLimbBits     = 32;
-  cTopBitIdx    = 31;
-  cWordBits     = 32;
-  cTopBit       = Cardinal(1) shl 31;
-  cLimbRemMask  = $1f;
-{$endif}
-  cNibbleMask   = $f;
-  cHexNumSymbols: array [0..cNibbleMask] of Char =
-    ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F');
 
 type
   TInt128 = record
@@ -105,6 +46,7 @@ type
     function ZeroQ: Boolean; inline;
     function Lo: UInt64; inline;
     function Hi: UInt64; inline;
+    function Signum: Integer; inline;
   end;
   PInt128 = ^TInt128;
 
@@ -149,6 +91,24 @@ type
   end;
   PUInt128 = ^TUInt128;
 
+  TUInt256 = record
+  private const
+    LCnt = {$ifdef Limb64}4{$else}8{$endif};
+  public type
+    TLimbs = array [0..3] of UInt64;
+  private
+    fLimbs: TLimbs;
+    class procedure LongDivMod(var A, B: TUInt256); static;
+    class procedure ShortDivMod(var A, B: TUInt256); static;
+  public
+    procedure Init(const L0, L1, L2, L3: UInt64); overload; inline;
+    procedure SetToZero; inline;
+    class operator Multiply(const A, B: TUInt256): TUInt256;
+    class operator IntDivide(const A, B: TUInt256): TUInt256;
+    class operator RightShift(const A: TUInt256; const B: Cardinal): TUInt256;
+  end;
+  PUInt256 = ^TUInt256;
+
   TReal128 = record
   private const
     MAX_EXPONENT        =  16383;
@@ -162,10 +122,6 @@ type
     BIT_CNT             = 128;
     FRAC_BIT_CNT        = 112;
     FRAC_OFFSET         = 16;
-
-    EXP_BIAS_F64        = 1023;
-    FRAC_OFFSET_F64     = 12;
-    FRAC_MASK_F64       = $000FFFFFFFFFFFFF;
 
     cLCnt = {$ifdef Limb64}2{$else}4{$endif};
   private
@@ -200,6 +156,8 @@ type
     class operator GreaterThanOrEqual(const A, B: TReal128): Boolean; inline;
     class operator Equal(const A, B: TReal128): Boolean; inline;
     class operator NotEqual(const A, B: TReal128): Boolean; inline;
+
+    class function SchoolDiv(const A, B: TReal128): TReal128; static;
 
     function Reciprocal: TReal128; inline;
     function Sqrt: TReal128;
@@ -250,28 +208,6 @@ const
 
 {$region 'low-level functions'}
 
-/// <summary>
-///   Evaluates in-place addition <c>B <- A + B</c>. It's supposed that <c>A</c> and <c>B</c> are
-///   positive numbers. It's also supposed that the both numbers have the same size.
-/// </summary>
-/// <remarks>
-///   <para>
-///     &#x2022; Function returns 1 when result overflows the output buffer
-///   </para>
-/// </remarks>
-function _ipAdd(pA, pB: PByte; n: NativeInt): TLimb;
-/// <summary>
-///   Evaluates in-place subtraction <c>B <- A - B</c>. It's supposed that <c>A</c> and <c>B</c> are
-///   positive numbers and <c>A</c> is greather than or equal to the <c>B</c>. It's also
-///   supposed that the both numbers have the same size.
-/// </summary>
-procedure _ipSub(pA, pB: PByte; n: NativeInt);
-/// <summary>
-///   Evaluates <c>A + D</c>, where <c>D</c> is machine precision unsigned integer.
-///   Result is stored in <c>A</c> buffer.
-/// </summary>
-function _Inc(pA: PByte; D: TLimb; n: NativeInt): TLimb;
-
 function _AddI128(pA, pB, pRes: PByte): Integer;
 function _SubI128(pA, pB, pRes: PByte): Integer;
 procedure _NegI128(pA, pRes: PByte);
@@ -280,76 +216,6 @@ function _IncUI128(pA: PByte; D: TLimb): TLimb;
 {$if defined(ASMx64)}
 procedure _MulUI128(pA, pB, pRes: PByte);
 {$endif}
-
-procedure _Mul(pA, pB, pRes: PByte; nA, nB: NativeInt);
-function _ShortDivMod(pA, pB, pRes: PByte; nA: NativeInt): TLimb;
-procedure _LongDivMod(pA, pB, pQ: PByte; nA: NativeInt; nB: NativeInt);
-
-/// <summary>
-///   Executes left bit shift.
-/// </summary>
-/// <param name="pSrc">Points to the  source data.</param>
-/// <param name="pDst">Points to the  of the destination data.</param>
-/// <param name="Count">
-///   Number of bits. Result will be shifted by this count. It's supposed that
-///   <c>Count</c> is less than or eqaul 31 (number of bits of the word).
-/// </param>
-/// <param name="Nsrc">Number of source's words.</param>
-/// <returns>
-///   Carry from the heighest word.
-/// </returns>
-function _shl(pSrc, pDst: PByte; count: Byte; Nsrc: NativeInt): TLimb;
-/// <summary>
-///   Executes right bit shift.
-/// </summary>
-/// <param name="pSrc">Points to the source data.</param>
-/// <param name="pDst">Points to the the destination data.</param>
-/// <param name="Count">
-///   Number of bits. Result will be shifted by this count. It's supposed that
-///   <c>Count</c> is less than or eqaul 31 (number of bits of the word).
-/// </param>
-/// <param name="Nsrc">Number of source's limbs.</param>
-function _shr(pSrc, pDst: PByte; count: Byte; Nsrc: NativeInt): TLimb;
-/// <summary>
-///   Executes bit shift in the direction according to <c>aDigits</c> signum
-/// </summary>
-/// <remarks>
-///   <para>
-///     &#x2022; For <c>aDigits > 0</c> is executed left shift and for
-///     <c>aDigits</c> is executed right shift.
-///   </para>
-///   <para>
-///     &#x2022; Unlinke <c>_shr</c>, <c>_shl</c> the <c>aDigits</c> can be arbitrary number.
-///   </para>
-/// </remarks>
-procedure _ipLongShift(pA: PLimb; aCount: Integer; aDigits: NativeInt);
-
-/// <summary>
-///   Finds offset of the most significant bit of the number <c>A</c>.
-/// </summary>
-/// <remarks>
-///   Index 1 corresponds with the least significant digit. If the <c>A</c>
-///   is equal to zero then function returns zero.
-/// </remarks>
-function _TopBitPos(A: TLimb): NativeInt; overload;
-function _TopBitPos(pA: PLimb; N: NativeInt): NativeInt; overload;
-function _CountLeadingZeros(A: TLimb): NativeInt; {$ifndef ASM}inline;{$endif} overload;
-function _CountLeadingZeros(pA: PLimb; N: NativeInt): NativeInt; overload;
-function _CountTrailingZeros(A: TLimb): NativeInt; overload;
-function _IsZero(pA: PLimb; N: NativeInt): Boolean;
-/// <summary>
-///   Returns the number of limbs without leading zero limbs.
-/// </summary>
-/// <param name="pA">points to the buffer</param>
-/// <param name="N">length of the buffer (number of the buffer's limbs)</param>
-function _Length(pA: PByte; N: NativeInt): NativeInt;
-
-{$endregion}
-
-{$region 'helper functions'}
-
-function HiLimbBaseQuotient(aValue: TLimb): TLimb; {$ifndef CPUx64}inline;{$endif}
-function IntPwr(A: TLimb; aExponent: Integer): TLimb;
 
 {$endregion}
 
@@ -368,193 +234,14 @@ begin
   raise EIntOverflow.Create('TInt128 overflow.');
 end;
 
-{$endregion}
-
-{$region 'helper functions'}
-
-function HiLimbBaseQuotient(aValue: TLimb): TLimb;
-{$if defined(ASMx64)}
-asm
-  // rcx <- aValue
-  cmp rcx, $FFFFFFFFFFFFFFFF
-  jne @Q
-  mov rax, 1
-  ret
-@Q:
-  inc rcx
-  mov rdx, 1
-  xor rax, rax
-  div rcx
-end;
-{$else}
+procedure RaiseUInt256Overflow;
 begin
-  Result := $100000000 div (UInt64(aValue) + 1);
-end;
-{$endif}
-
-function IntPwr(A: TLimb; aExponent: Integer): TLimb;
-var Y, Z: TLimb;
-    N: Integer absolute aExponent;
-    t: Integer;
-begin
-  Assert(aExponent > 0);
-  Y := 1;
-  Z := A;
-  while True do begin
-    t := N and 1;
-    N := N shr 1;
-    if t = 1 then Y := Z * Y;
-    if N = 0 then break;
-    Z := Z * Z;
-  end;
-  Result := Y;
+  raise EIntOverflow.Create('TUInt256 overflow.');
 end;
 
 {$endregion}
 
 {$region 'low-level functions'}
-
-function _ipAdd(pA, pB: PByte; n: NativeInt): TLimb;
-{$if defined(ASMx86)}
-asm
-  //pA -> EAX, pB -> EDX, n -> ECX
-  push ebx
-  push edi
-  push esi
-  mov esi, eax
-  mov edi, edx
-  xor edx, edx //EDX will be used to store a carry flag
-@L:
-  bt edx, 0 //set the carry flag
-  mov eax, [esi]
-  mov ebx, [edi]
-  adc eax, ebx
-  mov edx, 0
-  adc edx, 0
-  mov [edi], eax
-  add esi, 4
-  add edi, 4
-  dec ecx
-  jnz @L
-
-  mov eax, edx //return the last carry flag
-  pop esi
-  pop edi
-  pop ebx
-end;
-{$elseif defined(ASMx64)}
-asm
-  // pA -> RCX, pB -> RDX, n -> R8
-  mov r10, rcx
-  mov r11, rdx
-  xor rdx, rdx // RDX is used for carry flag
-  // pA -> R10, pB -> R11
-@L:
-  bt rdx, 0 // set the carry flag
-  mov rax, [r10]
-  adc rax, [r11]
-  mov rdx, 0
-  adc rdx, 0
-  mov [r11], rax
-  add r10, 8
-  add r11, 8
-  dec r8
-  jnz @L
-
-  mov rax, rdx
-end;
-{$else}
-var tmp: UInt64;
-    pair: array [0..1] of Cardinal absolute tmp;
-    carry: Cardinal;
-    pAc, pBc: PCardinal;
-    pEnd: PByte;
-begin
-  carry := 0;
-  pAc := PCardinal(pA);
-  pBc := PCardinal(pB);
-  pEnd := pA + n * SizeOf(Cardinal);
-  while PByte(pAc) < pEnd do begin
-    tmp := pAc^;
-    Inc(tmp, pBc^);
-    Inc(tmp, carry);
-    pBc^ := pair[0];
-    carry := pair[1];
-    Inc(pAc);
-    Inc(pBc);
-  end;
-  Result := carry;
-end;
-{$endif}
-
-procedure _ipSub(pA, pB: PByte; n: NativeInt);
-{$if defined(ASMx86)}
-asm
-  //pA -> EAX, pB -> EDX, n -> ECX
-  push ebx
-  push esi
-  push edi
-  mov esi, eax
-  mov edi, edx
-  xor edx, edx //EDX will be used to store a carry flag
-@L:
-  bt edx, 0 //set the carry flag
-  mov eax, [esi]
-  mov ebx, [edi]
-  sbb eax, ebx
-  mov edx, 0
-  adc edx, 0
-  mov [edi], eax
-  add esi, 4
-  add edi, 4
-  dec ecx
-  jnz @L
-
-  pop edi
-  pop esi
-  pop ebx
-end;
-{$elseif defined(ASMx64)}
-asm
-  // pA -> RCX, pB -> RDX, n -> R8
-  mov r10, rcx
-  mov r11, rdx
-  xor rdx, rdx
-@L:
-  bt rdx, 0 // set the carry flag
-  mov rax, [r10]
-  sbb rax, [r11]
-  mov rdx, 0
-  adc rdx, 0
-  mov [r11], rax
-  add r10, 8
-  add r11, 8
-  dec r8
-  jnz @L
-end;
-{$else}
-var tmp: UInt64;
-    pair: array [0..1] of Cardinal absolute tmp;
-    carry: Cardinal;
-    pAc, pBc: PCardinal;
-    pEnd: PByte;
-begin
-  carry := 0;
-  pAc := PCardinal(pA);
-  pBc := PCardinal(pB);
-  pEnd := pA + n * cLimbSize;
-  while PByte(pAc) < pEnd do begin
-    tmp := pAc^;
-    pair[1] := 1;
-    Dec(tmp, pBc^);
-    Dec(tmp, carry);
-    pBc^ := pair[0];
-    carry := 1 xor pair[1];
-    Inc(pAc);
-    Inc(pBc);
-  end;
-end;
-{$endif}
 
 procedure _NegMPI(pA, pRes: Pbyte; N: NativeInt);
 {$if defined(ASMx64)}
@@ -589,59 +276,6 @@ begin
     Inc(pRes, cI32Sz);
     Inc(pA, cI32Sz);
   end;
-end;
-{$endif}
-
-function _Inc(pA: PByte; D: TLimb; n: NativeInt): TLimb;
-{$if defined(ASMx86)}
-asm
-  //EAX <- pA, EDX <- D, ECX <- n
-  push esi
-  mov esi, eax
-@L:
-  mov eax, [esi]
-  add eax, edx
-  mov edx, 0
-  adc edx, 0
-  mov [esi], eax
-  add esi, 4
-  dec ecx
-  jnz @L
-
-  mov eax, edx
-  pop esi
-end;
-{$elseif defined(ASMx64)}
-asm
-  // RCX <- pA, RDX <- D, R8 <- n
-@L:
-  mov rax, [rcx]
-  add rax, rdx
-  mov rdx, 0
-  adc rdx, 0
-  mov [rcx], rax
-  add r10, 8
-  dec r8
-  jnz @L
-
-  mov rax, rdx
-end;
-{$else}
-var tmp: UInt64;
-    pair: array [0..1] of Cardinal absolute tmp;
-    pAc: PCardinal;
-    pEnd: PByte;
-begin
-  pAc := PCardinal(pA);
-  pEnd := pA + n * cLimbSize;
-  while PByte(pAc) < pEnd do begin
-    tmp := pAc^;
-    Inc(tmp, D);
-    pAc^ := pair[0];
-    D := pair[1];
-    Inc(pAc);
-  end;
-  Result := D;
 end;
 {$endif}
 
@@ -892,918 +526,28 @@ begin
 end;
 {$endif}
 
-procedure _Mul(pA, pB, pRes: PByte; nA, nB: NativeInt);
-{$if defined(ASMx86)}
-asm
-  push esi
-  push edi
-  //EAX <- pA, EDX <- pB, ECX <- pRes, [ESP + 12] <- nA, [ESP + 8] <- nB
-  mov esi, eax //ESI <- pA
-  mov edi, ecx //EDI <- pRes
-  push ebx
-  push 0 //k in [ESP + $C]
-  push 0 //j in [ESP + $8] {j = B's index}
-  push 0 //i in [ESP + $4] {i = A's index}
-  push edx //[ESP] contains pB
-
-@M3: //outer loop; initialize inner loop (i <- 0, k <- 0)
-  mov dword ptr [esp + $4], 0
-  mov dword ptr [esp + $C], 0
-  mov ecx, [esp + $4]
-@M4: //inner loop
-  mov eax, [esi + 4 * ecx] //EAX <- u_i
-  mov ebx, [esp]
-  mov ebx, [ebx]
-  mul ebx //(EAX:EDX) <- u_i x v_j
-  add ecx, [esp + $8] //ECX <- i + j
-  add eax, [edi + 4 * ecx] //EAX += w_{i + j}
-  adc edx, 0 //(EAX:EDX) <- u_i x v_j + w_{i + j}
-  add eax, [esp + $C]
-  adc edx, 0 // t := (EAX:EDX) <- u_i x v_j + w_{i + j} + k
-  mov [edi + 4 * ecx], eax // w_{i + j} <- t mod base
-  mov [esp + $c], edx //k <- Floor(t / base)
-//M5: Inc(i); if (i < nA) then @M4 else w_{j+m} <- k
-  mov ecx, [esp + $4]
-  inc ecx
-  cmp ecx, nA
-  je @E1
-  mov [esp + $4], ecx //Inc(i)
-  jmp @M4
-@E1: //end of inner loop
-  mov ecx, [esp + $8] //ECX <- j
-  add ecx, nA
-  mov [edi + 4 * ecx], edx // w_{j + m} <- k
-//M6: Inc(j); if (j < nB) then @M3 else @E
-  mov ecx, [esp + $8]
-  inc ecx
-  cmp ecx, nB
-  je @E2
-  mov [esp + $8], ecx
-  add [esp], 4
-  jmp @M3
-@E2: //end of outer loop
-  add esp, $10 //skip local vars
-  pop ebx
-  pop edi
-  pop esi
-end;
-{$elseif defined(ASMx64)}
-asm
-  // pA -> RCX, pB -> RDX, pRes -> R8, nA -> R9
-  push rdi
-  mov r10, rcx // R10 <- pA
-  mov r11, rdx // R11 <- pB
-  mov rdi, r8 // RDI <- pRes
-  push 0 // k in [RSP + 8]
-  push 0 // j in [RSP] {j = B's index}
-@M3: //outer loop; initialize inner loop (i <- 0, k <- 0)
-  mov qword ptr [rsp + 8], 0 // k <- 0
-  xor rcx, rcx // RCX <- i = 0 (A's index)
-@M4: //inner loop
-  mov rax, [r10 + 8 * rcx] // RAX <- u_i
-  mul qword ptr [r11] // (RAX:RDX) <- u_i x v_j
-  mov r8, rcx
-  add r8, [rsp] // R8 <- i + j
-  add rax, [rdi + 8 * r8] // RAX += w_{i + j}
-  adc rdx, 0 // (RAX:RDX) <- u_i x v_j + w_{i + j}
-  add rax, [rsp + 8]
-  adc rdx, 0 // t := (RAX:RDX) <- u_i x v_j + w_{i + j} + k
-  mov [rdi + 8 * r8], rax // w_{i + j} <- t mod base
-  mov [rsp + 8], rdx // k <- Floor(t / base)
-//M5: Inc(i); if (i < nA) then @M4 else w_{j+m} <- k
-  inc rcx
-  cmp rcx, nA
-  je @E1
-  jmp @M4
-@E1: //end of inner loop
-  mov rcx, [rsp] // RCX <- j
-  mov rax, rcx
-  add rax, nA
-  mov [rdi + 8 * rax], rdx // w_{j + m} <- k
-//M6: Inc(j); if (j < nB) then @M3 else @E
-  inc rcx
-  cmp rcx, nB
-  je @E2
-  mov [rsp], rcx
-  add r11, 8
-  jmp @M3
-@E2: //end of outer loop
-  add rsp, 16 //skip local vars (j, k)
-  pop rdi
-end;
-{$else}
-var I, J: Integer;
-    K: Cardinal;
-    tmp, V: UInt64;
-    pair: array [0..1] of Cardinal absolute tmp;
-    pW: PByte;
+function _Length256(pA: PByte): Integer; inline;
+{$if SizeOf(TLimb) = 8}
 begin
-  for J := 0 to nB - 1 do begin
-    V := PCardinal(pB + J * cI32Sz)^;// V <- v_j
-    if V = 0 then
-      PCardinal(pRes + (J + nA) * cI32Sz)^ := 0
-    else begin
-      K := 0;
-      for I := 0 to nA - 1 do begin
-        pW := pRes + (I + J) * cI32Sz;
-        tmp := PCardinal(pA + I * cI32Sz)^; // tmp <- u_i
-        tmp := tmp * V;
-        Inc(tmp, PCardinal(pW{w_i+j})^);
-        Inc(tmp, K{carry});
-        PCardinal(pW)^ := pair[0];
-        K := pair[1];
-      end;
-      PCardinal(pRes + (J + nA) * cI32Sz)^ := K;
-    end;
-  end;
-end;
-{$endif}
-
-function _ShortDivMod(pA, pB, pRes: PByte; nA: NativeInt): TLimb;
-{$if defined(ASMx86)}
-//EAX <- pA, EDX <- pB, ECX <- pRes, [ESP + $c] <- nA
-asm
-  push ebx
-  push edi
-  push esi
-  mov ebx, [edx]      //EBX <- pB^
-  mov edi, ecx        //EDI <- pRes
-  mov ecx, nA         //ECX <- NA
-  mov esi, eax        //ESI <- pA
-
-  lea esi, [esi + 4 * ecx - 4] //ESI <- @u_{n - 1}
-  lea edi, [edi + 4 * ecx - 4] //EDI <- @w_{n - 1}
-  xor edx, edx //EDX <- r := 0
-@L:
-  mov eax, [esi] //(EAX:EDX) <- r * b + u_j
-  div ebx //EAX <- (r*b + u_j) div v; EDX <- (r*b + u_j) mod v
-  mov [edi], eax //store quotient
-  sub esi, 4
-  sub edi, 4
-  dec ecx
-  jnz @L
-
-  mov eax, edx //returns remainder
-  pop esi
-  pop edi
-  pop ebx
-end;
-{$elseif defined(ASMx64)}
-asm
-  // RCX <- pA, RDX <- pB, R8 <- pRes, R9 <- nA
-  mov r10, rcx
-  mov r11, [rdx] // r11 <- B
-
-  lea r10, [r10 + 8 * r9 - 8] // r10 <- @A[n - 1]
-  lea r8, [r8 + 8 * r9 - 8] // r8 <- @Res[n - 1]
-  xor rdx, rdx // RDX <- r := 0
-@L:
-  mov rax, [r10] // (RAX:RDX) <- r * b + A[j]
-  div r11 // RAX <- (r*b + A[j]) div B; RDX <- (r*b + A[j]) mod B
-  mov [r8], rax // store quotient
-  sub r10, 8
-  sub r8, 8
-  dec r9
-  jnz @L
-
-  mov rax, rdx
-end;
-{$else}
-var tmp, q, r: UInt64;
-    pEnd: PByte;
-    v: Cardinal;
-    pair: array [0..1] of Cardinal absolute tmp;
-begin
-  pEnd := pA;
-  pA := pA + nA * cLimbSize - cI32Sz;
-  pRes := pRes + nA * cLimbSize - cI32Sz;
-  tmp := 0;
-  v := PCardinal(pB)^;
-  while pA >= pEnd do begin
-    pair[0] := PCardinal(pA)^;
-    DivMod(tmp, v, q, r);
-    PCardinal(pRes)^ := Cardinal(q);
-    pair[1] := r;
-    Dec(pRes, 4);
-    Dec(pA, 4);
-  end;
-  Result := r;
-end;
-{$endif}
-
-procedure _LongDivMod(pA, pB, pQ: PByte; nA: NativeInt; nB: NativeInt);
-{$if defined(ASMx86)}
-asm
-  push ebx
-  push esi
-  push edi
-  mov esi, pA
-  mov edi, pQ // (quotient result)
-  push 1 // [ESP + $18] <- carry
-  push 0 // [ESP + $14] <- i + j
-  push 0 // [ESP + $10] <- i
-  push 0 // [ESP + $c] <- r
-  push 0 // [ESP + 8] <- q
-  mov eax, nA
-  sub eax, nB
-  push eax // j in [ESP + 4] <- m = nA - nB
-  push pB // [ESP] -> v_0
-  shl eax, 2
-  add edi, eax // [edi] -> @Q[m]
-
-@D3: //q evaluation
-  mov ecx, nB
-  add ecx, [esp + 4] //ECX <- n + j
-  mov edx, [esi + 4 * ecx] //EDX <- u_{n + j}
-  mov eax, [esi + 4 * ecx - 4] //EAX <- u_{n+j-1} => (EDX:EAX)<- u_{n+j}b + u_{n+j-1}
-  mov ecx, nB
-  mov ebx, [esp]
-  mov ebx, [ebx + 4 * ecx - 4] // EBX <- v_{n - 1}
-  cmp edx, ebx
-  jae @1D3
-  div ebx
-  mov [esp + $8], eax //store q
-  mov [esp + $c], edx //store r
-  jmp @2D3
-@1D3:
-  mov ecx, nB
-  add ecx, [esp + 4] //ECX <- n + j
-  mov edx, [esi + 4 * ecx - 4] //EDX <- u_{j + n - 1}
-  mov eax, $ffffffff //(EDX:EAX) <- u_{j + n - 1} * b + (b - 1)
-  jmp @4D3
-@3D3:
-  mov eax, [esp + $8] //EAX <- q
-  dec eax //Dec(q)
-  mov edx, [esp + $c] //EDX <- r
-@4D3:
-  mov [esp + $8], eax //store q
-  mov ecx, nB
-  mov ebx, [esp]
-  add edx, [ebx + 4 * ecx - 4] //EDX <- r + v_{n - 1}
-  jc @D4
-  mov [esp + $c], edx //store r
-  mov eax, [esp + $8] //EAX <- q
-@2D3: //Test whether q*v_{n - 2} <= r*b + u _{j + n - 2}
-  mov ecx, nB
-  mov ebx, [esp]
-  mul [ebx + 4 * ecx - 8] //(EDX:EAX) <- q * v_{n - 2}
-  cmp edx, [esp + $c] //cmp(EDX, r)
-  jb @D4
-  ja @3D3
-  mov ecx, nB
-  cmp eax, [esi + 4 * ecx - 8] //cmp(EAX, u_{j + n - 2}
-  ja @3D3
-@D4: //Multiplication and subtraction
-  mov [esp + $18], 0 //set carry
-  mov [esp + $10], 0 //i <- 0
-  mov ecx, [esp + $4]
-  mov [esp + $14], ecx //(i + j) <- j
-@2D4:
-  mov ecx, [esp + $10] //ECX <- i
-  mov ebx, [esp]
-  mov eax, [ebx + 4 * ecx] // EAX <- v_i
-  mul [esp + $8] //(EDX: EAX) <- q * v_i
-  mov ecx, [esp + $14] //ECX <- i + j
-  sub [esi + 4 * ecx], eax //u_{i + j} - q * v_i
-  adc edx, 0
-  mov ebx, [esp + $18] //load last carry
-  sub [esi + 4 * ecx], ebx //subtract the last carry flag
-  adc edx, 0
-  mov [esp + $18], edx //store carry
-  inc [esp + $10] //Inc(i)
-  inc [esp + $14] //Inc(i + j)
-  mov ecx, [esp + $10] //ECX <- i
-  cmp ecx, nB
-  jbe @2D4
-@D5: //Remainder test
-  mov eax, [esp + $8] //EAX <- q
-  mov [edi], eax //q_j <- q
-  cmp edx, 0
-  je @D7
-@D6:
-  dec eax
-  mov [edi], eax //q_j <- q - 1
-  mov [esp + $10], 0 //i <- 0
-  mov ecx, [esp + $4]
-  mov [esp + $14], ecx //(i + j) <- j
-@1D6: //addition
-  mov ecx, [esp + $10]
-  cmp ecx, nB
-  jae @D7
-  mov eax, 0
-@2D6:
-  mov ecx, [esp + $10]
-  mov ebx, [esp]
-  add eax, [ebx + 4 * ecx] //EAX += v_{i}
-  mov ecx, [esp + $14] //ECX <- (i + j)
-  add eax, [esi + 4 * ecx] //EAX += u_{i + j}
-  mov [esi + 4 * ecx], eax
-  inc [esp + $10] //Inc(i)
-  inc [esp + $14] //Inc(i + j)
-  jnc @1D6
-  mov eax, 1
-  mov ecx, [esp + $10]
-  cmp ecx, nB
-  jna @2D6 //if i <= nB then @2D6
-@D7: //j-loop
-  mov ecx, [esp + $4]
-  dec ecx
-  sub edi, 4
-  mov [esp + $4], ecx
-  cmp ecx, 0
-  jge @D3
-  add esp, $1c //skip local vars
-  pop edi
-  pop esi
-  pop ebx
-end;
-{$elseif defined(ASMx64)}
-asm
-  push rbx
-  push rsi
-  push rdi
-  push r12
-  mov rsi, pA
-  mov rdi, pQ // (quotient result)
-  mov r10, 1 // R10 <- carry
-  mov r11, 0 // R11 <- i + j
-  mov r12, 0 // R12 <- i
-  push 0 // [RSP + $18] <- r
-  push 0 // [RSP + $10] <- q
-  mov rax, nA
-  sub rax, nB
-  push rax // j in [RSP + 8] <- m = nA - nB
-  push pB // [RSP] -> v_0
-  shl rax, 3
-  add rdi, rax // [RDI] -> @Q[m]
-
-@D3: //q evaluation
-  mov rcx, nB
-  add rcx, [rsp + $8] //RCX <- n + j
-  mov rdx, [rsi + 8 * rcx] //RDX <- u_{n + j}
-  mov rax, [rsi + 8 * rcx - 8] //RAX <- u_{n+j-1} => (RDX:RAX)<- u_{n+j}b + u_{n+j-1}
-  mov rcx, nB
-  mov rbx, [rsp]
-  mov rbx, [rbx + 8 * rcx - 8] // RBX <- v_{n - 1}
-  cmp rdx, rbx
-  jae @1D3
-  div rbx
-  mov [rsp + $10], rax //store q
-  mov [rsp + $18], rdx //store r
-  jmp @2D3
-@1D3:
-  mov rcx, nB
-  add rcx, [rsp + $8] //RCX <- n + j
-  mov rdx, [rsi + 8 * rcx - 8] //RDX <- u_{j + n - 1}
-  mov rax, $ffffffffffffffff //(RDX:RAX) <- u_{j + n - 1} * b + (b - 1)
-  jmp @4D3
-@3D3:
-  mov rax, [rsp + $10] //RAX <- q
-  dec rax //Dec(q)
-  mov rdx, [rsp + $18] //RDX <- r
-@4D3:
-  mov [rsp + $10], rax //store q
-  mov rcx, nB
-  mov rbx, [rsp]
-  add rdx, [rbx + 8 * rcx - 8] //RDX <- r + v_{n - 1}
-  jc @D4
-  mov [rsp + $18], rdx //store r
-  mov rax, [rsp + $10] //RAX <- q
-@2D3: //Test whether q*v_{n - 2} <= r*b + u _{j + n - 2}
-  mov rcx, nB
-  mov rbx, [rsp]
-  mul qword ptr [rbx + 8 * rcx - 16] //(RDX:RAX) <- q * v_{n - 2}
-  cmp rdx, [rsp + $18] //cmp(RDX, r)
-  jb @D4
-  ja @3D3
-  mov rcx, nB
-  cmp rax, [rsi + 8 * rcx - 16] //cmp(RAX, u_{j + n - 2}
-  ja @3D3
-@D4: //Multiplication and subtraction
-  mov r10, 0 //set carry
-  mov r12, 0 //i <- 0
-  mov rcx, [rsp + $8]
-  mov r11, rcx //(i + j) <- j
-@2D4:
-  mov rcx, r12 //RCX <- i
-  mov rbx, [rsp]
-  mov rax, [rbx + 8 * rcx] // RAX <- v_i
-  mul qword ptr [rsp + $10] //(RDX: RAX) <- q * v_i
-  mov rcx, r11 //RCX <- i + j
-  sub [rsi + 8 * rcx], rax //u_{i + j} - q * v_i
-  adc rdx, 0
-  mov rbx, r10 //load last carry
-  sub [rsi + 8 * rcx], rbx //subtract the last carry flag
-  adc rdx, 0
-  mov r10, rdx //store carry
-  inc r12 //Inc(i)
-  inc r11 //Inc(i + j)
-  mov rcx, r12 //RCX <- i
-  cmp rcx, nB
-  jbe @2D4
-@D5: //Remainder test
-  mov rax, [rsp + $10] //RAX <- q
-  mov [rdi], rax //q_j <- q
-  cmp rdx, 0
-  je @D7
-@D6:
-  dec rax
-  mov [rdi], rax //q_j <- q - 1
-  mov r12, 0 //i <- 0
-  mov rcx, [rsp + $8]
-  mov r11, rcx //(i + j) <- j
-@1D6: //addition
-  mov rcx, r12
-  cmp rcx, nB
-  jae @D7
-  mov rax, 0
-@2D6:
-  mov rcx, r12
-  mov rbx, [rsp]
-  add rax, [rbx + 8 * rcx] //RAX += v_{i}
-  mov rcx, r11 //RCX <- (i + j)
-  add rax, [rsi + 8 * rcx] //RAX += u_{i + j}
-  mov [rsi + 8 * rcx], rax
-  inc r12 //Inc(i)
-  inc r11 //Inc(i + j)
-  jnc @1D6
-  mov rax, 1
-  mov rcx, r12
-  cmp rcx, nB
-  jna @2D6 //if i <= nB then @2D6
-@D7: //j-loop
-  mov rcx, [rsp + $8]
-  dec rcx
-  sub rdi, 8
-  mov [rsp + $8], rcx
-  cmp rcx, 0
-  jge @D3
-  add rsp, $20 //skip local vars
-  pop r12
-  pop rdi
-  pop rsi
-  pop rbx
-end;
-{$else}
-var I, J, m, carry: Integer;
-    tmp, tmp2, q, r: UInt64;
-    pair: array [0..1] of Cardinal absolute tmp;
-    pU: PCardinal;
-const wsz = SizeOf(Cardinal); //word size
-      cBase: UInt64 = $100000000;
-begin
-  m := nA - nB;
-  Inc(PCardinal(pQ), m);
-  for J := m downto 0 do begin
-    DivMod(PUInt64(pA + (J + nB - 1) * wsz)^, PCardinal(pB + (nB - 1) * wsz)^, q, r);
-    while (q >= cBase) or (q * PCardinal(pB + (nB - 2) * wsz)^ > cBase * r + PCardinal(pA + (J + nB - 2) * wsz)^) do
-    begin
-      Inc(r, PCardinal(pB + (nB - 1) * wsz)^);
-      Dec(q);
-      if r >= cBase then break;
-    end;
-    // (u_{j+n},u_{j+n-1},...,u_j} - q*{0,v_{n-1},...,v_0}
-    carry := 0;
-    tmp := 0; tmp2 := 0;
-    for I := 0 to nB - 1 do begin
-      pU := PCardinal(pA + (J + I) * wsz);
-      tmp := pU^;
-      pair[1] := 1;
-      tmp2 := q * PCardinal(pB + I * wsz)^ + PCardinal(PByte(@tmp2) + wsz)^; //q * v_i
-      Dec(tmp, PCardinal(@tmp2)^);
-      Dec(tmp, carry);
-      carry := 1 xor pair[1];
-      pU^ := pair[0]; //U_{j+i} - (q * v_i) mod cBase
-    end;
-    Inc(pU);
-    pU^ := pU^ - PCardinal(PByte(@tmp2) + wsz)^ - Cardinal(carry);
-    PCardinal(pQ)^ := Cardinal(q);
-    if carry < 0 then begin
-      Dec(PCardinal(pQ)^, 1);
-      carry := 0;
-      for I := 0 to nB - 1 do begin
-        pU := PCardinal(pA + (J + I) * wsz);
-        tmp := Cardinal(pU^) + PCardinal(pB + I * wsz)^;
-      end;
-    end;
-    Dec(PCardinal(pQ));
-  end;
-end;
-{$endif}
-
-function _shl(pSrc, pDst: PByte; count: Byte; Nsrc: NativeInt): TLimb;
-{$if defined(ASMx86)}
-asm
-  //EAX <- pSrc, EDX <- pDst, ECX <- count
-  push ebx
-  push edi
-  push esi
-  mov ebx, Nsrc
-  dec ebx
-  shl ebx, 2
-  add eax, ebx
-  add edx, ebx
-  mov esi, eax //ESI points to the highest value of the source buffer
-  mov edi, edx //EDI points to the highest value of the destination buffer
-  xor eax, eax
-  mov edx, eax
-
-  mov eax, [esi]
-  shld edx, eax, cl
-  sub esi, 4
-  push edx //push the carry from the heighest limb
-  cmp ebx, 0
-  jz @E
-@1:
-  mov edx, eax
-  mov eax, [esi]
-  shld edx, eax, cl
-  mov [edi], edx
-  sub esi, 4
-  sub edi, 4
-  sub ebx, 4
-  jnz @1
-@E:
-  shl eax, cl
-  mov [edi], eax
-  pop eax
-  pop esi
-  pop edi
-  pop ebx
-end;
-{$elseif defined(ASMx64)}
-asm
-  lea r10, [rcx + 8 * r9 - 8] // R10 points to the highest limb of the source buffer
-  lea r11, [rdx + 8 * r9 - 8] // R11 points to the highes limb of the destionation buffer
-  mov rcx, r8
-  xor r8, r8
-  mov rax, [r10]
-  shld r8, rax, cl // R8 <- carry from the heighest limb
-  sub r10, 8
-  dec r9
-  jz @E
-@L:
-  mov rdx, rax
-  mov rax, [r10]
-  shld rdx, rax, cl
-  mov [r11], rdx
-  sub r10, 8
-  sub r11, 8
-  dec r9
-  jnz @L
-@E:
-  shl rax, cl
-  mov [r11], rax
-  mov rax, r8
-end;
-{$else}
-var tmp: UInt64;
-    pair: array [0..1] of Cardinal absolute tmp;
-    pEnd: PByte;
-    D: Cardinal;
-begin
-  pEnd := pSrc;
-  pSrc := pSrc + (Nsrc - 1) * cI32Sz;
-  pDst := pDst + (Nsrc - 1) * cI32Sz;
-  pair[0] := PCardinal(pSrc)^;
-  pair[1] := 0;
-  tmp := tmp shl count;
-  Result := pair[1];
-  D := pair[0];
-  Dec(pSrc, cI32Sz);
-  while pSrc >= pEnd do begin
-    pair[0] := PCardinal(pSrc)^;
-    pair[1] := 0;
-    tmp := tmp shl count;
-    pair[1] := pair[1] or D;
-    D := pair[0];
-    PCardinal(pDst)^ := pair[1];
-    Dec(pSrc, cI32Sz);
-    Dec(pDSt, cI32Sz);
-  end;
-  PCardinal(pDst)^ := D;
-end;
-{$endif}
-
-function _shr(pSrc, pDst: PByte; count: Byte; Nsrc: NativeInt): TLimb;
-{$if defined(ASMx86)}
-asm
-  //EAX <- pSrc, EDX <- pDst, ECX <- count
-  push ebx
-  push esi
-  push edi
-  mov ebx, Nsrc
-  mov esi, eax
-  mov edi, edx
-  xor edx, edx
-  mov eax, [esi]
-  shrd edx, eax, cl
-  push edx //store carry from the lowest limb
-  add esi, 4
-  dec ebx
-  jz @E
-@1:
-  mov edx, eax
-  mov eax, [esi]
-  shrd edx, eax, cl
-  mov [edi], edx
-  add esi, 4
-  add edi, 4
-  dec ebx
-  jnz @1
-@E:
-  shr eax, cl
-  mov [edi], eax
-  pop eax
-  pop edi
-  pop esi
-  pop ebx
-end;
-{$elseif defined(ASMx64)}
-asm
-  mov r10, rcx
-  mov r11, rdx
-  mov rcx, r8
-  xor r8, r8
-  mov rax, [r10]
-  shrd r8, rax, cl // R8 <- carry from the lowest limb
-  add r10, 8
-  dec r9
-  jz @E
-@L:
-  mov rdx, rax
-  mov rax, [r10]
-  shrd rdx, rax, cl
-  mov [r11], rdx
-  add r10, 8
-  add r11, 8
-  dec r9
-  jnz @L
-@E:
-  shr rax, cl
-  mov [r11], rax
-  mov rax, r8 // RAX <- carry
-end;
-{$else}
-var tmp: UInt64;
-    pair: array [0..1] of Cardinal absolute tmp;
-    pEnd: PByte;
-    D: Cardinal;
-begin
-  pEnd := pSrc + Nsrc * cLimbSize;
-  pair[1] := PCardinal(pSrc)^;
-  pair[0] := 0;
-  tmp := tmp shr count;
-  Result := pair[0];
-  D := pair[1];
-  Inc(pSrc, cI32Sz);
-  while pSrc < pEnd do begin
-    pair[1] := PCardinal(pSrc)^;
-    pair[0] := 0;
-    tmp := tmp shr count;
-    PCardinal(pDst)^ := pair[0] or D;
-    D := pair[1];
-    Inc(pSrc, cI32Sz);
-    Inc(pDst, cI32Sz);
-  end;
-  PCardinal(pDst)^ := D;
-end;
-{$endif}
-
-procedure _ipLongShift(pA: PLimb; aCount: Integer; aDigits: NativeInt);
-var offset: NativeInt;
-    p: PLimb;
-    bRight: Boolean;
-const wSz = SizeOf(TLimb);
-begin
-  if aDigits = 0 then exit;
-
-  bRight := (aDigits < 0);
-  aDigits := System.Abs(aDigits);
-  offset := aDigits shr W_LOG2_BITS;
-  if offset >= aCount then begin
-    FillChar(pA^, aCount * cLimbSize, 0);
-    exit;
-  end;
-  Dec(aCount, offset);
-  aDigits := aDigits and cLimbRemMask;
-  p := pA;
-
-  if bRight then begin
-    Inc(p, offset);
-    if aDigits > 0 then
-      _shr(PByte(p), PByte(pA), aDigits, aCount)
-    else
-      Move(p^, pA^, aCount * wSz);
-    p := pA;
-    Inc(p, aCount);
-    FillChar(p^, offset * wSz, 0);
-  end else begin
-    Inc(pA, offset);
-    if aDigits > 0 then
-      _shl(PByte(p), PByte(pA), aDigits, aCount)
-    else
-      Move(p^, pA^, aCount * wSz);
-    FillChar(p^, offset * wSz, 0);
-  end;
-end;
-
-function _TopBitPos(A: TLimb): NativeInt;
-{$if defined(ASMx86)}
-asm
-  cmp eax, 0
-  jnz @Scan
-  xor eax, eax
-  ret
-@Scan:
-  bsr edx, eax
-  inc edx
-  mov eax, edx
-end;
-{$elseif defined(ASMx64)}
-asm
-  cmp rcx, 0
-  jnz @Scan
-  xor rax, rax
-  ret
-@Scan:
-  bsr rax, rcx
-  inc rax
-end;
-{$else}
-begin
+  if PUInt64(pA + 24)^ > 0 then exit(4);
+  if PUInt64(pA + 16)^ > 0 then exit(3);
+  if PUInt64(pA + 8)^ > 0 then exit(2);
+  if PUInt64(pA)^ > 0 then exit(1);
   Result := 0;
-  if A = 0 then exit;
-  while A and cTopBit = 0 do begin
-    Inc(Result);
-    A := A shl 1;
-  end;
-  Result := 32 - Result;
-end;
-{$endif}
-
-function _TopBitPos(pA: PLimb; N: NativeInt): NativeInt;
-{$if defined(ASMx86)}
-asm
-  lea ecx, [eax + 4 * edx - 4] // ESI points to the highest limb
-  shl edx, 5 // EDX contains number of bits of the whole number
-@Words:
-  mov eax, [ecx]
-  cmp eax, 0
-  jnz @Bits
-  sub ecx, 4
-  sub edx, 32
-  and edx, edx
-  jz @E
-  jmp @Words
-@Bits:
-  bsr ecx, eax
-  inc ecx
-  sub edx, 32
-  add edx, ecx
-@E:
-  mov eax, edx
-end;
-{$elseif defined(ASMx64)}
-asm
-  // RCX <- pA, RDX <- N
-  lea r10, [rcx + 8 * rdx - 8] // R10 points to the highest limb
-  shl rdx, 6   // RDX contains bit count of the whole number
-@Limbs:
-  mov rax, [r10]
-  cmp rax, 0
-  jnz @Bits
-  sub r10, 8
-  sub rdx, 64
-  and rdx, rdx
-  jz @E
-  jmp @Limbs
-@Bits:
-  bsr rcx, rax
-  inc rcx
-  sub rdx, 64
-  add rdx, rcx
-@E:
-  mov rax, rdx
-end;
-{$else}
-var pEnd: PByte;
-    pos: Integer;
-begin
-  pEnd := PByte(pA);
-  Inc(pA, N - 1);
-  Result := N shl 5;
-  while PByte(pA) >= pEnd do begin
-    pos := _TopBitPos(PLimb(pA)^);
-    Dec(Result, 32);
-    if pos > 0 then exit(Result + pos);
-    Dec(pA);
-  end;
-end;
-{$endif}
-
-function _GetLimb(pA: PByte; I: NativeInt): TLimb; inline;
-begin
-  Result := PLimb(pA + I * cLimbSize)^;
-end;
-
-function _CountLeadingZeros(A: TLimb): NativeInt;
-{$if defined(ASMx86)}
-asm
-  bsr edx, eax
-  jnz @compl
-  mov eax, 32
-  ret
-@compl:
-  mov eax, 31
-  sub eax, edx
-end;
-{$elseif defined(ASMx64)}
-asm
-  bsr rdx, rcx
-  jnz @compl
-  mov rax, 64
-  ret
-@compl:
-  mov rax, 63
-  sub rax, rdx
 end;
 {$else}
 begin
-  Result := cLimbBits - _TopBitPos(A);
-end;
-{$endif}
-
-function _CountLeadingZeros(pA: PLimb; N: NativeInt): NativeInt;
-var pEnd: PByte;
-    v: TLimb;
-begin
+  if PUInt32(pA + 28)^ > 0 then exit(8);
+  if PUInt32(pA + 24)^ > 0 then exit(7);
+  if PUInt32(pA + 20)^ > 0 then exit(6);
+  if PUInt32(pA + 16)^ > 0 then exit(5);
+  if PUInt32(pA + 12)^ > 0 then exit(4);
+  if PUInt32(pA + 8)^ > 0 then exit(3);
+  if PUInt32(pA + 4)^ > 0 then exit(2);
+  if PUInt32(pA)^ > 0 then exit(1);
   Result := 0;
-  pEnd := PByte(pA);
-  pA := PLimb(PByte(pA) + (N - 1) * cLimbSize);
-  while PByte(pA) >= pEnd do begin
-    v := pA^;
-    if v <> 0 then begin
-      Inc(Result, _CountLeadingZeros(v));
-      exit;
-    end;
-    Inc(Result, cLimbBits);
-    Dec(pA);
-  end;
 end;
-
-function _CountTrailingZeros(A: TLimb): NativeInt;
-{$if defined(ASMx86)}
-asm
-  bsf eax, eax
-  jnz @end
-  mov eax, 32
-@end:
-end;
-{$elseif defined(ASMx64)}
-asm
-  bsf rax, rcx
-  jnz @end
-  mov rax, 64
-@end:
-end;
-{$else}
- begin
-   if A = 0 then exit(32);
-   Result := 0;
-   if (A and $FFFF) = 0 then begin
-     Inc(Result, 16);
-     A := (A shr 16) or $10000;
-   end;
-
-   while (A and 1) = 0 do begin
-     A := A shr 1;
-     Inc(Result);
-   end;
- end;
 {$endif}
-
-function _IsZero(pA: PLimb; N: NativeInt): Boolean;
-var pEnd: PByte;
-begin
-  pEnd := PByte(pA) + N * cLimbSize;
-  while PByte(pA) < pEnd do begin
-    if pA^ <> 0 then exit(False);
-    Inc(pA);
-  end;
-  Result := True;
-end;
-
-function _Length(pA: PByte; N: NativeInt): NativeInt;
-var p: PByte;
-begin
-  p := pA + (N - 1) * SizeOf(TLimb);
-  while p >= pA do begin
-    if p^ <> 0 then break;
-    Dec(p, SizeOf(TLimb));
-  end;
-  Result := (p - pA) div SizeOf(TLimb) + 1;
-end;
 
 {$endregion}
 
@@ -1828,6 +572,14 @@ end;
 function TInt128.Hi32: Cardinal;
 begin
   Result := PCardinal(PByte(@Self) + 12)^
+end;
+
+function TInt128.Signum: Integer;
+begin
+  if (fLimbs[1] and I64_HI_BIT) = 0 then
+    Result := 1
+  else
+    Result := -1;
 end;
 
 class operator TInt128.Implicit(const aValue: Int64): TInt128;
@@ -1855,7 +607,7 @@ begin
   _AddI128(@A, @B, @Result);
 {$ifopt Q+}
   if
-    ((A.Hi32 xor Result.Hi32) and (B.Hi32 xor Result.Hi32)) and cBit32 > 0
+    ((A.Hi32 xor Result.Hi32) and (B.Hi32 xor Result.Hi32)) and I32_HI_BIT > 0
   then
     RaiseInt128Overflow;
 {$endif}
@@ -1866,7 +618,7 @@ begin
   _SubI128(@A, @B, @Result);
 {$ifopt Q+}
   if
-    ((A.Hi32 xor Result.Hi32) and (not (B.Hi32 xor Result.Hi32))) and cBit32 > 0
+    ((A.Hi32 xor Result.Hi32) and (not (B.Hi32 xor Result.Hi32))) and I32_HI_BIT > 0
   then
     RaiseInt128Overflow;
 {$endif}
@@ -1876,7 +628,7 @@ class operator TInt128.Negative(const A: TInt128): TInt128;
 begin
   _NegI128(@A, @Result);
 {$ifopt Q+}
-  if (A.Hi32 and Result.Hi32 and cBit32) > 0 then RaiseInt128Overflow;
+  if (A.Hi32 and Result.Hi32 and I32_HI_BIT) > 0 then RaiseInt128Overflow;
 {$endif}
 end;
 
@@ -1888,8 +640,8 @@ var NA, NB: TInt128;
 begin
   pA := @A;
   pB := @B;
-  IsANeg := ((A.fLimbs[1] and cBit64) <> 0);
-  IsBNeg := ((B.fLimbs[1] and cBit64) <> 0);
+  IsANeg := ((A.fLimbs[1] and I64_HI_BIT) <> 0);
+  IsBNeg := ((B.fLimbs[1] and I64_HI_BIT) <> 0);
   if IsANeg then begin
     NA := -A;
     pA := @NA;
@@ -1970,8 +722,8 @@ class operator TInt128.IntDivide(const A, B: TInt128): TInt128;
 var q, r: TInt128;
     IsANeg, IsBNeg: Boolean;
 begin
-  isANeg := (A.Hi and cBit64 <> 0);
-  isBNeg := (B.Hi and cBit64 <> 0);
+  isANeg := (A.Hi and I64_HI_BIT <> 0);
+  isBNeg := (B.Hi and I64_HI_BIT <> 0);
   if IsANeg then q := -A
   else q := A;
   if IsBNeg then r := -B
@@ -2141,7 +893,7 @@ class operator TUInt128.Negative(const A: TUInt128): TUInt128;
 begin
   _NegI128(@A, @Result);
 {$ifopt Q+}
-  if (A.Hi32 and Result.Hi32 and cBit32) > 0 then RaiseInt128Overflow;
+  if (A.Hi32 and Result.Hi32 and I32_HI_BIT) > 0 then RaiseInt128Overflow;
 {$endif}
 end;
 
@@ -2212,7 +964,6 @@ begin
   B.fLimbs[0] := 0; B.fLimbs[1] := 0;
   PLimb(@B)^ := r;
 end;
-
 
 class operator TUInt128.IntDivide(const A, B: TUInt128): TUInt128;
 var r: TUInt128;
@@ -2332,6 +1083,124 @@ end;
 
 {$endregion}
 
+{$region 'TUInt256'}
+
+procedure TUInt256.Init(const L0, L1, L2, L3: UInt64);
+begin
+  fLimbs[0] := L0;
+  fLimbs[1] := L1;
+  fLimbs[2] := L2;
+  fLimbs[3] := L3;
+end;
+
+procedure TUInt256.SetToZero;
+begin
+  fLimbs[0] := 0;
+  fLimbs[1] := 0;
+  fLimbs[2] := 0;
+  fLimbs[3] := 0;
+end;
+
+{$ifdef RANGEON}
+   {$R-}
+{$endif}
+
+class procedure TUInt256.LongDivMod(var A, B: TUInt256);
+var nA, nB, pwr: Integer;
+    Adata, Bdata: array [0..5] of UInt64;
+    AArr: array [0..0] of TLimb absolute Adata;
+    BArr: array [0..0] of TLimb absolute Bdata;
+    Q: array [0..3] of UInt64;
+begin
+  AData[0] := 0; AData[1] := 0; AData[2] := 0; AData[3] := 0; AData[4] := 0;
+  BData[0] := 0; BData[1] := 0; BData[2] := 0; BData[3] := 0; AData[4] := 0;
+  Q[0] := 0; Q[1] := 0; Q[2] := 0; Q[3] := 0;
+  nA := _Length256(@A);
+  nB := _Length256(@B);
+  pwr := W_BIT_COUNT - _TopBitPos(_GetLimb(@B, nB - 1));
+  //normalize A
+  AArr[nA] := _shl(@A, @AData, pwr, nA);
+  //normalize B
+  BArr[nB] := _shl(@B, @BData, pwr, nB);
+  //execute DivMod
+  _LongDivMod(@AData, @BData, @Q, nA, nB);
+  //denormalize B
+  B.fLimbs[0] := AData[0];
+  B.fLimbs[1] := AData[1];
+  B.fLimbs[2] := AData[2];
+  B.fLimbs[3] := AData[3];
+  B := B shr pwr;
+  A.fLimbs[0] := Q[0];
+  A.fLimbs[1] := Q[1];
+  A.fLimbs[2] := Q[2];
+  A.fLimbs[3] := Q[3];
+end;
+{$ifdef RANGEON}
+  {$R+}
+{$endif}
+
+class procedure TUInt256.ShortDivMod(var A, B: TUInt256);
+var r: TLimb;
+    nA: Integer;
+    data: array [0..3] of UInt64;
+begin
+  data[0] := 0; data[1] := 0; data[2] := 0; data[3] := 0;
+  nA := _Length256(@A);
+  r := _ShortDivMod(@A, @B, @data, nA);
+  A.SetToZero;
+  Move(data, A, nA * cLimbSize);
+  B.SetToZero;
+  PLimb(@B)^ := r;
+end;
+
+class operator TUInt256.IntDivide(const A, B: TUInt256): TUInt256;
+var r: TUInt256;
+begin
+  Result := A;
+  r := B;
+  if _Length256(@r) = 1 then
+    ShortDivMod(Result, r)
+  else
+    LongDivMod(Result, r);
+end;
+
+class operator TUInt256.Multiply(const A, B: TUInt256): TUInt256;
+var buff: array [0..7] of UInt64;
+begin
+  buff[0] := 0;
+  buff[1] := 0;
+  buff[2] := 0;
+  buff[3] := 0;
+  buff[4] := 0;
+  buff[5] := 0;
+  buff[6] := 0;
+  buff[7] := 0;
+  _Mul(@A, @B, @buff, LCnt, LCnt);
+{$ifopt Q+}
+  if (buff[4] or buff[5] or buff[6] or buff[7]) <> 0 then
+    RaiseUInt256Overflow;
+{$endif}
+  Result.fLimbs[0] := buff[0];
+  Result.fLimbs[1] := buff[1];
+  Result.fLimbs[2] := buff[2];
+  Result.fLimbs[3] := buff[4];
+end;
+
+class operator TUInt256.RightShift(const A: TUInt256; const B: Cardinal): TUInt256;
+var offset, r: Integer;
+    p: PByte;
+begin
+  Result.SetToZero;
+  offset := B shr W_LOG2_BITS;
+  if offset >= LCnt then exit;
+
+  r := B and cLimbRemMask;
+  p := PByte(@A) + offset * cLimbSize;
+  _shr(p, @Result, r, LCnt - offset);
+end;
+
+{$endregion}
+
 {$region 'TReal128'}
 
 function Same(const A, B: TReal128): Boolean; inline;
@@ -2348,21 +1217,21 @@ begin
     //normalized numbers
     fLimbs[0] := iVal shl 60;
     fLimbs[1] :=
-      ((iVal and FRAC_MASK_F64) shr 4) or // fraction
+      ((iVal and F64_FRAC_MASK) shr 4) or // fraction
       UInt64(((e - $3FF) + EXP_BIAS) shl 48) or // exponent
-      (iVal and cBit64); // signum
+      (iVal and I64_HI_BIT); // signum
   end else begin
     //subnormal numbers
-    if (iVal and (not cBit64)) = 0 then begin
+    if (iVal and (not I64_HI_BIT)) = 0 then begin
       fLimbs[0] := 0;
       fLimbs[1] := 0;
     end else begin
       fLimbs[0] := 0;
-      fLimbs[1] := iVal and FRAC_MASK_F64;
+      fLimbs[1] := iVal and F64_FRAC_MASK;
       e := _CountLeadingZeros(@fLimbs, cLCnt);
       _ipLongShift(@fLimbs, cLCnt, e - FRAC_OFFSET + 1);
       fLimbs[1] := fLimbs[1] and HI_FRAC_MASK;
-      e := EXP_BIAS - EXP_BIAS_F64 + FRAC_OFFSET_F64 - e;
+      e := EXP_BIAS - F64_EXP_BIAS + F64_FRAC_OFFSET - e;
       fLimbs[1] := fLimbs[1] or (UInt64(e) shl 48);
     end;
     fLimbs[1] := fLimbs[1] or (iVal and SGN_MASK);
@@ -2387,10 +1256,10 @@ end;
 
 class function TReal128.Round(const aBuff): Integer;
 var buff: array [0..3] of UInt64 absolute aBuff;
-const REST_MASK = not cBit64;
+const REST_MASK = not I64_HI_BIT;
 begin
   Result := 0;
-  if (buff[1] and cBit64) = 0 then exit; // remainder < 1/2*ULP -> round down
+  if (buff[1] and I64_HI_BIT) = 0 then exit; // remainder < 1/2*ULP -> round down
   if (buff[0] or (buff[1] and REST_MASK)) <> 0 then begin // remainder > 1/2*ULP -> round up
     _IncUI128(@buff[2], 1);
     if (buff[3] and OF_QUARD) > 0 then begin
@@ -2562,8 +1431,9 @@ end;
 
 class operator TReal128.Divide(const A, B: TReal128): TReal128;
 begin
-  Result := A * B.InternalReciprocal;
-  AdjustByReminder(A, B, Result);
+//  Result := A * B.InternalReciprocal;
+//  AdjustByReminder(A, B, Result);
+  Result := SchoolDiv(A, B);
 end;
 
 class procedure TReal128.AdjustByReminder(const A, B: TReal128; var Q: TReal128);
@@ -2593,16 +1463,39 @@ begin
   buff[3] := A.fLimbs[1] and HI_FRAC_MASK or LEADING_ONE;
   _ipSub(@buff[0], @buff[4], 2 * cLCnt);  // buff[4..7] <- a - b * q
 
-  bNeg := (buff[7] and cBit64) > 0;
+  bNeg := (buff[7] and I64_HI_BIT) > 0;
   if bNeg then
     _NegMPI(@buff[4], @buff[4], 2 * cLCnt);
 
-  if (buff[5] and cBit64) > 0 then begin
+  if (buff[5] and I64_HI_BIT) > 0 then begin
     ulp.Init(0, 0);
     ulp.Exponent := -FRAC_BIT_CNT + Q.Exponent;
     if bNeg then ulp.Signum := -1;
     Q := Q + ulp;
   end;
+end;
+
+class function TReal128.SchoolDiv(const A, B: TReal128): TReal128;
+var fa, fb, fc: TUInt256;
+    de: Integer;
+begin
+  if B.IsExactZero then
+    raise EDivByZero.Create('Division by zero.');
+
+  if A.IsExactZero then exit(cZeroF128);
+
+  fa.Init(0, 0, A.fLimbs[0], (A.fLimbs[1] and HI_FRAC_MASK) or LEADING_ONE);
+  fb.Init(B.fLimbs[0], (B.fLimbs[1] and HI_FRAC_MASK) or LEADING_ONE, 0, 0);
+  fc := fa div fb;
+
+  de := _CountLeadingZeros(@fc.fLimbs[0], 2 * cLCnt) - (FRAC_OFFSET - 1);
+  _ipLongShift(@fc.fLimbs[0], 2 * cLCnt, de);
+  Round(fc.fLimbs);
+
+  Result.fLimbs[0] := fc.fLimbs[2];
+  Result.fLimbs[1] := fc.fLimbs[3] and HI_FRAC_MASK;
+  Result.Exponent := A.Exponent - B.Exponent - (de - cLCnt*W_BIT_COUNT + FRAC_OFFSET);
+  Result.Signum := A.Signum * B.Signum;
 end;
 
 function TReal128.InternalReciprocal: TReal128;
@@ -2633,6 +1526,7 @@ function TReal128.Reciprocal: TReal128;
 begin
   Result := InternalReciprocal();
   AdjustByReminder(cOneF128, Self, Result);
+//  Result := SchoolDiv(cOneF128, Self);
 end;
 
 function TReal128.Sqrt: TReal128;
@@ -2692,9 +1586,9 @@ begin
   if 1023 < e then
     raise ERangeError.Create('TReal128.AsDouble exponent overlflows Double exponent range.');
   Inc(e, 1023);
-  iVal := buff[2] and FRAC_MASK_F64;
+  iVal := buff[2] and F64_FRAC_MASK;
   iVal := iVal or (UInt64(e) shl 52);  // exponent
-  iVal := iVal or (fLimbs[1] and cBit64); // signum
+  iVal := iVal or (fLimbs[1] and I64_HI_BIT); // signum
 end;
 
 function TReal128.Abs: TReal128;

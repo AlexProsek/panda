@@ -164,9 +164,11 @@ type
     class operator Add(const A, B: TTensorC128): TTensorC128;
     class operator Subtract(const A, B: TTensorC128): TTensorC128;
     class operator Multiply(const A, B: TTensorC128): TTensorC128;
+    class operator Multiply(const A: TCmplx128; const B: TTensorC128): TTensorC128;
     class operator Divide(const A, B: TTensorC128): TTensorC128;
-    class operator Divide(const A: TTensorC128; B: TCmplx128): TTensorC128;
-    class operator Divide(A: TCmplx128; const B: TTensorC128): TTensorC128;
+    class operator Divide(const A: TTensorC128; const B: TCmplx128): TTensorC128;
+    class operator Divide(const A: TCmplx128; const B: TTensorC128): TTensorC128;
+    class operator Divide(const A: TTensorC128; const B: Double): TTensorC128;
     procedure Assign(const A: TTensorC128); inline;
     procedure AddTo(const aArr: TTensorC128); overload;
     procedure AddTo(const aValue: TCmplx128); overload;
@@ -2119,6 +2121,43 @@ begin
   end;
 end;
 
+procedure DivR_C128_F64(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+var pEnd: PByte;
+    s: Double;
+begin
+  if IncR = 0 then begin
+    // L <- L / r
+    s := 1/PDouble(R)^;
+    if IncL = cC128Sz then begin
+      VecMul(PDouble(L), s, PDouble(L), 2*N);
+      exit;
+    end;
+
+    pEnd := L + N * IncL;
+    while L < pEnd do begin
+      with PCmplx128(L)^ do begin
+        Re := s * Re;
+        Im := s * Im;
+      end;
+      Inc(L, IncL);
+    end;
+
+    exit;
+  end;
+
+  // L <- L / R
+  pEnd := L + N * IncL;
+  while L < pEnd do begin
+    s := 1/PDouble(R)^;
+    with PCmplx128(L)^ do begin
+      Re := s * Re;
+      Im := s * Im;
+    end;
+    Inc(L, IncL);
+    Inc(R, IncR);
+  end;
+end;
+
 {$endregion}
 
 class operator TTensorC128.Implicit(const aArr: INDArray<TCmplx128>): TTensorC128;
@@ -2149,22 +2188,34 @@ begin
   TNDAUt.Map<TCmplx128>(A, B, Result.fArr, MulL_C128, MulR_C128);
 end;
 
+class operator TTensorC128.Multiply(const A: TCmplx128; const B: TTensorC128): TTensorC128;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<TCmplx128>(A, B, Result.fArr, MulL_C128);
+end;
+
 class operator TTensorC128.Divide(const A, B: TTensorC128): TTensorC128;
 begin
   Result.fArr := nil;
   TNDAUt.Map<TCmplx128>(A, B, Result.fArr, DivL_C128, DivR_C128);
 end;
 
-class operator TTensorC128.Divide(const A: TTensorC128; B: TCmplx128): TTensorC128;
+class operator TTensorC128.Divide(const A: TTensorC128; const B: TCmplx128): TTensorC128;
 begin
   Result.fArr := nil;
   TNDAUt.Map<TCmplx128>(A, B, Result.fArr, DivR_C128);
 end;
 
-class operator TTensorC128.Divide(A: TCmplx128; const B: TTensorC128): TTensorC128;
+class operator TTensorC128.Divide(const A: TCmplx128; const B: TTensorC128): TTensorC128;
 begin
   Result.fArr := nil;
   TNDAUt.Map<TCmplx128>(A, B, Result.fArr, DivL_C128);
+end;
+
+class operator TTensorC128.Divide(const A: TTensorC128; const B: Double): TTensorC128;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<TCmplx128, Double, TCmplx128>(A, B, Result.fArr, DivR_C128_F64)
 end;
 
 procedure TTensorC128.Assign(const A: TTensorC128);

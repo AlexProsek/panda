@@ -44,6 +44,7 @@ type
     procedure CheckEquals(const aExpected, aValue: array of Single; const aTol: Single = 0); overload;
     procedure CheckEquals(const aExpected, aValue: array of Double; const aTol: Double = 0); overload;
     procedure CheckEquals(const aExpected: array of String; const aValue: array of String); overload;
+    procedure CheckEquals(const aExpected, aValue: TCmplx64; const aTol: Single = 0); overload;
     procedure CheckEquals(const aExpected, aValue: TCmplx128; const aTol: Double = 0); overload;
 
     function iRng2NDA(const aShape: array of NativeInt;
@@ -173,6 +174,12 @@ begin
   CheckEquals(Length(aExpected), Length(aValue));
   for I := 0 to High(aExpected) do
     CheckEquals(aExpected[I], aValue[I]);
+end;
+
+procedure TNDATestCase.CheckEquals(const aExpected, aValue: TCmplx64; const aTol: Single);
+begin
+  CheckEquals(Extended(aExpected.Re), Extended(aValue.Re), aTol);
+  CheckEquals(Extended(aExpected.Im), Extended(aValue.Im), aTol);
 end;
 
 procedure TNDATestCase.CheckEquals(const aExpected, aValue: TCmplx128; const aTol: Double);

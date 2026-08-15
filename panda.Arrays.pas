@@ -2025,11 +2025,17 @@ end;
 
 function TNDABuffer<T>.InitBuffer(const aDims: array of NativeInt; aAlignment: Integer): PByte;
 var sz: NativeInt;
+    mask: NativeUInt;
 begin
   sz := GetSize(aDims);
-  GetMem(fBuff, sz * SizeOf(T));
-  // todo: data alignment
-  Result := fBuff;
+  if aAlignment > 0 then begin
+    GetMem(fBuff, sz * SizeOf(T) + aAlignment);
+    mask :=  not NativeUInt(aAlignment - 1);
+    Result := PByte((NativeUInt(fBuff) + NativeUInt(aAlignment) - 1) and mask);
+  end else begin
+    GetMem(fBuff, sz * SizeOf(T));
+    Result := fBuff;
+  end;
 end;
 
 destructor TNDABuffer<T>.Destroy;

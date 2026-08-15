@@ -8,6 +8,7 @@ uses
   , panda.Intfs
   , panda.Arrays
   , panda.ArrManip
+  , panda.Nums
   , pandalib
 
   , Windows
@@ -21,6 +22,7 @@ type
     procedure Fill2DByVec;
     procedure TransposeMat;
     procedure TransposeT3;
+    procedure BlockVsStdTrCmp_Cmplx128;
     procedure BlockVsStdTrCmp_Double;
     procedure BlockVsStdTrCmp_Single;
     procedure BlockVsStrTrCmp_Word;
@@ -101,6 +103,35 @@ begin
   SWStart;
   DoTestLoop(procedure begin TNDAMan.Transpose<Integer>(a, b, [2, 1, 0]) end, 50);
   SWStop;
+end;
+
+procedure TArrManipTests.BlockVsStdTrCmp_Cmplx128;
+var a, b: INDArray<TCmplx128>;
+const N = 1014;
+      M = 768;
+begin
+  a := nda.Full<TCmplx128>([M, N], 0);
+  b := nda.Full<TCmplx128>([N, M], 0);
+
+  // for matrices with continuous rows a transposition by blocks is executed
+  SWStart;
+  DoTestLoop(
+    procedure begin
+      TNDAMan.Transpose<TCmplx128>(a, b, [1, 0]);
+    end
+  , 50);
+  SWStop('BlockTr');
+
+  a := nda.Full<TCmplx128>([M, 2*N], 0);
+  a := a[[NDIAll, NDIAll(2)]]; // make gaps between columns to avoid block transposition
+
+  SWStart;
+  DoTestLoop(
+    procedure begin
+      TNDAMan.Transpose<TCmplx128>(a, b, [1, 0]);
+    end
+  , 50);
+  SWStop('StdTr');
 end;
 
 procedure TArrManipTests.BlockVsStdTrCmp_Double;

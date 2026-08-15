@@ -5,7 +5,7 @@
         <FrameworkType>None</FrameworkType>
         <Base>True</Base>
         <Config Condition="'$(Config)'==''">Debug</Config>
-        <Platform Condition="'$(Platform)'==''">Win32</Platform>
+        <Platform Condition="'$(Platform)'==''">Win64</Platform>
         <ProjectName Condition="'$(ProjectName)'==''">PandaTests</ProjectName>
         <TargetedPlatforms>3</TargetedPlatforms>
         <AppType>Console</AppType>
@@ -194,13 +194,17 @@
         <DCCReference Include="panda.Tests.MAT4io.pas"/>
         <DCCReference Include="..\..\panda.Nums.pas"/>
         <DCCReference Include="panda.Tests.Nums.pas"/>
-        <DCCReference Include="panda.Tests.MPNums.pas"/>
-        <DCCReference Include="..\..\panda.MPNums.pas"/>
         <DCCReference Include="..\..\panda.Poly.pas"/>
         <DCCReference Include="panda.Tests.Poly.pas"/>
         <DCCReference Include="panda.Tests.DynArrayUtils.pas"/>
         <DCCReference Include="panda.Tests.cvCmp.pas"/>
         <DCCReference Include="panda.Tests.ArrCmp.pas"/>
+        <DCCReference Include="panda.Tests.fft.pas"/>
+        <DCCReference Include="panda.Tests.IntFactor.pas"/>
+        <DCCReference Include="..\..\panda.NumsLowLvl.pas"/>
+        <DCCReference Include="..\..\panda.NumsQP.pas"/>
+        <DCCReference Include="panda.Tests.NumsQP.pas"/>
+        <DCCReference Include="..\..\panda.fft.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

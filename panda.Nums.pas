@@ -16,12 +16,16 @@ type
   TCmplx64 = record
     Re, Im: Single;
     procedure Init(aRe, aIm: Single); inline;
+    function Abs: Single; inline;
+    function AbsSquare: Single; inline;
+    function Conjugate: TCmplx64; inline;
     class operator Implicit(const A: Single): TCmplx64; inline;
     class operator Add(const A, B: TCmplx64): TCmplx64;{$ifndef ASMx64}inline;{$endif}
     class operator Subtract(const A, B: TCmplx64): TCmplx64;{$ifndef ASMx64}inline;{$endif}
     class operator Negative(const A: TCmplx64): TCmplx64;{$ifndef ASMx64}inline;{$endif}
-    class operator Multiply(const A, B: TCmplx64): TCmplx64;{$ifdef NoASM}inline;{$endif}
+    class operator Multiply(const A, B: TCmplx64): TCmplx64; {$ifdef NoASM}inline;{$endif}
     class operator Divide(const A, B: TCmplx64): TCmplx64;{$ifdef NoASM}inline;{$endif}
+    class operator Divide(const A: TCmplx64; B: Single): TCmplx64; inline;
     class operator Equal(const A, B: TCmplx64): Boolean; inline;
     class operator NotEqual(const A, B: TCmplx64): Boolean; inline;
   end;
@@ -34,6 +38,7 @@ type
     class operator Explicit(const A: TCmplx64): TCmplx128; inline;
     class operator Explicit(const A: TCmplx128): TCmplx64; inline;
     function Abs: Double; inline;
+    function AbsSquare: Double; inline;
     function Arg: Double; inline;
     function Conjugate: TCmplx128; inline;
     function Reciprocal: TCmplx128; inline;
@@ -58,6 +63,7 @@ type
 const
   cBoolSz = SizeOf(Boolean);
   cI8Sz   = SizeOf(Int8);
+  cI16Sz  = SizeOf(Int16);
   cI32Sz  = SizeOf(Integer);
   cI64Sz  = SizeOf(Int64);
   cNISz   = SizeOf(NativeInt);
@@ -82,9 +88,21 @@ const
   cZeroC64:  TCmplx64  = (Re: 0; Im: 0);
   cZeroC128: TCmplx128 = (Re: 0; Im: 0);
 
+  function Cmplx64(aRe, aIm: Single): TCmplx64; inline;
   function Cmplx(const aRe, aIm: Double): TCmplx128; inline;
 
+const
+  Cmplx128: function (const aRe, aIm: Double): TCmplx128 = Cmplx;
+
 implementation
+
+{$EXCESSPRECISION OFF} // to prevent Single -> Double conversion by x64 compiler
+
+function Cmplx64(aRe, aIm: Single): TCmplx64;
+begin
+  Result.Re := aRe;
+  Result.Im := aIm;
+end;
 
 function Cmplx(const aRe, aIm: Double): TCmplx128;
 begin
@@ -104,6 +122,22 @@ class operator TCmplx64.Implicit(const A: Single): TCmplx64;
 begin
   Result.Re := A;
   Result.Im := 0;
+end;
+
+function TCmplx64.Abs: Single;
+begin
+  Result := Sqrt(Re * Re + Im * Im);
+end;
+
+function TCmplx64.AbsSquare: Single;
+begin
+  Result := Re * Re + Im * Im;
+end;
+
+function TCmplx64.Conjugate: TCmplx64;
+begin
+  Result.Re := Re;
+  Result.Im := -Im;
 end;
 
 class operator TCmplx64.Add(const A, B: TCmplx64): TCmplx64;
@@ -167,15 +201,14 @@ asm
 end;
 {$elseif defined(ASMx64)}
 asm
-  movq xmm0, [rcx]  // xmm0 <- (ar, ai)
-  movsldup xmm2, xmm0 // xmm2 <- (ar, ar)
-  movshdup xmm3, xmm0 // xmm3 <- (ai, ai)
-  movq xmm1, [rdx]    // xmm1 <- (br, bi)
-  mulps xmm2, xmm1   // xmm2 <- (br*ar, bi*ar)
-  mulps xmm3, xmm1   // xmm3 <- (br*ai, bi*ai)
-  pshufd xmm3, xmm3, $1 // xmm3 <- (bi*ai, br*ai)
-  addsubps xmm2, xmm3 // xmm2 <- a * b
-  movq rax, xmm2
+  movq xmm0, [rcx]          // xmm0 <- (ar, ai)
+  movq xmm1, [rdx]          // xmm1 <- (br, bi)
+  pshufd xmm0, xmm0, $50    // xmm0 <- (ar, ar, ai, ai)
+  pshufd xmm1, xmm1, $14    // xmm1 <- (br, bi, bi, br)
+  mulps xmm0, xmm1          // xmm0 <- (ar*br, ar*bi, ai*bi, ai*br)
+  movhlps xmm1, xmm0        // xmm1 <- (ai*bi, ai*br)
+  addsubps xmm0, xmm1
+  movq rax, xmm0
 end;
 {$else}
 begin
@@ -232,6 +265,12 @@ begin
 end;
 {$endif}
 
+class operator TCmplx64.Divide(const A: TCmplx64; B: Single): TCmplx64;
+begin
+  Result.Re := A.Re / B;
+  Result.Im := A.Im / B;
+end;
+
 class operator TCmplx64.Equal(const A, B: TCmplx64): Boolean;
 begin
   Result := System.Math.IsZero(A.Re - B.Re) and System.Math.IsZero(A.Im - B.Im);
@@ -273,6 +312,11 @@ end;
 function TCmplx128.Abs: Double;
 begin
   Result := Sqrt(Re * Re + Im * Im);
+end;
+
+function TCmplx128.AbsSquare: Double;
+begin
+  Result := Re * Re + Im * Im;
 end;
 
 function TCmplx128.Arg: Double;

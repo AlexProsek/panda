@@ -46,13 +46,17 @@ uses
   panda.Tests.MAT4io in 'panda.Tests.MAT4io.pas',
   panda.Nums in '..\..\panda.Nums.pas',
   panda.Tests.Nums in 'panda.Tests.Nums.pas',
-  panda.Tests.MPNums in 'panda.Tests.MPNums.pas',
-  panda.MPNums in '..\..\panda.MPNums.pas',
   panda.Poly in '..\..\panda.Poly.pas',
   panda.Tests.Poly in 'panda.Tests.Poly.pas',
   panda.Tests.DynArrayUtils in 'panda.Tests.DynArrayUtils.pas',
   panda.Tests.cvCmp in 'panda.Tests.cvCmp.pas',
-  panda.Tests.ArrCmp in 'panda.Tests.ArrCmp.pas';
+  panda.Tests.ArrCmp in 'panda.Tests.ArrCmp.pas',
+  panda.Tests.fft in 'panda.Tests.fft.pas',
+  panda.Tests.IntFactor in 'panda.Tests.IntFactor.pas',
+  panda.NumsLowLvl in '..\..\panda.NumsLowLvl.pas',
+  panda.NumsQP in '..\..\panda.NumsQP.pas',
+  panda.Tests.NumsQP in 'panda.Tests.NumsQP.pas',
+  panda.fft in '..\..\panda.fft.pas';
 
 {$R *.RES}
 

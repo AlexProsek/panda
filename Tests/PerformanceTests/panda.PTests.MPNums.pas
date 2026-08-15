@@ -5,8 +5,8 @@ interface
 uses
     TestFramework
   , panda.Tests.NDATestCase
-  , panda.MPNums
-  , panda.NumsAP
+  , panda.NumsQP
+  , panda.NumsLowLvl
   ;
 
 type
@@ -18,6 +18,7 @@ type
     procedure LongDivInt128;
     procedure LessCmpInt128;
     procedure MulReal128;
+    procedure DivReal128;
   end;
 
   TLowLvlFuncTests = class(TNDAPerformanceTestCase)
@@ -121,6 +122,22 @@ begin
   SWStart;
   while N > 0 do begin
     c := a * b;
+    Dec(N);
+  end;
+  SWStop;
+end;
+
+procedure TMPNumTests.DivReal128;
+var a, b, c: TReal128;
+    N: Integer;
+begin
+  a.Init(13);
+  b.Init(57);
+  N := 1000000;
+
+  SWStart;
+  while N > 0 do begin
+    c := a / b;
     Dec(N);
   end;
   SWStop;

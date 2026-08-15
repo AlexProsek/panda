@@ -4,7 +4,7 @@ interface
 
 uses
     panda.Nums
-  , panda.MPNums
+  , panda.NumsQP
   , System.Math
   ;
 

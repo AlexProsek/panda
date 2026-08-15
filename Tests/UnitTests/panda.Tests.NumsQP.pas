@@ -1,11 +1,12 @@
-unit panda.Tests.MPNums;
+unit panda.Tests.NumsQP;
 
 interface
 
 uses
     TestFramework
   , System.SysUtils
-  , panda.MPNums
+  , panda.NumsQP
+  , panda.NumsLowLvl
   , panda.Tests.NDATestCase
   ;
 
@@ -721,7 +722,7 @@ procedure TInt128Tests.AddOverflowNN;
 var a: TInt128;
 begin
   ExpectedException := EIntOverflow;
-  a.Init(0, cBit64);
+  a.Init(0, I64_HI_BIT);
   a := a + a;
 end;
 
@@ -729,7 +730,7 @@ procedure TInt128Tests.SubOverflowNP;
 var a, b: TInt128;
 begin
   ExpectedException := EIntOverflow;
-  a.Init(0, cBit64);
+  a.Init(0, I64_HI_BIT);
   b := 10;
   a := a - b;
 end;
@@ -738,7 +739,7 @@ procedure TInt128Tests.SubOverflowPN;
 var a, b: TInt128;
 begin
   ExpectedException := EIntOverflow;
-  a.Init(High(UInt64), High(UInt64) - cBit64);
+  a.Init(High(UInt64), High(UInt64) - I64_HI_BIT);
   b := -10;
   a := a - b;
 end;
@@ -747,7 +748,7 @@ procedure TInt128Tests.NegOverflow;
 var a: TInt128;
 begin
   ExpectedException := EIntOverflow;
-  a.Init(0, cBit64);
+  a.Init(0, I64_HI_BIT);
   a := -a;
 end;
 

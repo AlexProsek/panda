@@ -1554,7 +1554,7 @@ asm
   mov ecx, [ebp + 8]
   test ecx, ecx
   jz @end
-@loop:
+@L:
   movddup xmm2, [eax] // xmm2 <- (ar, ar)
   movddup xmm3, [eax + 8] // xmm3 <- (ai, ai)
   movupd xmm1, [edx]  // xmm1 <- (br, bi)
@@ -1567,7 +1567,7 @@ asm
   add edx, 16
   add edi, 16
   dec ecx
-  jnz @loop
+  jnz @L
 @end:
   pop edi
 end;
@@ -1579,7 +1579,7 @@ asm
   mov r10, r9
   shr r9, 1
   jz @rest
-@loop:
+@L:
 {$ifdef AVX}
   vmovupd ymm0, [rcx]      // a = ar0,ai0, ar1,ai1
   vmovupd ymm1, [rdx]      // b = br0,bi0, br1,bi1
@@ -1625,7 +1625,7 @@ asm
   add r8, 16
 {$endif}
   dec r9
-  jnz @loop
+  jnz @L
 
 {$ifdef AVX}
   vzeroupper
