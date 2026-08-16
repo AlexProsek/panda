@@ -114,6 +114,7 @@ begin
 
   ifft := TRealIFFTEvalF64.Create;
   try
+    ifft.Normalize := True;
     ifft.Init(Length(fSrc));
     ifft.Execute(s, dst);
   finally

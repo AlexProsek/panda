@@ -128,19 +128,25 @@ type
   end;
 
   TRealFFTEvalBase<TF, TC> = class abstract(TFFTEvalBase<TF, TC>)
+  protected
+    fDir: TFFTDirection;
+    procedure InitBuffers(N: NativeInt); override;
+  public
+    procedure Init(N: NativeInt); overload; override;
+  end;
+
+  TRealFFTEval<TF, TC> = class abstract(TRealFFTEvalBase<TF, TC>)
   protected type
     TFTRecombFnc =  procedure (const src, W, dst: TVec<TC>);
   protected
     fFullSpectrum: Boolean;
     fFnc_FTRecombFull: TFTRecombFnc;
     fFnc_FTRecombHalf: TFTRecombFnc;
-    procedure InitBuffers(N: NativeInt); override;
   {$region 'Getters/Setters'}
     procedure SetFullSpectrum(aValue: Boolean);
     function GetResult: TVec<TC>;
   {$endregion}
   public
-    procedure Init(N: NativeInt); overload; override;
     procedure Init(N: NativeInt; aFullSpectrum: Boolean); overload;
     procedure Execute(const aSrc: INDArray<TF>; var aDst: INDArray<TC>); overload;
     // Do the evaluation and the result is left in the internal buffer.
@@ -152,23 +158,27 @@ type
     property Result: TVec<TC> read GetResult;
   end;
 
-  TRealIFFTEvalBase<TF, TC> = class abstract(TFFTEvalBase<TF, TC>)
+  TRealIFFTEval<TF, TC> = class abstract(TRealFFTEvalBase<TF, TC>)
   protected type
     TFTReconstructionFnc =  procedure (const src, W, dst: TVec<TC>);
+    TNormFnc = procedure (aSrc, aDst: PByte; aCount: NativeInt);
   protected
+    fNormalize: Boolean;
+    fFnc_Norm: TNormFnc;
     fFnc_FTReconstruct: TFTReconstructionFnc;
-    procedure InitBuffers(N: NativeInt); override;
   {$region 'Getters/Setters'}
     function GetResult: TVec<TF>;
   {$endregion}
   public
-    procedure Init(N: NativeInt); override;
+    procedure AfterConstruction; override;
     procedure Execute(const aSrc: INDArray<TC>; var aDst: INDArray<TF>); overload;
     procedure Execute(const aSrc: INDArray<TC>); overload;
 
     // Returns vector that points to the internal buffer. It can be useful
     // when only a part of the result is needed.
     property Result: TVec<TF> read GetResult;
+    property Normalize: Boolean read fNormalize write fNormalize;
+
   end;
 
   TRealFFTFilter<TF, TC> = class abstract
@@ -176,8 +186,8 @@ type
     TSpectrumFilter = procedure (const aSpectrum: INDArray<TC>) of object;
   protected
     fFilter: TSpectrumFilter;
-    fFwdFFT: TRealFFTEvalBase<TF, TC>;
-    fInvFFT: TRealIFFTEvalBase<TF, TC>;
+    fFwdFFT: TRealFFTEval<TF, TC>;
+    fInvFFT: TRealIFFTEval<TF, TC>;
   public
     procedure Execute(const aSrc: INDArray<TF>; var aDst: INDArray<TF>);
 
@@ -280,7 +290,12 @@ type
     procedure InitFunctions; override;
   end;
 
-  TRealFFTEvalF32 = class(TRealFFTEvalBase<Single, TCmplx64>)
+  TRealFFTEvalF32 = class(TRealFFTEval<Single, TCmplx64>)
+  protected
+    procedure InitFunctions; override;
+  end;
+
+  TRealIFFTEvalF32 = class(TRealIFFTEval<Single, TCmplx64>)
   protected
     procedure InitFunctions; override;
   end;
@@ -295,12 +310,12 @@ type
     procedure InitFunctions; override;
   end;
 
-  TRealFFTEvalF64 = class(TRealFFTEvalBase<Double, TCmplx128>)
+  TRealFFTEvalF64 = class(TRealFFTEval<Double, TCmplx128>)
   protected
     procedure InitFunctions; override;
   end;
 
-  TRealIFFTEvalF64 = class(TRealIFFTEvalBase<Double, TCmplx128>)
+  TRealIFFTEvalF64 = class(TRealIFFTEval<Double, TCmplx128>)
   protected
     procedure InitFunctions; override;
   end;
@@ -3667,6 +3682,120 @@ begin
 end;
 {$endif}
 
+procedure RealFTReconstruct(const Z, W, X: TVecC64); overload;
+{$if defined(ASMx64)}
+// RCX <- @Z, RDX <- @W, R8 <- @X
+asm
+  sub rsp, 56        // 32 for xmm6, xmm7 + 16 for RSI, RDI + 8 for stack alignment
+  mov [rsp], rsi
+  mov [rsp + 8], rdi
+  movupd [rsp + 16], xmm6
+  movupd [rsp + 32], xmm7
+
+  mov rsi, [rcx]          // RSI <- @Z[0]
+  mov rdi, [r8]           // RDI <- @X[0]
+  mov rax, [rdx]          // RAX <- @W[0]
+  mov r9, [r8 + 16]       // R9 <- N := X.Length
+  mov r8, r9
+  shr r8, 1               // R8 <- N2 := N div 2
+  mov r10, r9             // R10 <- N
+  shl r10, 3              // R10 <- N * SizeOf(TCmplx64)
+  lea r11, rdi + r10      // R11 <- @X[N]
+  lea r10, rsi + r10      // R10 <- @Z[N]
+
+  movd xmm0, [rsi]
+  pshufd xmm0, xmm0, 0        // xmm0 <- (Z[0].Re, Z[0].Re)
+  movd xmm1, [r10]
+  pshufd xmm1, xmm1, 0        // xmm1 <- (Z[N].Re, Z[N].Re)
+  addsubps xmm0, xmm1         // xmm0 <- (Z[0].Re - Z[N].Re, Z[0].Re + Z[N].Re)
+  pshufd xmm0, xmm0, 1
+  movq [rdi], xmm0            // X[0] <- (Z[0].Re + Z[N].Re, Z[0].Re - Z[N].Re)
+
+  movups xmm6, cImSgnMaskF32
+  movups xmm7, cReSgnMaskF32
+  add rsi, 8                  // RSI <- @Z[1]
+  sub r10, 8                  // R10 <- @Z[N - 1]
+  add rdi, 8                  // RDI <- @X[1]
+  sub r11, 8                  // R11 <- @X[N - 1]
+  add rax, 8                  // RAX <_ @W[1]
+  dec r8
+@L:
+  movq xmm0, [rsi]          // xmm0 <- A := Z[k]
+  movq xmm1, xmm0
+  movq xmm2, [r10]            // xmm1 <- Z[N - k]
+  xorps xmm2, xmm6            // xmm1 <- B := Z[N - k]*
+  addps xmm0, xmm2            // xmm0 <- S := A + B
+  subps xmm1, xmm2            // xmm1 <- D := A - B
+
+  movq xmm3, [rax]            // xmm3 <- (wr, wi)
+  pshufd xmm3, xmm3, $14      // xmm3 <- (wr, wi, wi, wr)
+  pshufd xmm1, xmm1, $50      // xmm1 <- (dr, dr, di, di)
+  mulps xmm3, xmm1            // xmm3 <- (wr*dr, wi*dr, wi*di, wr*di)
+  movhlps xmm1, xmm3          // xmm1 <- (wi*di, wr*di)
+  addsubps xmm3, xmm1         // xmm3 <- W[k]*(A - B)
+
+  pshufd xmm4, xmm3, 1
+  xorps xmm4, xmm7            // xmm4 <- (-Di, Dr) == I*D
+  addps xmm4, xmm0            // xmm4 <- S + I*D
+  movq [rdi], xmm4
+
+  pshufd xmm3, xmm3, 1        // xmm3 <- (Di, Dr) == I*D.conj
+  xorps xmm0, xmm6            // xmm0 <- S.conj
+  addps xmm3, xmm0            // xmm3 <- S.conj + I*D.conj
+  movq [r11], xmm3
+
+  add rdi, 8
+  add rsi, 8
+  add rax, 8
+  sub r10, 8
+  sub r11, 8
+  dec r8
+  jnz @L
+
+  movd xmm0, [rsi]            // xmm0 <- A[N2].Re
+  movd xmm1, [rsi + 4]        // xmm1 <- A[N2].Im
+  pshufd xmm1, xmm1, 0        // xmm1 <- (A[N2].Im, A[N2].Im)
+  movq xmm2, [rax]            // xmm2 <- W[N2]
+  mulps xmm2, xmm1
+  subps xmm0, xmm2            // (A[N2].Re, 0) - (A[N2].Im*wr, A[N2].Im*wi)
+  addps xmm0, xmm0
+  movq [rdi], xmm0
+
+  mov rsi, [rsp]
+  mov rdi, [rsp + 8]
+  movupd xmm6, [rsp + 16]
+  movupd xmm7, [rsp + 32]
+  add rsp, 56
+end;
+{$else}
+var k, N, N2: NativeInt;
+    A, B, D, S, Wk: TCmplx64;
+const I: TCmplx64 = (Re: 0.0; Im: 1.0);
+begin
+  N := X.Length;
+  N2 := N div 2;
+  A := Z[0];
+  B := Z[N];
+  D.Re := A.Re + B.Re;
+  D.Im := A.Re - B.Re;
+  X[0] := D;
+
+  for k := 1 to N2 - 1 do begin
+    A := Z[k];
+    B := Z[N - k].Conjugate;
+    Wk := W[k];
+    S := A + B;
+    D := Wk*(A - B);
+    X[k] := S + I*D;
+    X[N - k] := S.Conjugate + I*D.Conjugate;
+  end;
+
+  A := Z[N2];
+  Wk := W[N2];
+  X[N2] := 2*(A.Re - A.Im*Wk);
+end;
+{$endif}
+
 procedure RealFTReconstruct(const Z, W, X: TVecC128); overload;
 {$if defined(ASMx64)}
 // RCX <- @Z, RDX <- @W, R8 <- @X
@@ -4658,7 +4787,7 @@ end;
 
 {$endregion}
 
-{$endregion 'TFFTEval<TF, TC>'}
+{$region 'TFFTEval<TF, TC>'}
 
 procedure TFFTEval<TF, TC>.AfterConstruction;
 begin
@@ -4711,9 +4840,22 @@ end;
 
 {$endregion}
 
-{$region}
+{$endregion}
 
 {$region 'TRealFFTEvalBase<TF, TC>'}
+
+procedure TRealFFTEvalBase<TF, TC>.InitBuffers(N: NativeInt);
+begin
+  fW := TNDABuffer<TC>.Create([2*N]);
+  fWv.Init(fW.Data, 2*N);
+  if fDir = fdForward then
+    fFnc_EvalTwiddleFactors(fWv, 1)
+  else
+    fFnc_EvalTwiddleFactors(fWv, -1);
+
+  fBuff := TNDABuffer<TC>.Create([3*N]);
+  fBuffv.Init(fBuff.Data, 2*N);
+end;
 
 procedure TRealFFTEvalBase<TF, TC>.Init(N: NativeInt);
 begin
@@ -4726,7 +4868,11 @@ begin
   fWv.Stride := 2 * cCSz;
 end;
 
-procedure TRealFFTEvalBase<TF, TC>.Init(N: NativeInt; aFullSpectrum: Boolean);
+{$endregion}
+
+{$region 'TRealFFTEval<TF, TC>'}
+
+procedure TRealFFTEval<TF, TC>.Init(N: NativeInt; aFullSpectrum: Boolean);
 begin
   if N <= 0 then
     raise EArgumentOutOfRangeException.Create(cPositiveSizeErrorMsg);
@@ -4735,17 +4881,7 @@ begin
   Init(N);
 end;
 
-procedure TRealFFTEvalBase<TF, TC>.InitBuffers(N: NativeInt);
-begin
-  fW := TNDABuffer<TC>.Create([2*N]);
-  fWv.Init(fW.Data, 2*N);
-  fFnc_EvalTwiddleFactors(fWv);
-
-  fBuff := TNDABuffer<TC>.Create([3*N]);
-  fBuffv.Init(fBuff.Data, 2*N);
-end;
-
-procedure TRealFFTEvalBase<TF, TC>.Execute(const aSrc: INDArray<TF>);
+procedure TRealFFTEval<TF, TC>.Execute(const aSrc: INDArray<TF>);
 var srcv, res, w: TVec<TC>;
 begin
   Assert(Assigned(aSrc) and (aSrc.NDim = 1) and (2*fN = aSrc.Shape[0]));
@@ -4771,7 +4907,7 @@ begin
     fFnc_FTRecombHalf(fBuffv.Span(0, fN), w, res);
 end;
 
-procedure TRealFFTEvalBase<TF, TC>.Execute(const aSrc: INDArray<TF>; var aDst: INDArray<TC>);
+procedure TRealFFTEval<TF, TC>.Execute(const aSrc: INDArray<TF>; var aDst: INDArray<TC>);
 begin
   Execute(aSrc);
 
@@ -4802,12 +4938,12 @@ end;
 
 {$region 'Getters/Setters'}
 
-procedure TRealFFTEvalBase<TF, TC>.SetFullSpectrum(aValue: Boolean);
+procedure TRealFFTEval<TF, TC>.SetFullSpectrum(aValue: Boolean);
 begin
   if not fInitialized then fFullSpectrum := aValue;
 end;
 
-function TRealFFTEvalBase<TF, TC>.GetResult: TVec<TC>;
+function TRealFFTEval<TF, TC>.GetResult: TVec<TC>;
 begin
   if fFullSpectrum then
     Result := fBuffv.Span(fN,  2*fN)
@@ -4819,30 +4955,16 @@ end;
 
 {$endregion}
 
-{$region 'TRealIFFTEvalBase<TF, TC>.'}
+{$region 'TRealIFFTEval<TF, TC>.'}
 
-procedure TRealIFFTEvalBase<TF, TC>.Init(N: NativeInt);
+procedure TRealIFFTEval<TF, TC>.AfterConstruction;
 begin
-  if (N and 1) <> 0 then
-    raise EFFTSizeError.Create(cEvenSizeErrorMsg);
-
-  inherited Init(N div 2);
-
-  fWv.Length := N;
-  fWv.Stride := 2 * cCSz;
+  inherited;
+  fDir := fdInverse;
+  fNormalize := False;
 end;
 
-procedure TRealIFFTEvalBase<TF, TC>.InitBuffers(N: NativeInt);
-begin
-  fW := TNDABuffer<TC>.Create([2*N]);
-  fWv.Init(fW.Data, 2*N);
-  fFnc_EvalTwiddleFactors(fWv, -1);
-
-  fBuff := TNDABuffer<TC>.Create([3*N]);
-  fBuffv.Init(fBuff.Data, 2*N);
-end;
-
-procedure TRealIFFTEvalBase<TF, TC>.Execute(const aSrc: INDArray<TC>);
+procedure TRealIFFTEval<TF, TC>.Execute(const aSrc: INDArray<TC>);
 var w, srcv, resv: TVec<TC>;
 begin
   Assert(
@@ -4858,24 +4980,41 @@ begin
   fFactTop := High(fFactors);
   fFactPwr := fFactors[fFactTop].Power;
   FFT(srcv, resv);
+
+  if fNormalize then
+    fFnc_Norm(resv.Data, resv.Data, resv.Length);
 end;
 
-procedure TRealIFFTEvalBase<TF, TC>.Execute(const aSrc: INDArray<TC>; var aDst: INDArray<TF>);
+procedure TRealIFFTEval<TF, TC>.Execute(const aSrc: INDArray<TC>; var aDst: INDArray<TF>);
+var bNorm: Boolean;
+    s: TF;
 begin
-  Execute(aSrc);
+  bNorm := fNormalize;
+  try
+    fNormalize := False;
+    Execute(aSrc);
+  finally
+    fNormalize := bNorm;
+  end;
 
   if not Assigned(aDst) then
     aDst := TNDABuffer<TF>.Create([2*fN]);
 
-  if CContiguousQ(aDst) then
+  if CContiguousQ(aDst) then begin
+    if fNormalize then begin
+      fFnc_Norm(fBuffv.ItemPtr[fN], aDst.Data, 2*fN);
+    end else
       Move(fBuffv.ItemPtr[fN]^, aDst.Data^, fN*cCSz)
-  else
+  end else begin
+    if fNormalize then
+      fFnc_Norm(fBuffv.ItemPtr[fN], fBuffv.ItemPtr[fN], 2*fN);
     TNDAUt.Fill<TF>(aDst, TNDAUt.AsType<TF>(fBuff[[NDISpan(fN, 2*fN - 1)]]));
+  end;
 end;
 
 {$region 'Getters/Setters'}
 
-function TRealIFFTEvalBase<TF, TC>.GetResult: TVec<TF>;
+function TRealIFFTEval<TF, TC>.GetResult: TVec<TF>;
 begin
   Result.Init(fBuffv.ItemPtr[fN], 2*fN, SizeOf(TF));
 end;
@@ -5175,7 +5314,7 @@ begin
       ColFFTNative(aSrc, fBuff);
     end;
   else
-    raise EFFTError.Create('Unknown spectrum layour.');
+    raise EFFTError.Create('Unknown spectrum layout.');
   end;
 end;
 
@@ -5233,7 +5372,7 @@ end;
 
 {$region 'TRealFFTEvalF32'}
 
-procedure InitRealFFTFunctionsF32(aFFT: TRealFFTEvalBase<Single, TCmplx64>);
+procedure InitRealFFTFunctionsF32(aFFT: TRealFFTEval<Single, TCmplx64>);
 begin
   InitFFTFunctionsF32(aFFT);
 
@@ -5246,6 +5385,30 @@ end;
 procedure TRealFFTEvalF32.InitFunctions;
 begin
   InitRealFFTFunctionsF32(Self);
+end;
+
+{$endregion}
+
+{$region 'TRealIFFTEvalF32'}
+
+procedure NormalizeF32(pSrc, pDst: PByte; aCount: NativeInt);
+begin
+  VecMul(PSingle(pSrc), 1/aCount, PSingle(pDst), aCount);
+end;
+
+procedure InitRealIFFTFunctionsF32(aFFT: TRealIFFTEval<Single, TCmplx64>);
+begin
+  InitFFTFunctionsF32(aFFT, fdInverse);
+
+  with aFFT do begin
+    fFnc_Norm := NormalizeF32;
+    fFnc_FTReconstruct := RealFTReconstruct;
+  end;
+end;
+
+procedure TRealIFFTEvalF32.InitFunctions;
+begin
+  InitRealIFFTFunctionsF32(Self);
 end;
 
 {$endregion}
@@ -5396,7 +5559,7 @@ end;
 
 {$region 'TRealFFTEvalF64'}
 
-procedure InitRealFFTFunctionsF64(aFFT: TRealFFTEvalBase<Double, TCmplx128>);
+procedure InitRealFFTFunctionsF64(aFFT: TRealFFTEval<Double, TCmplx128>);
 begin
   InitFFTFunctionsF64(aFFT);
 
@@ -5415,11 +5578,17 @@ end;
 
 {$region 'TRealIFFTEvalF64'}
 
-procedure InitRealIFFTFunctionsF64(aFFT: TRealIFFTEvalBase<Double, TCmplx128>);
+procedure NormalizeF64(pSrc, pDst: PByte; aCount: NativeInt);
+begin
+  VecMul(PDouble(pSrc), 1/aCount, PDouble(pDst), aCount);
+end;
+
+procedure InitRealIFFTFunctionsF64(aFFT: TRealIFFTEval<Double, TCmplx128>);
 begin
   InitFFTFunctionsF64(aFFT, fdInverse);
 
   with aFFT do begin
+    fFnc_Norm := NormalizeF64;
     fFnc_FTReconstruct := RealFTReconstruct;
   end;
 end;

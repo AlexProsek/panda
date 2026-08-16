@@ -161,6 +161,7 @@ type
     procedure InvFFT_25;   // 5^2
 
     procedure FwdInvFFT_25;
+    procedure FwdInvRealFFT_24;
   end;
 
 implementation
@@ -1419,6 +1420,7 @@ begin
 
   ifft := TRealIFFTEvalF64.Create;
   try
+    ifft.Normalize := True;
     ifft.Init(N);
     ifft.Execute(tmp, res);
   finally
@@ -1427,7 +1429,7 @@ begin
 
   TNDAUt.TryAsDynArray<Double>(res, resData);
   for I := 0 to High(data) do
-    CheckEquals(data[I], resData[I]/N, dTol);
+    CheckEquals(data[I], resData[I], dTol);
 end;
 
 {$endregion}
@@ -2241,6 +2243,44 @@ begin
   TNDAUt.TryAsDynArray<TCmplx64>(ires, idata);
   for I := 0 to High(data) do
     CheckEquals(data[I], idata[I]/N, sTol);
+end;
+
+procedure TFFT32Tests.FwdInvRealFFT_24;
+var data, resData: TArray<Single>;
+    a, res: INDArray<Single>;
+    tmp: INDArray<TCmplx64>;
+    fft: TRealFFTEvalF32;
+    ifft: TRealIFFTEvalF32;
+    I, N: Integer;
+begin
+  data := TArray<Single>.Create(
+    1, 2, 3, 2, 1, 0, 1, 2, 3, 2,
+    1, 0, 1, 2, 3, 2, 1, 0, 1, 2,
+    2, 3, 3, 2
+  );
+  N := Length(data);
+  a := TDynArrWrapper<Single>.Create(data);
+
+  fft := TRealFFTEvalF32.Create;
+  try
+    fft.Init(N);
+    fft.Execute(a, tmp);
+  finally
+    fft.Free;
+  end;
+
+  ifft := TRealIFFTEvalF32.Create;
+  try
+    ifft.Normalize := True;
+    ifft.Init(N);
+    ifft.Execute(tmp, res);
+  finally
+    ifft.Free;
+  end;
+
+  TNDAUt.TryAsDynArray<Single>(res, resData);
+  for I := 0 to High(data) do
+    CheckEquals(data[I], resData[I], sTol);
 end;
 
 {$endregion}
