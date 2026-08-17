@@ -42,6 +42,7 @@ procedure VecNeg(pA, pRes: PSingle; aCount: NativeInt); overload;
 
 procedure VecAbs(pA, pRes: PDouble; aCount: NativeInt); overload;
 procedure VecAbs(pA, pRes: PSingle; aCount: NativeInt); overload;
+procedure VecAbs(pA: PCmplx128; pRes: PDouble; aCount: NativeInt); overload;
 
 procedure VecMul(pA, pB, pRes: PSingle; aCount: NativeInt); overload;
 procedure VecMul(pA, pB, pRes: PDouble; aCount: NativeInt); overload;
@@ -1388,6 +1389,53 @@ begin
     Inc(pA);
   end;
 end;
+
+procedure VecAbs(pA: PCmplx128; pRes: PDouble; aCount: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- pA, RDX <- pRes, R8 <- aCount
+asm
+  mov r9, r8
+  shr r8, 1
+  jz @rest
+@L:
+  movupd xmm0, [rcx]
+  movupd xmm2, [rcx + 16]
+  mulpd xmm0, xmm0
+  mulpd xmm2, xmm2
+  movhlps xmm1, xmm0
+  movhlps xmm3, xmm2
+  addsd xmm0, xmm1
+  addsd xmm2, xmm3
+  movlhps xmm0, xmm2
+  sqrtpd xmm0, xmm0
+  movupd [rdx], xmm0
+  add rcx, 32
+  add rdx, 16
+  dec r8
+  jnz @L
+@rest:
+  and r9, 1
+  jz @end
+  movupd xmm0, [rcx]
+  mulpd xmm0, xmm0
+  movhlps xmm1, xmm0
+  addsd xmm0, xmm1
+  sqrtsd xmm0, xmm0
+  movsd [rdx], xmm0
+@end:
+end;
+{$else}
+var pEnd: PByte;
+begin
+  pEnd := PByte(pA) + aCount * cC128Sz;
+  while PByte(pA) < pEnd do begin
+    with pA^ do
+      pRes^ := Sqrt(Sqr(Re) + Sqr(Im));
+    Inc(pRes);
+    Inc(pA);
+  end;
+end;
+{$endif}
 
 procedure VecMul(pA, pB, pRes: PSingle; aCount: NativeInt);
 {$if defined(ASMx86)}

@@ -130,6 +130,7 @@ type
     procedure TestVecNeg_Double_9;
     procedure TestVecAbs_Single_3;
     procedure TestVecAbs_Single_8;
+    procedure TestVecAbs_Cmplx128_3;
     procedure TestVecAnd_3;
     procedure TestVecAnd_4;
     procedure TestVecAnd_5;
@@ -1647,6 +1648,18 @@ begin
   VecAbs(PSingle(x), PSingle(y), Length(x));
   for I := 0 to High(x) do
     CheckEquals(Abs(x[I]), y[I], 1e-6);
+end;
+
+procedure TTestVectorMath.TestVecAbs_Cmplx128_3;
+var x: TArray<TCmplx128>;
+    y: TArray<Double>;
+    I: Integer;
+begin
+  x := TArray<TCmplx128>.Create(Cmplx(1, 2), Cmplx(3, -4), Cmplx(-1, 3));
+  SetLength(y, Length(x));
+  VecAbs(PCmplx128(x), PDouble(y), Length(x));
+  for I := 0 to High(x) do
+    CheckEquals(x[I].Abs, y[I], 1e-12);
 end;
 
 procedure TTestVectorMath.TestVecAnd_3;

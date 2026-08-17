@@ -50,6 +50,7 @@ type
     procedure VecNeg_Double;
     procedure VecAbs_Single;
     procedure VecAbs_Double;
+    procedure VecAbs_Cmplx128;
     procedure VecMin_UI8;
     procedure VecMax_Single;
     procedure Diff_Single;
@@ -650,6 +651,26 @@ begin
   VecAbs(PDouble(x), PDouble(y), Length(x));
   SWStop;
 end;
+
+procedure TVecMathPerformance.VecAbs_Cmplx128;
+var x: TArray<TCmplx128>;
+    y: TArray<Double>;
+    I: Integer;
+const N = 10000000;
+begin
+  SetLength(x, N);
+  for I := 0 to High(x) do begin
+    x[I].Re := Random(100);
+    x[I].Im := Random(100);
+  end;
+
+  SetLength(y, N);
+
+  SWStart;
+  VecAbs(PCmplx128(x), PDouble(y), Length(x));
+  SWStop;
+end;
+
 
 procedure TVecMathPerformance.VecMin_UI8;
 var x, y: TArray<UInt8>;
