@@ -64,6 +64,8 @@ type
     procedure FillMatColsByValue;
     procedure FillMatCornersByValue;
     procedure PartAssignment;
+    procedure FillMatColByVec;
+    procedure FillMatColsByVec;
 
     procedure SetPart2DContLvl0;
     procedure SetPart2DContLvl1;
@@ -131,6 +133,7 @@ type
     procedure Array3D_SliceAxes21;
     procedure Array3D_SliceAxes20;
     procedure Array3D_SliceAxes10;
+    procedure Array3D_SliceAxis1;
   end;
 
   TNDASliceItChainTests = class(TNDATestCase)
@@ -197,6 +200,8 @@ type
 
     procedure BroadcastLvlArr2DArr1D;
     procedure BreadcastLvlArr2DArr2D;
+
+    procedure BroadcastableQ2D;
 
     procedure Copy2DPacked;
     procedure Copy2DStridesLvl0;
@@ -845,6 +850,40 @@ begin
   CheckEquals(4,  m[1, 0]);
   CheckEquals(10, m[1, 1]);
   CheckEquals(6,  m[1, 2]);
+end;
+
+procedure TArrayTests.FillMatColByVec;
+var a, b: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+  b := TNDAUt.AsArray<Integer>([3, 2, 1]);
+
+  a[[NDIAll, NDI(0)]] := b;
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(a, m));
+
+  CheckEquals(3, Length(m));
+  CheckEquals([3, 2, 3], m[0]);
+  CheckEquals([2, 5, 6], m[1]);
+  CheckEquals([1, 8, 9], m[2]);
+end;
+
+procedure TArrayTests.FillMatColsByVec;
+var a, b: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+  b := TNDAUt.AsArray<Integer>([[3], [2], [1]]);
+
+  a[[NDIAll, NDISpan(0,1)]] := b;
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(a, m));
+
+  CheckEquals(3, Length(m));
+  CheckEquals([3, 3, 3], m[0]);
+  CheckEquals([2, 2, 6], m[1]);
+  CheckEquals([1, 1, 9], m[2]);
 end;
 
 procedure TArrayTests.SetPart2DContLvl0;
@@ -1622,6 +1661,35 @@ begin
     CheckEquals([2, 8],  m[0]);
     CheckEquals([4, 10], m[1]);
     Checkequals([6, 12], m[2]);
+
+    CheckFalse(it.MoveNext);
+  finally
+    it.Free;
+  end;
+end;
+
+procedure TNDASliceItTests.Array3D_SliceAxis1;
+var a: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+    it: TNDASliceIt;
+begin
+  a := iRng2NDA([2, 3, 2]);
+  it := TNDASliceIt.Create(a, 1, 1);
+  try
+    CheckTrue(it.MoveNext);
+    CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(it.CurrentSlice, m));
+    CheckEquals([1, 2],  m[0]);
+    CheckEquals([7, 8],  m[1]);
+
+    CheckTrue(it.MoveNext);
+    CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(it.CurrentSlice, m));
+    CheckEquals([3, 4],  m[0]);
+    CheckEquals([9, 10], m[1]);
+
+    CheckTrue(it.MoveNext);
+    CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(it.CurrentSlice, m));
+    CheckEquals([5, 6],   m[0]);
+    CheckEquals([11, 12], m[1]);
 
     CheckFalse(it.MoveNext);
   finally
@@ -2523,6 +2591,34 @@ begin
   lvl := BroadcastLvl(a, b);
 
   CheckEquals(0, lvl);
+end;
+
+procedure TNDAUtTests.BroadcastableQ2D;
+var a, b: INDArray<Integer>;
+    axis: Integer;
+begin
+  a := TNDAUt.Full<Integer>([3, 2], 0);
+  b := TNDAUt.Full<Integer>([1, 2], 0);
+
+  CheckTrue(BroadcastableQ(a, b, axis));
+  CheckEquals(0, axis);
+
+  a := TNDAUt.Full<Integer>([3, 2], 0);
+  b := TNDAUt.Full<Integer>([3, 1], 0);
+
+  CheckTrue(BroadcastableQ(a, b, axis));
+  CheckEquals(1, axis);
+
+  a := TNDAUt.Full<Integer>([3, 2], 0);
+  b := TNDAUt.Full<Integer>([3, 2], 0);
+
+  CheckTrue(BroadcastableQ(a, b, axis));
+  CheckEquals(-1, axis);
+
+  a := TNDAUt.Full<Integer>([3, 2], 0);
+  b := TNDAUt.Full<Integer>([3, 3], 0);
+
+  CheckFalse(BroadcastableQ(a, b, axis));
 end;
 
 procedure TNDAUtTests.Copy2DPacked;

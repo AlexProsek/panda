@@ -160,6 +160,8 @@ type
     function GetFillRFunc: TIPProcVV; virtual; abstract;
     procedure SetPart_SetIdx(const aIdx: INDIndexSeq; const aValue: INDArray); virtual;
     procedure SetSlicePart(const aSlice: INDArray; const aIdx: INDIndexSeq; const aValue: INDArray); virtual; abstract;
+    procedure BroadcastSetPart(const aDst, aValue: INDArray; aAxis: Integer);
+    procedure AssignPart(const aDst, aValue: INDArray); virtual; abstract;
     function PermuteAxes(const aPerm: array of Integer): INDArray; virtual; abstract;
     procedure InitPermuted(const aShape, aStrides: TArray<NativeInt>; const aAxesPerm: array of Integer);
   end;
@@ -172,6 +174,7 @@ type
     function GetItemPart(const aIdx: array of INDIndex): T;
     procedure SetItemPart(const aIdx: array of INDIndex; const aValue: T);
     procedure SetSlicePart(const aSlice: INDArray; const aIdx: INDIndexSeq; const aValue: INDArray); override;
+    procedure AssignPart(const aDst, aValue: INDArray); override;
     function GetFillRFunc: TIPProcVV; override;
     function PermuteAxes(const aPerm: array of Integer): INDArray; override;
   public
@@ -500,7 +503,8 @@ type
     class procedure MapL<T>(const L: T; const R: INDArray<T>; aLFnc :TIPProcVV); overload; static; inline;
 
     class procedure Copy<T>(aSrc, aDst: PByte; aCount: NativeInt); overload; static;
-    class procedure Copy<T>(aSrc, aDst: PByte; aCount, aStep: NativeInt); overload; static;
+    class procedure Copy<T>(aSrc, aDst: PByte; aCount, aSrcStep: NativeInt); overload; static;
+    class procedure Copy<T>(aSrc, aDst: PByte; aCount, aSrcStep, aDstStep: NativeInt); overload; static;
     class procedure Copy<T>(const aArr: INDArray; aDst: PByte); overload; static;
     class function Permute<T>(const aData: TArray<T>; const aIndices: array of Integer): TArray<T>;
     class procedure AdjustBuffer<T>(const aShape: TNDAShape; var aBuff: INDArray<T>); static;
@@ -585,6 +589,7 @@ type
   function GetCommonCContLvl(const A, B: INDArray; out aSz: NativeInt): Integer;
   function CheckCContLvl(const aArr: INDArray; aRequiredLvl: Integer): Boolean;
   function BroadcastLvl(A, B: INDArray): Integer;
+  function BroadcastableQ(const A, B: INDArray; out aAxis: Integer): Boolean;
   function GetPartShape(const A: INDArray; const aIdx: INDIndexSeq): TNDAShape;
   function CompatibleQ(const aShapes: array of TNDAShape; out aResShape: TNDAShape): Boolean; overload;
   function CompatibleQ(const aArrays: array of INDArray; out aResShape: TNDAShape; out aType: PTypeInfo): Boolean; overload;
@@ -861,6 +866,26 @@ begin
   for I := 0 to Result do
     if sA[hiLvlA - I] <> sB[hiLvlB - I] then exit(-1);
   Result := hiLvlA - Result;
+end;
+
+function BroadcastableQ(const A, B: INDArray; out aAxis: Integer): Boolean;
+var sA, sB: TNDAShape;
+    I: Integer;
+begin
+  if A.NDim <> B.NDim then exit(False);
+
+  aAxis := -1;
+  sA := A.Shape;
+  sB := B.Shape;
+  for I := High(SA) downto 0 do
+    if sA[I] <> sB[I] then begin
+      if (sA[I] = 1) or (sB[I] = 1) then begin
+        if aAxis >= 0 then exit(False);
+        aAxis := I;
+      end else
+        exit(False);
+    end;
+  Result := True;
 end;
 
 function GetPartShape(const A: INDArray; const aIdx: INDIndexSeq): TNDAShape;
@@ -1772,6 +1797,18 @@ begin
   end;
 end;
 
+procedure TNDA.BroadcastSetPart(const aDst, aValue: INDArray; aAxis: Integer);
+var it: TNDASliceIt;
+begin
+  it := TNDASliceIt.Create(aDst, aAxis, aAxis);
+  try
+    while it.MoveNext do
+      AssignPart(it.CurrentSlice, aValue);
+  finally
+    it.Free;
+  end;
+end;
+
 procedure TNDA.InitPermuted(const aShape, aStrides: TArray<NativeInt>;
   const aAxesPerm: array of Integer);
 var I, J, nDim: Integer;
@@ -1882,6 +1919,48 @@ begin
   slice[aIdx] := val;
 end;
 
+procedure TNDA<T>.AssignPart(const aDst, aValue: INDArray);
+var it1, it2: TNDAIt;
+    aLvl, vLvl, hiLvl: Integer;
+    aSz, vSz, s1, s2: NativeInt;
+begin
+  aLvl := GetCContLvl(aValue, aSz);
+  vLvl := GetCContLvl(aDst, vSz);
+  aLvl := Max(aLvl, vLvl);
+  if aLvl = 0 then begin
+    TNDAUt.Copy<T>(aValue.Data, aDst.Data, aSz div SizeOf(T));
+    exit;
+  end;
+  aSz := Min(aSz, vSz);
+
+  hiLvl := aDst.NDim - 1;
+  if hiLvl = 0 then begin
+    TNDAUt.Copy<T>(aValue.Data, aDst.Data,
+      aDst.Shape[hiLvl], aValue.Strides[hiLvl], aDst.Strides[hiLvl]
+    );
+    exit;
+  end;
+
+  it1 := TNDAIt.Create(aDst, Min(aLvl - 1, hiLvl - 1));
+  it2 := TNDAIt.Create(aValue, Min(aLvl - 1, hiLvl - 1));
+  try
+    if aSz = SizeOf(T) then begin
+      s1 := aDst.Strides[hiLvl];
+      s2 := aValue.Strides[hiLvl];
+      aSz := aDst.Shape[hiLvl];
+      while it1.MoveNext and it2.MoveNext do
+        TNDAUt.Copy<T>(it2.Current, it1.Current, aSz, s2, s1);
+    end else begin
+      aSz := aSz div SizeOf(T);
+      while it1.MoveNext and it2.MoveNext do
+        TNDAUt.Copy<T>(it2.Current, it1.Current, aSz);
+    end;
+  finally
+    it1.Free;
+    it2.Free;
+  end;
+end;
+
 function TNDA<T>.GetFillRFunc: TIPProcVV;
 begin
   Result := TNDAUt.TFuncUt<T>.FillR;
@@ -1895,9 +1974,7 @@ end;
 procedure TNDA<T>.SetPart(const aIdx: INDIndexSeq; const aValue: INDArray<T>);
 var view: INDArray<T>;
     its: TNDIndexTypes;
-    it1, it2: TNDAIt;
-    aLvl, vLvl: Integer;
-    aSz, vSz: NativeInt;
+    brAxis: Integer;
     val: T;
 begin
   NDITypes(aIdx, its);
@@ -1919,35 +1996,15 @@ begin
     exit;
   end;
 
-  if not SameShapeQ(view, aValue) then
+  if not BroadcastableQ(view, aValue, brAxis) then
     raise ENDAPartError.CreateFmt(csInvBroadcastErr,
-      [NDIToStr(view.Shape), NDIToStr(aValue.Shape)]
+      [NDIToStr(aValue.Shape), NDIToStr(view.Shape)]
     );
 
-  aLvl := GetCContLvl(aValue, aSz);
-  vLvl := GetCContLvl(view, vSz);
-  aLvl := Max(aLvl, vLvl);
-  if aLvl = 0 then begin
-    TNDAUt.Copy<T>(aValue.Data, view.Data, aSz div SizeOf(T));
-    exit;
-  end;
-  aSz := Min(aSz, vSz);
-
-  it1 := TNDAIt.Create(view, aLvl - 1);
-  it2 := TNDAIt.Create(aValue, aLvl - 1);
-  try
-    if aSz = SizeOf(T) then begin
-      while it1.MoveNext and it2.MoveNext do
-        PT(it1.Current)^  := PT(it2.Current)^;
-    end else begin
-      aSz := aSz div SizeOf(T);
-      while it1.MoveNext and it2.MoveNext do
-        TNDAUt.Copy<T>(it2.Current, it1.Current, aSz);
-    end;
-  finally
-    it1.Free;
-    it2.Free;
-  end;
+  if brAxis >= 0 then
+    BroadcastSetPart(view, aValue, brAxis)
+  else
+    AssignPart(view, aValue);
 end;
 
 function TNDA<T>.Reshape(const aShape: array of NativeInt): INDArray<T>;
@@ -2939,14 +2996,25 @@ begin
     Move(aSrc^, aDst^, aCount * SizeOf(T));
 end;
 
-class procedure TNDAUt.Copy<T>(aSrc, aDst: PByte; aCount, aStep: NativeInt);
+class procedure TNDAUt.Copy<T>(aSrc, aDst: PByte; aCount, aSrcStep: NativeInt);
 var pEnd: PByte;
 begin
-  pEnd := aSrc + aCount * aStep;
-  while aSrc < pEnd do begin
+  pEnd := aSrc + aCount * aSrcStep;
+  while aSrc <> pEnd do begin
     TNDA<T>.PT(aDst)^ := TNDA<T>.PT(aSrc)^;
-    Inc(aSrc, aStep);
+    Inc(aSrc, aSrcStep);
     Inc(aDst, SizeOf(T));
+  end;
+end;
+
+class procedure TNDAUt.Copy<T>(aSrc, aDst: PByte; aCount, aSrcStep, aDstStep: NativeInt);
+var pEnd: PByte;
+begin
+  pEnd := aSrc + aCount * aSrcStep;
+  while aSrc <> pEnd do begin
+    TNDA<T>.PT(aDst)^ := TNDA<T>.PT(aSrc)^;
+    Inc(aSrc, aSrcStep);
+    Inc(aDst, aDstStep);
   end;
 end;
 
