@@ -18,6 +18,7 @@ type
     procedure AddVecInPlace_Single;
     procedure MulVec_Single;
     procedure MulVec_Double;
+    procedure MulVec_Cmplx64;
     procedure MulVec_Cmplx128;
     procedure DivVec_Cmplx128;
     procedure AddScalarToVec_Single;
@@ -25,6 +26,7 @@ type
     procedure AddScalarToVec_Cmplx128;
     procedure SubScalarFromVec_Single;
     procedure MulVecByScalar_Single;
+    procedure MulVecByScalar_Cmplx64;
     procedure MulVecByScalar_Cmplx128;
     procedure AddVecWithSat_UInt8;
     procedure AddVecWithSat_UInt16;
@@ -143,6 +145,18 @@ begin
   SWStop;
 end;
 
+procedure TVecMathPerformance.MulVec_Cmplx64;
+var x, res: TArray<TCmplx64>;
+const N = 1000000;
+begin
+  SetLength(x, N);
+  SetLength(res, N);
+
+  SWStart;
+  DoTestLoop(procedure begin VecMul(PCmplx64(@x[0]), @x[0], @res[0], N) end, 100);
+  SWStop;
+end;
+
 procedure TVecMathPerformance.MulVec_Cmplx128;
 var x, res: TArray<TCmplx128>;
 const N = 1000000;
@@ -237,6 +251,20 @@ begin
 
   SWStart;
   VecMul(PSingle(x), y, PSingle(res), N);
+  SWStop;
+end;
+
+procedure TVecMathPerformance.MulVecByScalar_Cmplx64;
+var x, res: TArray<TCmplx64>;
+    y: TCmplx64;
+const N = 1000000;
+begin
+  y.Init(1, 2);
+  SetLength(x, N);
+  SetLength(res, N);
+
+  SWStart;
+  VecMul(PCmplx64(x), y, PCmplx64(res), N);
   SWStop;
 end;
 

@@ -46,9 +46,11 @@ procedure VecAbs(pA: PCmplx128; pRes: PDouble; aCount: NativeInt); overload;
 
 procedure VecMul(pA, pB, pRes: PSingle; aCount: NativeInt); overload;
 procedure VecMul(pA, pB, pRes: PDouble; aCount: NativeInt); overload;
+procedure VecMul(pA, pB, pRes: PCmplx64; aCount: NativeInt); overload;
 procedure VecMul(pA, pB, pRes: PCmplx128; aCount: NativeInt); overload;
 procedure VecMul(pA: PSingle; B: Single; pRes: PSingle; aCount: NativeInt); overload;
 procedure VecMul(pA: PDouble; const B: Double; pRes: PDouble; aCount: NativeInt); overload;
+procedure VecMul(pA: PCmplx64; const B: TCmplx64; pRes: PCmplx64; aCount: NativeInt); overload;
 procedure VecMul(pA: PCmplx128; const B: TCmplx128; pRes: PCmplx128; aCount: NativeInt); overload;
 
 procedure VecDiv(pA, pB, pRes: PSingle; aCount: NativeInt); overload;
@@ -1593,6 +1595,65 @@ begin
 end;
 {$endif}
 
+procedure VecMul(pA, pB, pRes: PCmplx64; aCount: NativeInt);
+{$if defined(ASMx64)}
+ // RCX <- pA, RDX <- pB, R8 <- pRes, R9 <- aCount
+asm
+  mov r10, r9
+  shr r9, 1
+  jz @rest
+@L:
+  movups xmm0, [rcx]      // xmm0 <- (a[k], a[k+1])
+  movups xmm1, [rdx]      // xmm1 <- (b[k], b[k+1])
+  pshufd xmm2, xmm0, $14  // xmm2 <- (a[k].re, a[k].im, a[k].im, a[k].re)
+  pshufd xmm3, xmm1, $50  // xmm3 <- (b[k].re, b[k].re, b[k].im, b[k].im)
+  mulps xmm2, xmm3
+  movhlps xmm3, xmm2
+  addsubps xmm2, xmm3
+  movq [r8], xmm2         // res[k] <- a[k] * b[k]
+  pshufd xmm0, xmm0, $be  // xmm0 <- (a[k+1].re, a[k+1].im, a[k+1].im, a[k+1].re)
+  pshufd xmm1, xmm1, $fa  // xmm1 <- (b[k+1].re, b[k+1].re, b[k+1].im, b[k+1].im)
+  mulps xmm0, xmm1
+  movhlps xmm1, xmm0
+  addsubps xmm0, xmm1
+  movq [r8 + 8], xmm0     // res[k+1] <- a[k+1] * b[k+1]
+  add rcx, 16
+  add rdx, 16
+  add r8, 16
+  dec r9
+  jnz @L
+@rest:
+  and r10, 1
+  jz @end
+  movq xmm0, [rcx]
+  movq xmm1, [rdx]
+  pshufd xmm2, xmm0, $14  // xmm2 <- (a.re, a.im, a.im, a.re)
+  pshufd xmm3, xmm1, $50  // xmm3 <- (b.re, b.re, b.im, b.im)
+  mulps xmm2, xmm3
+  movhlps xmm3, xmm2
+  addsubps xmm2, xmm3
+  movq [r8], xmm2
+@end:
+end;
+{$else}
+var pEnd: PByte;
+    tmp: TCmplx64;
+begin
+  pEnd := PByte(pA) + aCount * SizeOf(TCmplx64);
+  while PByte(pA) < pEnd do begin
+    with tmp do begin
+      Re := pA^.Re * pB^.Re - pA^.Im * pB^.Im;
+      Im := pA^.Im * pB^.Re + pA^.Re * pB^.Im;
+      pRes^.Re := Re;
+      pRes^.Im := Im;
+    end;
+    Inc(pRes);
+    Inc(pA);
+    Inc(pB);
+  end;
+end;
+{$endif}
+
 procedure VecMul(pA, pB, pRes: PCmplx128; aCount: NativeInt);
 {$if defined(ASMx86)}
 asm
@@ -1693,12 +1754,15 @@ asm
 end;
 {$else}
 var pEnd: PByte;
+    tmp: TCmplx128;
 begin
   pEnd := PByte(pA) + aCount * SizeOf(TCmplx128);
   while PByte(pA) < pEnd do begin
-    with pRes^ do begin
+    with tmp do begin
       Re := pA^.Re * pB^.Re - pA^.Im * pB^.Im;
       Im := pA^.Im * pB^.Re + pA^.Re * pB^.Im;
+      pRes^.Re := Re;
+      pRes^.Im := Im;
     end;
     Inc(pRes);
     Inc(pA);
@@ -1817,6 +1881,61 @@ begin
   pEnd := PByte(pA) + aCount * SizeOf(Double);
   while PByte(pA) < pEnd do begin
     pRes^  := pA^ * B;
+    Inc(pRes);
+    Inc(pA);
+  end;
+end;
+{$endif}
+
+procedure VecMul(pA: PCmplx64; const B: TCmplx64; pRes: PCmplx64; aCount: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- pA, RDX <- @B, R8 <- pRes, R9 <- aCount
+asm
+  mov r10, r9
+  movq xmm5, [rdx]        // xmm5 <- b
+  pshufd xmm5, xmm5, $50  // xmm5 <- (br, br, bi, bi)
+  shr r9, 1
+  jz @rest
+@L:
+  movups xmm0, [rcx]      // xmm0 <- (a[k], a[k+1])
+  pshufd xmm1, xmm0, $14  // xmm1 <- (a[k].re, a[k].im, a[k].im, a[k].re)
+  mulps xmm1, xmm5
+  movhlps xmm2, xmm1
+  addsubps xmm1, xmm2     // xmm1 <- a[k]*b[k]
+  pshufd xmm3, xmm0, $be  // xmm2 <- (a[k+1].re, a[k+1].im, a[k+1].im, a[k+1].re)
+  mulps xmm3, xmm5
+  movhlps xmm4, xmm3
+  addsubps xmm3, xmm4     // xmm3 <- a[k+1]*b[k+1]
+  movq [r8], xmm1         // res[k] <- a[k]*b[k]
+  movq [r8 + 8], xmm3     // res[k+1] <- a[k+1]*b[k+1]
+  add rcx, 16
+  add rdx, 16
+  add r8, 16
+  dec r9
+  jnz @L
+
+@rest:
+  and r10, 1
+  jz @end
+  movq xmm0, [rcx]
+  pshufd xmm1, xmm0, $14
+  mulps xmm1, xmm5
+  movhlps xmm2, xmm1
+  addsubps  xmm1, xmm2
+  movq [r8], xmm1
+@end:
+end;
+{$else}
+var pEnd: PByte;
+    tmpRe: Single;
+begin
+  pEnd := PByte(pA) + aCount * SizeOf(TCmplx64);
+  while PByte(pA) < pEnd do begin
+    with pRes^ do begin
+      tmpRe := pA^.Re;
+      Re := tmpRe * B.Re - pA^.Im * B.Im;
+      Im := tmpRe * B.Im + pA^.Im * B.Re;
+    end;
     Inc(pRes);
     Inc(pA);
   end;

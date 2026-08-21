@@ -166,6 +166,11 @@ function IntPwr(A: TLimb; aExponent: Integer): TLimb;
 
 implementation
 
+uses
+    panda.Nums
+  , System.Math
+  ;
+
 {$region 'helper functions'}
 
 function GCD(A, B: UInt64): UInt64;
@@ -464,7 +469,7 @@ var tmp: UInt64;
     pEnd: PByte;
 begin
   pAc := PCardinal(pA);
-  pEnd := pA + n * cLimbSize;
+  pEnd := PByte(pA) + n * cLimbSize;
   while PByte(pAc) < pEnd do begin
     tmp := pAc^;
     Inc(tmp, D);

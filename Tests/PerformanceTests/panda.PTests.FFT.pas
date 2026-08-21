@@ -3,7 +3,7 @@ unit panda.PTests.FFT;
 interface
 
 {$ifdef RELEASE}
-  {$define _OCV}
+  {$define OCV}
 {$endif}
 
 uses
@@ -50,6 +50,7 @@ type
     procedure RealFFT1D_MediumData;
     procedure RealFFT2D_1024x1024;
     procedure RealFFT2D_1024x768;
+    procedure RealIFFT2D_1024_1024;
   {$ifdef OCV}
     procedure OcvCmplxFFT1D_LargeData;
     procedure OcvRealFFT1D_LargeData;
@@ -513,6 +514,7 @@ begin
 
   fft := TRealFFTEval2DF32.Create;
   try
+//    fft.SpectrumLayout := slNative;
     fft.RecursiveMethodThreshold := 1024;
     fft.Init(H, W);
     fft.Execute(src, dst);  // warm-up
@@ -554,6 +556,49 @@ begin
     fft.Free;
   end;
 end;
+
+procedure TFFT32Tests.RealIFFT2D_1024_1024;
+var fft: TRealFFTEval2DF32;
+    ifft: TRealIFFTEval2DF32;
+    src, dst: INDArray<Single>;
+    tmp: INDArray<TCmplx64>;
+const W = 1024;
+      H = 768;
+begin
+  src := TNDAUt.Table2D<Single>(
+    function (X, Y: NativeInt): Single
+    begin
+      Result := (X mod 100) + (Y mod 50);
+    end,
+    0, W - 1, 0, H - 1
+  );
+  dst := TNDAUt.Empty<Single>([H, W]);
+
+  fft := TRealFFTEval2DF32.Create;
+  try
+    fft.SpectrumLayout := slNative;
+    fft.Init(H, W);
+    fft.Execute(src, tmp);
+  finally
+    fft.Free;
+  end;
+
+  ifft := TRealiFFTEval2DF32.Create;
+  try
+    ifft.SpectrumLayout := slNative;
+    ifft.Normalize := True;
+    ifft.RecursiveMethodThreshold := 1024;
+    ifft.Init(H, W);
+    ifft.Execute(tmp, dst);
+
+    SWStart;
+    DoTestLoop(procedure begin ifft.Execute(tmp, dst); end, 50);
+    SWStop(Format('%dx%d', [W, H]));
+  finally
+    ifft.Free;
+  end;
+end;
+
 
 {$ifdef OCV}
 procedure TFFT32Tests.OcvCmplxFFT1D_LargeData;

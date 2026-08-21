@@ -55,11 +55,17 @@ type
     procedure SubScalarWithSat16_UInt8;
     procedure SubScalarWithSat3_UInt16;
     procedure SubScalarWithSat8_UInt16;
+    procedure MulVec1_Cmplx64;
+    procedure MulVec2_Cmplx64;
+    procedure MulVec3_Cmplx64;
     procedure MulVec1_Cmplx128;
     procedure MulVec2_Cmplx128;
     procedure MulVec3_Cmplx128;
+    procedure MulVec3ip_Cmplx128;
     procedure MulByScalar3_Single;
     procedure MulByScalar5_Single;
+    procedure MulbyScalar1_Cmplx64;
+    procedure MulbyScalar2_Cmplx64;
     procedure MulbyScalar1_Cmplx128;
     procedure MulbyScalar2_Cmplx128;
     procedure DivVec1_Cmplx128;
@@ -717,6 +723,48 @@ begin
   CheckEquals(5, res[7]);
 end;
 
+procedure TTestVectorMath.MulVec1_Cmplx64;
+var a, b, c: TCmplx64;
+begin
+  a.Init(1, 2);
+  b.Init(3, 4);
+  VecMul(PCmplx64(@a), @b, @c, 1);
+  CheckEquals(-5, c.Re, stol);
+  CheckEquals(10, c.Im, stol);
+end;
+
+procedure TTestVectorMath.MulVec2_Cmplx64;
+var a, b, c: array [0..1] of TCmplx64;
+begin
+  a[0].Init(1, 2);
+  a[1].Init(3, 4);
+  b[0].Init(3, 4);
+  b[1].Init(5, 6);
+  VecMul(PCmplx64(@a), @b, @c, 2);
+  CheckEquals(-5, c[0].Re, stol);
+  CheckEquals(10, c[0].Im, stol);
+  CheckEquals(-9, c[1].Re, stol);
+  CheckEquals(38, c[1].Im, stol);
+end;
+
+procedure TTestVectorMath.MulVec3_Cmplx64;
+var a, b, c: array [0..2] of TCmplx64;
+begin
+  a[0].Init(1, 2);
+  a[1].Init(3, 4);
+  a[2].Init(5, 6);
+  b[0].Init(3, 4);
+  b[1].Init(5, 6);
+  b[2].Init(7, 8);
+  VecMul(PCmplx64(@a), @b, @c, 3);
+  CheckEquals(-5,  c[0].Re, stol);
+  CheckEquals(10,  c[0].Im, stol);
+  CheckEquals(-9,  c[1].Re, stol);
+  CheckEquals(38,  c[1].Im, stol);
+  CheckEquals(-13, c[2].Re, stol);
+  CheckEquals(82,  c[2].Im, stol);
+end;
+
 procedure TTestVectorMath.MulVec1_Cmplx128;
 var a, b, c: TCmplx128;
 begin
@@ -759,6 +807,24 @@ begin
   CheckEquals(82,  c[2].Im, dtol);
 end;
 
+procedure TTestVectorMath.MulVec3ip_Cmplx128;
+var a, b: array [0..2] of TCmplx128;
+begin
+  a[0].Init(1, 2);
+  a[1].Init(3, 4);
+  a[2].Init(5, 6);
+  b[0].Init(3, 4);
+  b[1].Init(5, 6);
+  b[2].Init(7, 8);
+  VecMul(PCmplx128(@a), @b, @b, 3);
+  CheckEquals(-5,  b[0].Re, dtol);
+  CheckEquals(10,  b[0].Im, dtol);
+  CheckEquals(-9,  b[1].Re, dtol);
+  CheckEquals(38,  b[1].Im, dtol);
+  CheckEquals(-13, b[2].Re, dtol);
+  CheckEquals(82,  b[2].Im, dtol);
+end;
+
 procedure TTestVectorMath.MulByScalar3_Single;
 const
   A: array [0..2] of Single = (1, 2, 3);
@@ -781,6 +847,30 @@ begin
   CheckEquals(6, res[2]);
   CheckEquals(8, res[3]);
   CheckEquals(10, res[4]);
+end;
+
+procedure TTestVectorMath.MulbyScalar1_Cmplx64;
+var a, b, c: TCmplx64;
+begin
+  a.Init(1, 2);
+  b.Init(3, 4);
+  VecMul(PCmplx64(@a), b, @c, 1);
+  CheckEquals(-5, c.Re, sTol);
+  CheckEquals(10, c.Im, sTol);
+end;
+
+procedure TTestVectorMath.MulbyScalar2_Cmplx64;
+var a, c: array [0..1] of TCmplx64;
+    b: TCmplx64;
+begin
+  a[0].Init(1, 2);
+  a[1].Init(2, 3);
+  b.Init(4, 5);
+  VecMul(PCmplx64(@a), b, @c, 2);
+  CheckEquals(-6, c[0].Re, sTol);
+  CheckEquals(13, c[0].Im, sTol);
+  CheckEquals(-7, c[1].Re, sTol);
+  CheckEquals(22, c[1].Im, sTol);
 end;
 
 procedure TTestVectorMath.MulbyScalar1_Cmplx128;
