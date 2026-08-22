@@ -7,6 +7,8 @@ uses
   , panda.Intfs
   , panda.Arrays
   , panda.Conv
+  , panda.Math
+  , panda.Arithmetic
   , panda.Tests.NDATestCase
   ;
 
@@ -20,6 +22,7 @@ type
   published
     procedure Correlate1D;
     procedure Correlate2D;
+    procedure Correlate3D;
     procedure Correlate1D_K3;
     procedure Correlate2D_K3;
     procedure Corr1D_Impulse;
@@ -83,6 +86,30 @@ begin
     for J := 0 to High(m[I]) do
       CheckEquals(cLs[I,J]+2*cLs[I,J+1]+3*cLs[I+1,J]+4*cLs[I+1,J+1], m[I,J], tol);
 end;
+
+procedure TCorrTests.Correlate3D;
+var a, res: INDArray<Single>;
+    ker, b: TTensorF32;
+    t: TArray<TArray<TArray<Single>>>;
+    s: Single;
+    I, J, K: Integer;
+begin
+  a := sRng2NDA([3, 4, 5]);
+  ker := sRng2NDA([2, 2, 2]);
+
+  res := ndaCorrelate(ker, a);
+
+  CheckEquals([2, 3, 4], res.Shape);
+  TNDAUt.TryAsDynArray3D<Single>(res, t);
+  for I := 0 to 1 do
+    for J := 0 to 2 do
+      for K := 0 to 3 do begin
+        b := a[[NDISpan(I,I+1), NDISpan(J,J+1), NDISpan(K,K+1)]];
+        TNDAUt.TryAsScalar<Single>(ndaTotalToLvl(ker * b, 2), s);
+        CheckEquals(s, t[I, J, K], tol);
+      end;
+end;
+
 
 procedure TCorrTests.Correlate1D_K3;
 var k, ls, res: INDArray<Single>;

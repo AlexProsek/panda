@@ -9,14 +9,15 @@ uses
   , panda.Intfs
   , panda.Arrays
   , panda.cvArithmetic
-  , panda.cvMath
 {$ifdef BLAS}
   , LibCBLAS
 {$endif}
   ;
 
+{$I AsmDefs.inc}
+
 type
-  TCorrBase = class abstract
+  TCorr = class abstract
   protected type
     // pK - kernel
     // aKSz - kernel size
@@ -30,6 +31,16 @@ type
     fInSh, fOutSh: TNDAShape;
     fInitialized: Boolean;
     fCorrProc: TCorr1DProc;
+    fItRes, fItArr: TNDAIt;
+    fItK, fItAb: TNDAIt;
+    fSItK, fSItRes: TNDASliceIt;
+    fKer, fRes, fRs: INDArray;
+    fAbIdx, fArIdx: INDIndexSeq;
+    fKnSt, fKnSz, fRnSz: NativeInt;
+    procedure InternalInit(const aK: INDArray; const aInShape: TNDAShape); virtual;
+    procedure InternalEval1D(const aInput: INDArray); virtual;
+    procedure InternalEvalND(const aInput: INDArray); virtual;
+    procedure InternalEval(const aInput: INDArray); virtual;
     function CreateBuffer(const aShape: TNDAShape): INDArray; virtual; abstract;
     function AsContiguous(const aArr: INDArray): INDArray; virtual; abstract;
     procedure CheckInput(const aInput: INDArray);
@@ -41,48 +52,11 @@ type
     property Initialized: Boolean read fInitialized;
   end;
 
-  // This class is introduced only to reduce Shape() and Strides() calling
-  TBlockIt = class(TNDAIt)
-  protected
-    fShape: TArray<NativeInt>;
-    fStrides: TArray<NativeInt>;
-  public
-    procedure AfterConstruction; override;
-    
-    property Shape: TArray<NativeInt> read fShape;
-    property Strides: TArray<NativeInt> read fStrides;
-  end;  
-
-  TCorr = class abstract(TCorrBase)
-  protected type
-      TTotalProc = procedure (aIt: TBlockIt; pRes: PByte) of object;
-  protected
-    fItRes, fItArr: TNDAIt;
-    fItK, fItAb, fItRb: TNDAIt;
-    fSItKs, fSItK, fSItRes: TNDASliceIt;
-    fItKs: TBlockIt;
-    fKer, fRes, fRs, fRb, fKs: INDArray;
-    fKsPtr: PByte;
-    fAbIdx, fArIdx: INDIndexSeq;
-    fKnSt, fKnSz, fKsSz, fRnSz: NativeInt;
-    fTotalProc: TTotalProc;
-    procedure InternalInit(const aK: INDArray; const aInShape: TNDAShape); virtual;
-    procedure InternalEval1D(const aInput: INDArray); virtual;
-    procedure InternalEvalND(const aInput: INDArray); virtual;
-    procedure InternalEval(const aInput: INDArray); virtual;
-    procedure Total1D(aIt: TBlockIt; pRes: PByte); virtual; abstract;
-    procedure TotalND(aIt: TBlockIt; pRes: PByte); virtual; abstract;
-  public
-    procedure Finalize; override;
-  end;
-
   TCorr<T> = class abstract(TCorr)
   protected
     function CreateBuffer(const aShape: TNDAShape): INDArray; override;
     function AsContiguous(const aArr: INDArray): INDArray; override;
     function GetOutput: INDArray<T>;
-    procedure Copy1D(aIt: TBlockIt; pDst: PByte);
-    procedure CopyND(aIt: TBlockIt; pDst: PByte);
   public
     constructor Create(const aK: INDArray<T>; aInShape: TNDAShape); virtual;
     procedure Evaluate(const aArr: INDArray<T>);
@@ -91,17 +65,11 @@ type
   end;
   
   TCorrF32 = class(TCorr<Single>)
-  protected
-    procedure Total1D(aIt: TBlockIt; pRes: PByte); override;
-    procedure TotalND(aIt: TBlockIt; pRes: PByte); override;
   public
     procedure AfterConstruction; override;
   end;
 
   TCorrF64 = class(TCorr<Double>)
-  protected
-    procedure Total1D(aIt: TBlockIt; pRes: PByte); override;
-    procedure TotalND(aIt: TBlockIt; pRes: PByte); override;
   public
     procedure AfterConstruction; override;
   end;
@@ -112,6 +80,8 @@ function ndaConvolve(const aKer, aArr: INDArray<Single>): INDArray<Single>; over
 function ndaConvolve(const aKer, aArr: INDArray<Double>): INDArray<Double>; overload;
 
 implementation
+
+{$EXCESSPRECISION OFF} // to prevent Single -> Double conversion by x64 compiler
 
 uses
     panda.ArrManip
@@ -132,21 +102,16 @@ end;
 
 {$endregion}
 
-{$region 'TCorrBase'}
+{$region 'TCorr'}
 
-procedure TCorrBase.BeforeDestruction; 
+procedure TCorr.BeforeDestruction;
 begin
   if fInitialized then
     Finalize;
   inherited;
 end;
 
-procedure TCorrBase.Finalize; 
-begin
-  fInitialized := False;
-end;
-
-procedure TCorrBase.CheckInput(const aInput: INDArray);
+procedure TCorr.CheckInput(const aInput: INDArray);
 var sh: TNDAShape;
     I: Integer;
 begin
@@ -158,7 +123,7 @@ begin
       raise ENDAShapeError.Create('Incorrect input shape.');
 end;
 
-class function TCorrBase.OutShape(const aLShape, aKerShape: TNDAShape): TNDAShape;
+class function TCorr.OutShape(const aLShape, aKerShape: TNDAShape): TNDAShape;
 var I, dim, lvl0: Integer;
 begin
   Assert((Length(aLShape) > 0) and (Length(aKerShape) > 0));
@@ -178,20 +143,6 @@ begin
       Result[lvl0 + I] := aLShape[I] - aKerShape[lvl0 + I] + 1;
   end;
 end;
-
-{$endregion}
-
-{$region 'TBlockIt'}
-
-procedure TBlockIt.AfterConstruction;
-begin
-  fShape := fArr.Shape;
-  fStrides := fArr.Strides;
-end;
-
-{$endregion}
-
-{$region 'TCorr'}
 
 procedure TCorr.InternalInit(const aK: INDArray; const aInShape: TNDAShape);
 var kSh, rbSh: TNDAShape;
@@ -220,17 +171,12 @@ begin
   end else
     fRs := fRes;
 
-  case fNDim of
-    1: begin
-      fKnSz := kSh[kLvl0];
-      fKnSt := aK.Strides[kLvl0 + fNDim - 1];
-      fRnSz := aInShape[inLvl0] - kSh[kLvl0] + 1;
-      fInitialized := True;
-      exit;
-    end;
-    2: fTotalProc := Total1D;
-  else
-    fTotalProc := TotalND;
+  if fNDim = 1 then begin
+    fKnSz := kSh[kLvl0];
+    fKnSt := aK.Strides[kLvl0 + fNDim - 1];
+    fRnSz := aInShape[inLvl0] - kSh[kLvl0] + 1;
+    fInitialized := True;
+    exit;
   end;
 
   SetLength(fAbIdx, fNDim - 1);
@@ -244,7 +190,6 @@ begin
   fRnSz := aInShape[inLvl0 + fNDim - 1] - kSh[kLvl0 + fNDim - 1] + 1;
   rbSh := Copy(kSh, kLvl0, fNDim);
   rbSh[fNDim - 1] := fRnSz;
-  fRb := CreateBuffer(rbSh); // Rb - buffer for sums over the last axis
 
   if fMapLvl <> 0 then
     fItRes := TNDAIt.Create(fSItRes.CurrentSlice, 0, fNDim - 2)
@@ -254,13 +199,7 @@ begin
     fItK  := TNDAIt.Create(fSItK.CurrentSlice, 0, fNDim - 2)
   else
     fItK  := TNDAIt.Create(fKer, 0, fNDim - 2);
-  fItRb := TNDAIt.Create(fRb, 0, fNDim - 2);
-  fSItKs := TNDASliceIt.Create(fRb, fNDim - 1, -1);
-  fItKs := TBlockIt.Create(fSItKs.CurrentSlice);
 
-  fKs := CreateBuffer(fSItKs.CurrentSlice.Shape);
-  fKsPtr := fKs.Data;
-  fKsSz := GetSize(fKs);
   fKnSz := kSh[kLvl0 + fNDim - 1];
   fKnSt := aK.Strides[kLvl0 + fNDim - 1];
   fInitialized := True;
@@ -271,20 +210,17 @@ begin
   FreeAndNil(fItRes);
   FreeAndNil(fSItRes);
   FreeAndNil(fItK);
-  FreeAndNil(fItRb);
   FreeAndNil(fSItK);
-  FreeAndNil(fSItKs);
-  FreeAndNil(fItKs);
   fKer := nil;
   fRes := nil;
   fRs := nil;
-  fRb := nil;
-  fKs := nil;
+  fInitialized := False;
   inherited;
 end;
 
 procedure TCorr.InternalEval1D(const aInput: INDArray);
 begin
+  FillChar(fRs.Data^, fRnSz * fRs.ItemSize, 0);
   fCorrProc(fKer.Data, fKnSt, fKnSz, aInput.Data, fRs.Data, fRnSz);
 end;
 
@@ -303,28 +239,22 @@ procedure TCorr.InternalEvalND(const aInput: INDArray);
 var itArr, itAb: TNDAIt;
     Ar, Ab: INDArray;
     elSz: Integer;
-    p: PByte;
 begin
   Ab := TBlockView.Create(aInput, fAbIdx);
   Ar := TBlockView.Create(aInput, fArIdx);
 
   itArr := TNDAIt.Create(Ar, 0, fNDim - 2);
-  itAb := TNDAIt.Create(Ab, 0, fNDim - 2); 
+  itAb := TNDAIt.Create(Ab, 0, fNDim - 2);
   try
-    elSz := fRs.ItemSize;
+    elSz := fRes.ItemSize;
     fItRes.Reset;
     while fItRes.MoveNext and itArr.MoveNext do begin
       TBlockView(Ab).SetOrigin(itArr.Current);
       itAb.Reset;
-      fItRb.Reset;
       fItK.Reset;
-      while fItK.MoveNext and itAb.MoveNext and fItRb.MoveNext do
-        fCorrProc(fItK.Current, fKnSt, fKnSz, itAb.Current, fItRb.Current, fRnSz);
-      p := fItRes.Current;
-      fSItKs.Reset;
-      while fSItKs.MoveNext do begin
-        fTotalProc(fItKs, p);
-        Inc(p, elSz);
+      FillChar(fItRes.Current^, fRnSz * elSz, 0);
+      while fItK.MoveNext and itAb.MoveNext do begin
+        fCorrProc(fItK.Current, fKnSt, fKnSz, itAb.Current, fItRes.Current, fRnSz);
       end;
     end;
   finally
@@ -412,43 +342,88 @@ end;
 function TCorr<T>.GetOutput: INDArray<T>;
 begin
   Result := (fRes as INDArray<T>);
-end; 
-
-procedure TCorr<T>.Copy1D(aIt: TBlockIt; pDst: PByte);
-var pSrc, pEnd: PByte;
-    srcStep: NativeInt;
-begin
-  pSrc := aIt.fArr.Data;
-  pEnd := pDst + aIt.Shape[0] * SizeOf(T);
-  srcStep := aIt.Strides[0];
-  while pDst < pEnd do begin
-    TNDA<T>.PT(pDst)^ := TNDA<T>.PT(pSrc)^;
-    Inc(pSrc, srcStep);
-    Inc(pDst, SizeOf(T));
-  end;
-end;
-
-procedure TCorr<T>.CopyND(aIt: TBlockIt; pDst: PByte);
-begin
-  aIt.Reset;
-  while aIt.MoveNext do begin
-    TNDA<T>.PT(pDst)^ := TNDA<T>.PT(aIt.Current)^;
-    Inc(pDst, SizeOf(T));
-  end;
 end;
 
 {$endregion}
 
 {$region 'TCorrF32'}
 
-procedure corr1df32(pK: PByte; aKStep, aKSz: NativeInt; pArr, pRes: PByte; aRSz: NativeInt);
+procedure _corr3F32(pK: PByte; aKStep, aKSz: NativeInt; pIn, pOut: PByte; aOutSz: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- pK, RDX <- aKStep, R8 <- aKSz, R9 <- pIn, [RBP + $30] <- pOut, [RBP + $38] <- aOutSz
+asm
+  movd xmm0, [rcx]
+  pshufd xmm0, xmm0, 0          // xmm0 <- 4x k1
+  movd xmm1, [rcx + rdx]
+  pshufd xmm1, xmm1, 0          // xmm1 <- 4x k2
+  movd xmm2, [rcx + 2*rdx]
+  pshufd xmm2, xmm2, 0          // xmm2 <- 4x k3
+  mov rcx, [rbp + $38]          // RCX <- aOutSz
+  mov r10, [rbp + $30]          // R10 <- pOut
+  shr rcx, 2
+  jz @rest
+@L:
+  movups xmm3, [r9]             // xmm3 <- In[k:k+3]
+  mulps xmm3, xmm0              // xmm3 <- k1*In[k:k+3]
+  movups xmm4, [r9 + 4]         // xmm4 <- In[k+1:k+4]
+  mulps xmm4, xmm1              // xmm4 <- k2*In[k+1:k+4]
+  addps xmm3, xmm4
+  movups xmm5, [r9 + 8]         // xmm5 <- In[k+2:k+5]
+  mulps xmm5, xmm2              // xmm5 <- k3*In[k+2:k+5]
+  addps xmm3, xmm5
+  movups xmm4, [r10]            // xmm4 <- Out[k:k+3]
+  addps xmm4, xmm3
+  movups [r10], xmm4
+  add r9, 16
+  add r10, 16
+  dec rcx
+  jnz @L
+
+@rest:
+  mov rcx, [rbp + $38]          // R10 <- aOutSz
+  and rcx, 3
+  jz @end
+@Lrest:
+  movd xmm3, [r9]
+  mulss xmm3, xmm0
+  movd xmm4, [r9 + 4]
+  mulss xmm4, xmm1
+  addss xmm3, xmm4
+  movd xmm5, [r9 + 8]
+  mulss xmm5, xmm2
+  addss xmm3, xmm5
+  movd xmm4, [r10]
+  addss xmm4, xmm3
+  movd [r10], xmm4
+  add r9, 4
+  add r10, 4
+  dec rcx
+  jnz @Lrest
+@end:
+end;
+{$else}
+var pEnd: PByte;
+    k1, k2, k3: Single;
+begin
+  k1 := PSingle(pK)^;
+  k2 := PSingle(pK + aKStep)^;
+  k3 := PSingle(pK + 2*aKStep)^;
+  pEnd := pOut + aOutSz * cF32Sz;
+  while pOut < pEnd do begin
+    PSingle(pOut)^ := PSingle(pOut)^ + k1 * PSingle(pIn)^ + k2 * PSingle(pIn + cF32Sz)^ + k3 * PSingle(pIn + 2*cF32Sz)^;
+    Inc(pOut, cF32Sz);
+    Inc(pIn, cF32Sz);
+  end;
+end;
+{$endif}
+
+procedure corr1dF32(pK: PByte; aKStep, aKSz: NativeInt; pArr, pRes: PByte; aRSz: NativeInt);
 var pEnd: PByte;
 begin
-  FillChar(pRes^, aRSz * cF32Sz, 0);
   pEnd := pK + aKSz * aKStep;
   while pK <> pEnd do begin
   {$ifdef BLAS}
-    cblas.saxpy(aRSz, PSingle(pArr), 1, PSingle(pRes), 1); 
+    cblas.saxpy(aRSz, PSingle(pK)^, PSingle(pArr), 1, PSingle(pRes), 1);
   {$else}
     axpy(PSingle(pK)^, PSingle(pArr), PSingle(pRes), aRSz);
   {$endif}
@@ -460,33 +435,25 @@ end;
 procedure TCorrF32.AfterConstruction;
 begin
   inherited;
-  fCorrProc := corr1df32;
-end;
 
-procedure TCorrF32.Total1D(aIt: TBlockIt; pRes: PByte); 
-begin
-  Copy1D(aIt, fKsPtr);
-  PSingle(pRes)^ := cvTotal(PSingle(fKsPtr), fKsSz);
-end;
-
-procedure TCorrF32.TotalND(aIt: TBlockIt; pRes: PByte); 
-begin
-  CopyND(aIt, fKsPtr);
-  PSingle(pRes)^ := cvTotal(PSingle(fKsPtr), fKsSz);
+  case fKnSz of
+    3: fCorrProc := _corr3F32;
+  else
+    fCorrProc := corr1dF32;
+  end;
 end;
 
 {$endregion}
 
 {$region 'TCorrF64'}
 
-procedure corr1df64(pK: PByte; aKStep, aKSz: NativeInt; pArr, pRes: PByte; aRSz: NativeInt);
+procedure corr1dF64(pK: PByte; aKStep, aKSz: NativeInt; pArr, pRes: PByte; aRSz: NativeInt);
 var pEnd: PByte;
 begin
-  FillChar(pRes^, aRSz * cF64Sz, 0);
   pEnd := pK + aKSz * aKStep;
   while pK <> pEnd do begin
   {$ifdef BLAS}
-    cblas.daxpy(aRSz, PDouble(pArr), 1, PDouble(pRes), 1);
+    cblas.daxpy(aRSz, PDouble(pK)^, PDouble(pArr), 1, PDouble(pRes), 1);
   {$else}
     axpy(PDouble(pK)^, PDouble(pArr), PDouble(pRes), aRSz);
   {$endif}
@@ -499,18 +466,6 @@ procedure TCorrF64.AfterConstruction;
 begin
   inherited;
   fCorrProc := corr1df64;
-end;
-
-procedure TCorrF64.Total1D(aIt: TBlockIt; pRes: PByte);
-begin
-  Copy1D(aIt, fKsPtr);
-  PDouble(pRes)^ := cvTotal(PDouble(fKsPtr), fKsSz);
-end;
-
-procedure TCorrF64.TotalND(aIt: TBlockIt; pRes: PByte);
-begin
-  CopyND(aIt, fKsPtr);
-  PDouble(pRes)^ := cvTotal(PDouble(fKsPtr), fKsSz);
 end;
 
 {$endregion}

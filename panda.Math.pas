@@ -53,7 +53,8 @@ function ndaTotal(const aArr: INDArray<Double>): INDArray<Double>; overload;
 /// <summary>
 ///   Gives totals all elements down to level <c>aLvl</c>.
 /// </summary>
-function ndaTotalToLvl(const aArr: INDArray<Single>; aLvl: Integer): INDArray<Single>;
+function ndaTotalToLvl(const aArr: INDArray<Single>; aLvl: Integer): INDArray<Single>; overload;
+function ndaTotalToLvl(const aArr: INDArray<Double>; aLvl: Integer): INDArray<Double>; overload;
 /// <summary>
 ///   Gives totals elements at level <c>aLvl</c>.
 /// </summary>
@@ -135,6 +136,18 @@ begin
     itRes.Free;
     itA.Free;
   end;
+end;
+
+class function TNDAMath.TotalToLvl<T>(const aArr: INDArray<T>; aLvl: Integer; aTotFunc: TNDAFuncNS<T>): INDArray<T>;
+var tmp: INDArray<T>;
+begin
+  aLvl := Min(aLvl, aArr.NDim - 1);
+  tmp := aArr;
+  while aLvl >= 0  do begin
+    tmp := TotalAtLvl<T>(tmp, 0, aTotFunc);
+    Dec(aLvl);
+  end;
+  Result := tmp;
 end;
 
 class function TNDAMath.InnerProdShape(const aAShape, aBShape: TNDAShape): TNDAShape;
@@ -456,6 +469,12 @@ end;
 
 function ndaTotalToLvl(const aArr: INDArray<Single>; aLvl: Integer): INDArray<Single>;
 begin
+  Result := TNDAMath.TotalToLvl<Single>(aArr, aLvl, Total);
+end;
+
+function ndaTotalToLvl(const aArr: INDArray<Double>; aLvl: Integer): INDArray<Double>;
+begin
+  Result := TNDAMath.TotalToLvl<Double>(aArr, aLvl, Total);
 end;
 
 function ndaTotalAtLvl(const aArr: INDArray<Integer>; aLvl: Integer): INDArray<Integer>;
