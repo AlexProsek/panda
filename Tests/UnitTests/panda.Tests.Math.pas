@@ -26,6 +26,8 @@ type
     procedure Total3D;
     procedure Total3DLvl1;
     procedure Total3DLvl2;
+    procedure TotalAll2D;
+    procedure TotalAll3D;
 
     procedure Softmax1D;
     procedure Softmax2D;
@@ -163,6 +165,24 @@ begin
   CheckEquals(15, x[[1, 0]], tol);
   CheckEquals(19, x[[1, 1]], tol);
   CheckEquals(23, x[[1, 2]], tol);
+end;
+
+procedure TMathTests.TotalAll2D;
+var x: INDArray<Single>;
+begin
+  x := TNDAUt.AsArray<Single>([[1, 2, 3], [4, 5, 6]]);
+  x := ndaTotalToLvl(x, 1);
+  CheckTrue(ScalarQ(x));
+  CheckEquals(21, PSingle(x.Data)^, tol);
+end;
+
+procedure TMathTests.TotalAll3D;
+var x: INDArray<Single>;
+begin
+  x := TNDAUt.AsArray<Single>([[[1, 2, 3], [4, 5, 6]], [[7, 8, 9], [10, 11, 12]]]);
+  x := ndaTotalToLvl(x, 2);
+  CheckTrue(ScalarQ(x));
+  CheckEquals(78, PSingle(x.Data)^, tol);
 end;
 
 function softmax(const aX: INDArray<Single>): INDArray<Single>;

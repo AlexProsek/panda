@@ -152,6 +152,22 @@ type
     property Part[const aIdx: INDIndexSeq]: TTensorF64 read GetPart write SetPart; default;
   end;
 
+  TTensorC64 = record
+  private
+    fArr: INDArray<TCmplx64>;
+    function GetPart(const aIdx: INDIndexSeq): TTensorC64; inline;
+    procedure SetPart(const aIdx: INDIndexSeq; const aValue: TTensorC64); inline;
+    function GetShape: TNDAShape; inline;
+  public
+    class operator Implicit(const aArr: INDArray<TCmplx64>): TTensorC64;
+    class operator Implicit(const aArr: TTensorC64): INDArray<TCmplx64>;
+    class operator Multiply(const A, B: TTensorC64): TTensorC64;
+
+    property NDA: INDArray<TCmplx64> read fArr;
+    property Shape: TNDAShape read GetShape;
+    property Part[const aIdx: INDIndexSeq]: TTensorC64 read GetPart write SetPart; default;
+  end;
+
   TTensorC128 = record
   private
     fArr: INDArray<TCmplx128>;
@@ -1854,6 +1870,95 @@ begin
 end;
 
 function TTensorF64.GetShape: TNDAShape;
+begin
+  Result := fArr.Shape;
+end;
+
+{$endregion}
+
+{$region 'TTesnorC64'}
+
+{$region 'LR functions'}
+
+procedure MulL_C64(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+var pEnd: PByte;
+    s: TCmplx64;
+    tmpRe: Single;
+begin
+  if IncL = 0 then begin
+    // R <- l * R
+    s := PCmplx64(L)^;
+    if IncR = cC64Sz then begin
+      VecMul(PCmplx64(R), s, PCmplx64(R), N);
+      exit;
+    end;
+
+    pEnd := R + N * IncR;
+    while R < pEnd do begin
+      with PCmplx64(R)^ do begin
+        tmpRe := Re;
+        Re := s.Re * tmpRe - s.Im * Im;
+        Im := s.Re * Im + s.Im * tmpRe;
+      end;
+      Inc(R, IncR);
+    end;
+
+    exit;
+  end;
+
+  // R <- L * R
+  if (IncL = cC64Sz) and (IncR = cC64Sz) then begin
+    VecMul(PCmplx64(L), PCmplx64(R), PCmplx64(R), N);
+    exit;
+  end;
+
+  pEnd := R + N * IncR;
+  while R < pEnd do begin
+    s := PCmplx64(L)^;
+    with PCmplx64(R)^ do begin
+      tmpRe := Re;
+      Re := s.Re * tmpRe - s.Im * Im;
+      Im := s.Re * Im + s.Im * tmpRe;
+    end;
+    Inc(L, IncL);
+    Inc(R, IncR);
+  end;
+end;
+
+procedure MulR_C64(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+begin
+  MulL_C64(N, R, IncR, L, IncL);
+end;
+
+{$endregion}
+
+class operator TTensorC64.Implicit(const aArr: INDArray<TCmplx64>): TTensorC64;
+begin
+  Result.fArr := aArr;
+end;
+
+class operator TTensorC64.Implicit(const aArr: TTensorC64): INDArray<TCmplx64>;
+begin
+  Result := aArr.fArr;
+end;
+
+class operator TTensorC64.Multiply(const A, B: TTensorC64): TTensorC64;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<TCmplx64>(A, B, Result.fArr, MulL_C64, MulR_C64);
+end;
+
+function TTensorC64.GetPart(const aIdx: INDIndexSeq): TTensorC64;
+begin
+  Result := fArr[aIdx];
+end;
+
+procedure TTensorC64.SetPart(const aIdx: INDIndexSeq; const aValue: TTensorC64);
+begin
+  fArr[aIdx] := aValue;
+end;
+
+function TTensorC64.GetShape: TNDAShape;
 begin
   Result := fArr.Shape;
 end;

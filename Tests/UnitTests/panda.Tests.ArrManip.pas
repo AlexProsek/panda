@@ -7,12 +7,16 @@ uses
   , panda.Intfs
   , panda.Arrays
   , panda.ArrManip
+  , panda.Nums
   , panda.Tests.NDATestCase
   ;
 
 type
   TArrManipLowLvlTests = class(TNDATestCase)
   published
+    procedure BlockTr4x4_16B;
+    procedure BlockTr10x10_16B;
+
     procedure BlockTr4x4_8B;
     procedure BlockTr10x10_8B;
 
@@ -82,6 +86,41 @@ uses
   ;
 
 {$region 'TArrManipLowLvlTests'}
+
+procedure TArrManipLowLvlTests.BlockTr4x4_16B;
+var a, b: array [0..3, 0..3] of TCmplx128;
+    I, J: Integer;
+begin
+  for I := 0 to 3 do
+    for J := 0 to 3 do begin
+      a[I, J] := 4*I + J;
+      b[J, I] := 0;
+    end;
+
+  Tr4x4_16B(@a, @b, 64, 64);
+
+  for I := 0 to 3 do
+    for J := 0 to 3 do
+      CheckEquals(a[I, J], b[J, I]);
+end;
+
+procedure TArrManipLowLvlTests.BlockTr10x10_16B;
+var a: array [0..9, 0..9] of TCmplx128;
+    b: array [0..9, 0..9] of TCmplx128;
+    I, J: Integer;
+begin
+  for I := 0 to 9 do
+    for J := 0 to 9 do begin
+      a[I, J] := 10*I + J;
+      b[J, I] := 0;
+    end;
+
+  CTr_16B(@a, @b, 10, 10, 160, 160);
+
+  for I := 0 to 9 do
+    for J := 0 to 9 do
+      CheckEquals(a[I, J], b[J, I]);
+end;
 
 procedure TArrManipLowLvlTests.BlockTr4x4_8B;
 var a, b: array [0..3, 0..3] of Double;

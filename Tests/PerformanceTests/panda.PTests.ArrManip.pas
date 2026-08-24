@@ -27,6 +27,10 @@ type
     procedure BlockVsStdTrCmp_Single;
     procedure BlockVsStrTrCmp_Word;
     procedure BlockVsStdTrCmp_Byte;
+
+    procedure MatCopy;
+    procedure MatBlockCopy;
+    procedure MatVFlip;
   end;
 
   TArrManipPascalImplTests = class(TNDAPerformanceTestCase)
@@ -35,6 +39,10 @@ type
     procedure Fill2DByVec_Pascal;
     procedure TransposeMat;
     procedure TransposeT3;
+
+    procedure MatCopy;
+    procedure MatBlockCopy;
+    procedure MatVFlip;
 
     procedure Fill2D_GetMemVsDynArray_Pascal;
   end;
@@ -251,6 +259,55 @@ begin
   SWStop('StdTr');
 end;
 
+procedure TArrManipTests.MatCopy;
+var a, b: INDArray<Integer>;
+const N = 1000;
+begin
+  a := TNDAUt.Full<Integer>([N, N], 0);
+  b := TNDAUt.Full<Integer>([N, N], 1);
+
+  SWStart;
+  DoTestLoop(
+    procedure begin
+      b[[NDIAll, NDIAll]] := a[[NDIAll, NDIAll]];
+    end
+  , 50);
+  SWStop('StdTr');
+end;
+
+procedure TArrManipTests.MatBlockCopy;
+var a, b: INDArray<Integer>;
+const N = 1000;
+begin
+  a := TNDAUt.Full<Integer>([N, N], 0);
+  b := TNDAUt.Full<Integer>([2*N, 2*N], 1);
+
+  SWStart;
+  DoTestLoop(
+    procedure begin
+      b[[NDISpan(N, -1), NDISpan(N, -1)]] := a[[NDIAll, NDIAll]];
+    end
+  , 50);
+  SWStop('StdTr');
+end;
+
+procedure TArrManipTests.MatVFlip;
+var a, b: INDArray<Integer>;
+const N = 1000;
+begin
+  a := TNDAUt.Full<Integer>([N, N], 0);
+  b := TNDAUt.Full<Integer>([N, N], 1);
+
+  SWStart;
+  DoTestLoop(
+    procedure begin
+      b[[NDIAll, NDIAll]] := a[[NDIAll, NDIAll(-1)]];
+    end
+  , 50);
+  SWStop('StdTr');
+end;
+
+
 {$endregion}
 
 {$region 'TArrManipPascalImplTests'}
@@ -356,6 +413,71 @@ begin
   SWStop;
 end;
 
+procedure TArrManipPascalImplTests.MatCopy;
+var a, b: TArray<TArray<TArray<Integer>>>;
+const N = 1000;
+begin
+  SetLength(a, N, N);
+  SetLength(b, N, N);
+
+  SWStart;
+
+  DoTestLoop(
+    procedure
+    var I, J: Integer;
+    begin
+      for I := 0 to N - 1 do
+        for J := 0 to N - 1 do
+          b[I, J] := a[I, J];
+    end
+  , 50);
+
+  SWStop;
+end;
+
+procedure TArrManipPascalImplTests.MatBlockCopy;
+var a, b: TArray<TArray<TArray<Integer>>>;
+const N = 1000;
+begin
+  SetLength(a, N, N);
+  SetLength(b, 2*N, 2*N);
+
+  SWStart;
+
+  DoTestLoop(
+    procedure
+    var I, J: Integer;
+    begin
+      for I := 0 to N - 1 do
+        for J := 0 to N - 1 do
+          b[N + I, N + J] := a[I, J];
+    end
+  , 50);
+
+  SWStop;
+end;
+
+procedure TArrManipPascalImplTests.MatVFlip;
+var a, b: TArray<TArray<TArray<Integer>>>;
+const N = 1000;
+begin
+  SetLength(a, N, N);
+  SetLength(b, N, N);
+
+  SWStart;
+
+  DoTestLoop(
+    procedure
+    var I, J: Integer;
+    begin
+      for I := 0 to N - 1 do
+        for J := 0 to N - 1 do
+          b[N - I - 1, N - J - 1] := a[I, J];
+    end
+  , 50);
+
+  SWStop;
+end;
 
 procedure TArrManipPascalImplTests.Fill2D_GetMemVsDynArray_Pascal;
 var I, J: Integer;

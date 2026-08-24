@@ -92,6 +92,7 @@ type
     fFnc_EvalTwiddleFactors: TTFFunc1;
     fFnc_pack: TVecFunc2;
     fFnc_split2: TVecFunc2;
+    fFnc_split3: TVecFunc2;
     fFnc_split4: TVecFunc2;
     fFnc_BRP: TBRPFunc;       // bit-reversal permutation
     fFnc_DLW: TVecFunc2;      // Danielson-Lanczos inplace method for 2^M sample
@@ -161,11 +162,12 @@ type
   TRealIFFTEval<TF, TC> = class abstract(TRealFFTEvalBase<TF, TC>)
   protected type
     TFTReconstructionFnc =  procedure (const src, W, dst: TVec<TC>);
-    TNormFnc = procedure (aSrc, aDst: PByte; aCount: NativeInt);
+    TNormFnc = procedure (aSrc, aDst: PByte; aCount: NativeInt; const s: TF);
   protected
     fNormalize: Boolean;
     fFnc_Norm: TNormFnc;
     fFnc_FTReconstruct: TFTReconstructionFnc;
+    function GetNormFactor: TF; virtual; abstract;
   {$region 'Getters/Setters'}
     function GetResult: TVec<TF>;
   {$endregion}
@@ -178,7 +180,6 @@ type
     // when only a part of the result is needed.
     property Result: TVec<TF> read GetResult;
     property Normalize: Boolean read fNormalize write fNormalize;
-
   end;
 
   TRealFFTFilter<TF, TC> = class abstract
@@ -226,6 +227,7 @@ type
   public
     constructor Create;
     destructor Destroy; override;
+    // only even row count is supported
     procedure Init(aNRows, aNCols: NativeInt); overload; virtual;
 
     property RecursiveMethodThreshold: Integer read GetRecursiveMethodThreshold
@@ -258,18 +260,26 @@ type
     TVecFunc2 = TFFTEvalBase<TF, TC>.TVecFunc2;
     TVecFunc3 = TFFTEvalBase<TF, TC>.TVecFunc3;
     TSplitRowsFunc = procedure(pSrc, pRow1, pRow2: PByte; aCount: NativeInt);
+    TNormFunc = procedure (aSrc, aDst: PByte; aCount: NativeInt; const s: TF);
   protected
+    fNormalize: Boolean;
     fBuff, fRowBuff: INDArray<TC>;
     fCBuff: INDArray<TC>;
 
     fFnc_RealRowPairReconstruction: TVecFunc3;
+    fFnc_Norm: TNormFunc;
     fFnc_SplitRows: TSplitRowsFunc;
     fFnc_Copy: TVecFunc2;
     fFnc_Tr4: TFFTEvalBase2D<TF, TC>.TTrFnc4;
     procedure ColFFTNative(const aSrc, aDst: INDArray<TC>);
+    procedure RowFFT(const aSrc: INDArray<TC>; aDst: INDArray<TF>);
+    function GetNormFactor: TF; virtual; abstract;
   public
     procedure AfterConstruction; override;
+    procedure Init(aNRows, aNCols: NativeInt); override;
     procedure Execute(const aSrc: INDArray<TC>; var aDst: INDArray<TF>);
+
+    property Normalize: Boolean read fNormalize write fNormalize;
   end;
 
   TRealFFTFilter2D<TF, TC> = class abstract
@@ -297,11 +307,18 @@ type
 
   TRealIFFTEvalF32 = class(TRealIFFTEval<Single, TCmplx64>)
   protected
+    function GetNormFactor: Single; override;
     procedure InitFunctions; override;
   end;
 
   TRealFFTEval2DF32 = class(TRealFFTEval2D<Single, TCmplx64>)
   protected
+    procedure InitFunctions; override;
+  end;
+
+  TRealIFFTEval2DF32 = class(TRealIFFTEval2D<Single, TCmplx64>)
+  protected
+    function GetNormFactor: Single; override;
     procedure InitFunctions; override;
   end;
 
@@ -317,6 +334,7 @@ type
 
   TRealIFFTEvalF64 = class(TRealIFFTEval<Double, TCmplx128>)
   protected
+    function GetNormFactor: Double; override;
     procedure InitFunctions; override;
   end;
 
@@ -327,6 +345,7 @@ type
 
   TRealIFFTEval2DF64 = class(TRealIFFTEval2D<Double, TCmplx128>)
   protected
+    function GetNormFactor: Double; override;
     procedure InitFunctions; override;
   end;
 
@@ -379,6 +398,7 @@ type
 const
   cPositiveSizeErrorMsg = 'Data size must be greater than zero.';
   cEvenSizeErrorMsg = 'Real FFT is implemented only for even sample size.';
+  cEvenRowCountErrorMsg = 'Real 2D FFT is implemented only for even row count.';
   cInvSizeErrorMsg = 'Output buffer size is %d but %d is expected.';
 
 type
@@ -1007,6 +1027,155 @@ begin
     Inc(pSrc, srcStep);
     PCmplx128(pDst1)^ := PCmplx128(pSrc)^;
     Inc(pDst1, dstStep);
+    Inc(pSrc, srcStep);
+  end;
+end;
+{$endif}
+
+procedure _split3C64(const aSrc, aDst: TVecC64);
+{$if defined(ASMx64)}
+// RCX <- @aSrc, RDX <- @aDst
+asm
+  push rsi
+  push rdi
+  push rbx
+
+  mov rdi, rdx            // RDI <- @aDst
+  mov rax, [rcx + 16]     // RAX <- N
+  xor rdx, rdx
+  mov rbx, 3
+  div rbx                 // RAX <- N/3
+  mov r10, rax            // R10 <- N/3
+  mul rax, [rdi + 8]      // RAX <- N/3 * aDst.Stride
+  mov rbx, rax
+  mov rdx, rdi            // RDX <- @aDst
+
+  mov rsi, [rcx]          // RSI <- aSrc.Data
+  mov rdi, [rdx]          // RDI <- aDst.Data
+  mov rax, [rcx + 8]      // RAX <- aSrc.Stride
+  mov rdx, [rdx + 8]      // RDX <- aDst.Stride
+  mov rcx, r10            // RCX <- N3 := N/3
+
+  lea r8, rdi + rbx       // R8  <- aDst.Data + N3 * aDst.Stride
+  lea r9, r8 + rbx        // R9  <- aDst.Data + 2* N3 * aDst.Stride
+@L:
+  lea r11, rsi + 2*rax
+  movq xmm0, [rsi]
+  movq [rdi], xmm0
+  movq xmm1, [rsi + rax]
+  movq [r8], xmm1
+  movq xmm2, [rsi + 2*rax]
+  movq [r9], xmm2
+  lea rsi, rsi + 2*rax
+  add rsi, rax
+  add rdi, rdx
+  add r8, rdx
+  add r9, rdx
+  dec rcx
+  jnz @L
+
+  pop rbx
+  pop rdi
+  pop rsi
+end;
+{$else}
+var N, N3, srcStep, dstStep: NativeInt;
+    pSrc, pDst0, pDst1, pDst2: PByte;
+    pEnd: PByte;
+begin
+  N := aSrc.Length;
+  N3 := N div 3;
+  srcStep := aSrc.Stride;
+  dstStep := aDst.Stride;
+  pSrc := aSrc.Data;
+  pEnd := pSrc + srcStep * N;
+  pDst0 := aDst.Data;
+  pDst1 := pDst0 + 1 * N3 * dstStep;
+  pDst2 := pDst0 + 2 * N3 * dstStep;
+  while pSrc < pEnd do begin
+    PCmplx64(pDst0)^ := PCmplx64(pSrc)^;
+    Inc(pDst0, dstStep);
+    Inc(pSrc, srcStep);
+    PCmplx64(pDst1)^ := PCmplx64(pSrc)^;
+    Inc(pDst1, dstStep);
+    Inc(pSrc, srcStep);
+    PCmplx64(pDst2)^ := PCmplx64(pSrc)^;
+    Inc(pDst2, dstStep);
+    Inc(pSrc, srcStep);
+  end;
+end;
+{$endif}
+
+procedure _split3C128(const aSrc, aDst: TVecC128);
+{$if defined(ASMx64)}
+// RCX <- @aSrc, RDX <- @aDst
+asm
+  push rsi
+  push rdi
+  push rbx
+
+  mov rdi, rdx            // RDI <- @aDst
+  mov rax, [rcx + 16]     // RAX <- N
+  xor rdx, rdx
+  mov rbx, 3
+  div rbx                 // RAX <- N/3
+  mov r10, rax            // R10 <- N/3
+  mul rax, [rdi + 8]      // RAX <- N/3 * aDst.Stride
+  mov rbx, rax
+  mov rdx, rdi            // RDX <- @aDst
+
+  mov rsi, [rcx]          // RSI <- aSrc.Data
+  mov rdi, [rdx]          // RDI <- aDst.Data
+  mov rax, [rcx + 8]      // RAX <- aSrc.Stride
+  mov rdx, [rdx + 8]      // RDX <- aDst.Stride
+  mov rcx, [rcx + 16]     // RCX <- N := aSrc.Length
+  mov rcx, r10            // RCX <- N3 := N/3
+
+  lea r8, rdi + rbx       // R8  <- aDst.Data + N3 * aDst.Stride
+  lea r9, r8 + rbx        // R9  <- aDst.Data + 2* N3 * aDst.Stride
+@L:
+  movupd xmm0, [rsi]
+  movupd [rdi], xmm0
+  movupd xmm1, [rsi + rax]
+  movupd [r8], xmm1
+  movupd xmm2, [rsi + 2*rax]
+  movupd [r9], xmm2
+  lea rsi, rsi + 2*rax
+  add rsi, rax
+  add rdi, rdx
+  add r8, rdx
+  add r9, rdx
+  add r10, rdx
+  dec rcx
+  jnz @L
+
+  pop rbx
+  pop rdi
+  pop rsi
+end;
+{$else}
+var N, N3, srcStep, dstStep: NativeInt;
+    pSrc, pDst0, pDst1, pDst2, pDst3: PByte;
+    pEnd: PByte;
+begin
+  N := aSrc.Length;
+  N3 := N div 3;
+  srcStep := aSrc.Stride;
+  dstStep := aDst.Stride;
+  pSrc := aSrc.Data;
+  pEnd := pSrc + srcStep * N;
+  pDst0 := aDst.Data;
+  pDst1 := pDst0 + 1 * N3 * dstStep;
+  pDst2 := pDst0 + 2 * N3 * dstStep;
+  while pSrc < pEnd do begin
+    PCmplx128(pDst0)^ := PCmplx128(pSrc)^;
+    Inc(pDst0, dstStep);
+    Inc(pSrc, srcStep);
+    PCmplx128(pDst1)^ := PCmplx128(pSrc)^;
+    Inc(pDst1, dstStep);
+    Inc(pSrc, srcStep);
+    PCmplx128(pDst2)^ := PCmplx128(pSrc)^;
+    Inc(pDst2, dstStep);
     Inc(pSrc, srcStep);
   end;
 end;
@@ -3905,109 +4074,6 @@ begin
 end;
 {$endif}
 
-type
-  TArrayF32x8 = array [0..7] of Single;
-  PArrayF32x8 = ^TArrayF32x8;
-  TArrayF64x8 = array [0..7] of Double;
-  PArrayF64x8 = ^TArrayF64x8;
-
-// Leaf radix-4 fft for Danielson-Lanzos ruotine
-procedure fftN4(var aData: TArrayF32x8); overload; inline;
-var y: TArrayF32x8;
-begin
-  y[0] := aData[0] + aData[2];
-  y[1] := aData[1] + aData[3];
-  y[2] := aData[4] + aData[6];
-  y[3] := aData[5] + aData[7];
-
-  y[4] := aData[0] - aData[2];
-  y[5] := aData[1] - aData[3];
-  y[6] := aData[4] - aData[6];
-  y[7] := aData[5] - aData[7];
-
-  aData[0] := y[0] + y[2];
-  aData[1] := y[1] + y[3];
-  aData[4] := y[0] - y[2];
-  aData[5] := y[1] - y[3];
-
-  aData[2] := y[4] - y[7];
-  aData[3] := y[5] + y[6];
-  aData[6] := y[4] + y[7];
-  aData[7] := y[5] - y[6];
-end;
-
-procedure ifftN4(var aData: TArrayF32x8); overload; inline;
-var y: TArrayF32x8;
-begin
-  y[0] := aData[0] + aData[2];
-  y[1] := aData[1] + aData[3];
-  y[2] := aData[4] + aData[6];
-  y[3] := aData[5] + aData[7];
-
-  y[4] := aData[0] - aData[2];
-  y[5] := aData[1] - aData[3];
-  y[6] := aData[4] - aData[6];
-  y[7] := aData[5] - aData[7];
-
-  aData[0] := y[0] + y[2];
-  aData[1] := y[1] + y[3];
-  aData[4] := y[0] - y[2];
-  aData[5] := y[1] - y[3];
-
-  aData[2] := y[4] + y[7];
-  aData[3] := y[5] - y[6];
-  aData[6] := y[4] - y[7];
-  aData[7] := y[5] + y[6];
-end;
-
-procedure ifftN4(var aData: TArrayF64x8); overload; inline;
-var y: TArrayF64x8;
-begin
-  y[0] := aData[0] + aData[2];
-  y[1] := aData[1] + aData[3];
-  y[2] := aData[4] + aData[6];
-  y[3] := aData[5] + aData[7];
-
-  y[4] := aData[0] - aData[2];
-  y[5] := aData[1] - aData[3];
-  y[6] := aData[4] - aData[6];
-  y[7] := aData[5] - aData[7];
-
-  aData[0] := y[0] + y[2];
-  aData[1] := y[1] + y[3];
-  aData[4] := y[0] - y[2];
-  aData[5] := y[1] - y[3];
-
-  aData[2] := y[4] + y[7];
-  aData[3] := y[5] - y[6];
-  aData[6] := y[4] - y[7];
-  aData[7] := y[5] + y[6];
-end;
-
-procedure fftN4(var aData: TArrayF64x8); overload; inline;
-var y: TArrayF64x8;
-begin
-  y[0] := aData[0] + aData[2];
-  y[1] := aData[1] + aData[3];
-  y[2] := aData[4] + aData[6];
-  y[3] := aData[5] + aData[7];
-
-  y[4] := aData[0] - aData[2];
-  y[5] := aData[1] - aData[3];
-  y[6] := aData[4] - aData[6];
-  y[7] := aData[5] - aData[7];
-
-  aData[0] := y[0] + y[2];
-  aData[1] := y[1] + y[3];
-  aData[4] := y[0] - y[2];
-  aData[5] := y[1] - y[3];
-
-  aData[2] := y[4] - y[7];
-  aData[3] := y[5] + y[6];
-  aData[6] := y[4] + y[7];
-  aData[7] := y[5] - y[6];
-end;
-
 procedure DLW(const aData, aW: TVecC64);
 {$if defined(ASMx64)}
 // RCX <- @aData, RDX <- @aW
@@ -4219,6 +4285,59 @@ asm
 @ExitN2:
 end;
 {$else}
+type
+  TArrayF32x8 = array [0..7] of Single;
+  PArrayF32x8 = ^TArrayF32x8;
+
+  // Leaf radix-4 fft for Danielson-Lanzos ruotine
+  procedure fftN4(var aData: TArrayF32x8); inline;
+  var y: TArrayF32x8;
+  begin
+    y[0] := aData[0] + aData[2];
+    y[1] := aData[1] + aData[3];
+    y[2] := aData[4] + aData[6];
+    y[3] := aData[5] + aData[7];
+
+    y[4] := aData[0] - aData[2];
+    y[5] := aData[1] - aData[3];
+    y[6] := aData[4] - aData[6];
+    y[7] := aData[5] - aData[7];
+
+    aData[0] := y[0] + y[2];
+    aData[1] := y[1] + y[3];
+    aData[4] := y[0] - y[2];
+    aData[5] := y[1] - y[3];
+
+    aData[2] := y[4] - y[7];
+    aData[3] := y[5] + y[6];
+    aData[6] := y[4] + y[7];
+    aData[7] := y[5] - y[6];
+  end;
+
+  procedure ifftN4(var aData: TArrayF32x8); inline;
+  var y: TArrayF32x8;
+  begin
+    y[0] := aData[0] + aData[2];
+    y[1] := aData[1] + aData[3];
+    y[2] := aData[4] + aData[6];
+    y[3] := aData[5] + aData[7];
+
+    y[4] := aData[0] - aData[2];
+    y[5] := aData[1] - aData[3];
+    y[6] := aData[4] - aData[6];
+    y[7] := aData[5] - aData[7];
+
+    aData[0] := y[0] + y[2];
+    aData[1] := y[1] + y[3];
+    aData[4] := y[0] - y[2];
+    aData[5] := y[1] - y[3];
+
+    aData[2] := y[4] + y[7];
+    aData[3] := y[5] - y[6];
+    aData[6] := y[4] - y[7];
+    aData[7] := y[5] + y[6];
+  end;
+
 var J, I, MMax: NativeInt;
     IStep, N, M, s: NativeInt;
     w, u, t: TCmplx64;
@@ -4512,9 +4631,62 @@ asm
 @ExitN2:
 end;
 {$else}
+type
+  TArrayF64x8 = array [0..7] of Double;
+  PArrayF64x8 = ^TArrayF64x8;
+
+  // Leaf radix-4 fft for Danielson-Lanzos ruotine
+  procedure ifftN4(var aData: TArrayF64x8); inline;
+  var y: TArrayF64x8;
+  begin
+    y[0] := aData[0] + aData[2];
+    y[1] := aData[1] + aData[3];
+    y[2] := aData[4] + aData[6];
+    y[3] := aData[5] + aData[7];
+
+    y[4] := aData[0] - aData[2];
+    y[5] := aData[1] - aData[3];
+    y[6] := aData[4] - aData[6];
+    y[7] := aData[5] - aData[7];
+
+    aData[0] := y[0] + y[2];
+    aData[1] := y[1] + y[3];
+    aData[4] := y[0] - y[2];
+    aData[5] := y[1] - y[3];
+
+    aData[2] := y[4] + y[7];
+    aData[3] := y[5] - y[6];
+    aData[6] := y[4] - y[7];
+    aData[7] := y[5] + y[6];
+  end;
+
+  procedure fftN4(var aData: TArrayF64x8); inline;
+  var y: TArrayF64x8;
+  begin
+    y[0] := aData[0] + aData[2];
+    y[1] := aData[1] + aData[3];
+    y[2] := aData[4] + aData[6];
+    y[3] := aData[5] + aData[7];
+
+    y[4] := aData[0] - aData[2];
+    y[5] := aData[1] - aData[3];
+    y[6] := aData[4] - aData[6];
+    y[7] := aData[5] - aData[7];
+
+    aData[0] := y[0] + y[2];
+    aData[1] := y[1] + y[3];
+    aData[4] := y[0] - y[2];
+    aData[5] := y[1] - y[3];
+
+    aData[2] := y[4] - y[7];
+    aData[3] := y[5] + y[6];
+    aData[6] := y[4] + y[7];
+    aData[7] := y[5] - y[6];
+  end;
+
 var J, I, MMax: NativeInt;
     IStep, N, M, s: NativeInt;
-    w, t: TCmplx128;
+    u, w, t: TCmplx128;
     pVecC4: PArrayF64x8;
 begin
   N := aData.Length;
@@ -4539,7 +4711,7 @@ begin
     end;
   end;
   MMax := 4;
-  s := aData.Length shr 3;
+  s := N shr 3;
 
   while Mmax < N do begin //Outer loop executed log_2(N/2) times.
     Istep := Mmax shl 1;  // step between blocks
@@ -4549,9 +4721,10 @@ begin
       w := aW[M * s];
       while I < N do  begin       //This is the Danielson-Lanczos formula.
         J := I + Mmax;
+        u := aData[I];
         t := w * aData[J];
-        aData[J] := aData[I] - t;
-        aData[I] := aData[I] + t;
+        aData[J] := u - t;
+        aData[I] := u + t;
         Inc(I, Istep);
       end;
       Inc(M);
@@ -4638,7 +4811,7 @@ begin
 
     if ws < fWv.Length then begin
       fW2 := TNDAUt.Copy<TC>(fW[[NDISpan(0, -1, fWv.Length div ws)]]);
-      fWv2.Init(fW2.Data, fW2.Shape[0])
+      fWv2.Init(fW2.Data, fW2.Shape[0]);
     end else
       fWv2.Init(fW.Data, fN);
 
@@ -4717,18 +4890,35 @@ end;
 
 procedure TFFTEvalBase<TF, TC>.FFT3(const aSrc, aDst: TVec<TC>);
 var N, N3: NativeInt;
+    v: TVec<TC>;
 begin
   N := aSrc.Length;
-  N3 := N div 3;
-  if N3 = 1 then begin
+
+  if N = 3 then begin
     fFnc_pack(aSrc, aDst);
     fFnc_fftN3(aDst);
+    exit;
+  end;
+
+  N3 := N div 3;
+  if N3 = fDLBlockSize then begin
+    fFnc_split3(aSrc, aDst);
+    v := aDst.Span(0, N3);
+    fFnc_BRP(fBRPIdxs, v);
+    fFnc_DLW(v, fWv2);
+    v := aDst.Span(N3, N3);
+    fFnc_BRP(fBRPIdxs, v);
+    fFnc_DLW(v, fWv2);
+    v := aDst.Span(2*N3, N3);
+    fFnc_BRP(fBRPIdxs, v);
+    fFnc_DLW(v, fWv2);
   end else begin
     FFT(aSrc.Span(0, N3, 3), aDst.Span(0, N3));
     FFT(aSrc.Span(1, N3, 3), aDst.Span(N3, N3));
     FFT(aSrc.Span(2, N3, 3), aDst.Span(2*N3, N3));
-    fFnc_fftcomb3(aDst.Span(0, N), fWv.Span(0, N3, aSrc.Stride div cCSz));
   end;
+
+  fFnc_fftcomb3(aDst.Span(0, N), fWv.Span(0, N3, aSrc.Stride div cCSz));
 end;
 
 procedure TFFTEvalBase<TF, TC>.FFT4(const aSrc, aDst: TVec<TC>);
@@ -4826,7 +5016,7 @@ begin
   fFactPwr := fFactors[fFactTop].Power;
   FFT(srcv, fBuffv);
   if CContiguousQ(aDst) then
-      Move(fBuff.Data^, aDst.Data^, fN * cCSz)
+    Move(fBuff.Data^, aDst.Data^, fN * cCSz)
   else
     TNDAUt.Fill<TC>(aDst, fBuff[[NDISpan(0, fN - 1)]]);
 end;
@@ -4982,12 +5172,11 @@ begin
   FFT(srcv, resv);
 
   if fNormalize then
-    fFnc_Norm(resv.Data, resv.Data, resv.Length);
+    fFnc_Norm(resv.Data, resv.Data, resv.Length, GetNormFactor());
 end;
 
 procedure TRealIFFTEval<TF, TC>.Execute(const aSrc: INDArray<TC>; var aDst: INDArray<TF>);
 var bNorm: Boolean;
-    s: TF;
 begin
   bNorm := fNormalize;
   try
@@ -5002,12 +5191,12 @@ begin
 
   if CContiguousQ(aDst) then begin
     if fNormalize then begin
-      fFnc_Norm(fBuffv.ItemPtr[fN], aDst.Data, 2*fN);
+      fFnc_Norm(fBuffv.ItemPtr[fN], aDst.Data, 2*fN, GetNormFactor());
     end else
       Move(fBuffv.ItemPtr[fN]^, aDst.Data^, fN*cCSz)
   end else begin
     if fNormalize then
-      fFnc_Norm(fBuffv.ItemPtr[fN], fBuffv.ItemPtr[fN], 2*fN);
+      fFnc_Norm(fBuffv.ItemPtr[fN], fBuffv.ItemPtr[fN], 2*fN, GetNormFactor());
     TNDAUt.Fill<TF>(aDst, TNDAUt.AsType<TF>(fBuff[[NDISpan(fN, 2*fN - 1)]]));
   end;
 end;
@@ -5087,6 +5276,9 @@ end;
 
 procedure TFFTEvalBase2D<TF, TC>.Init(aNRows, aNCols: NativeInt);
 begin
+  if (aNRows and 1) <> 0 then
+    raise EFFTSizeError.Create(cEvenRowCountErrorMsg);
+
   InitFunctions;
   fNRows := aNRows;
   fNCols := aNCols;
@@ -5135,8 +5327,12 @@ begin
   Assert((aSrc.NDim = 2) and (aSrc.Shape[0] = fNRows) and (aSrc.Shape[1] = fNCols));
 
   NDstCols := (fNCols div 2) + 1;
-  if not Assigned(aDst) then
-    aDst := TNDABuffer<TC>.Create([fNRows, NDstCols]);
+  if not Assigned(aDst) then begin
+    if fSpectrumLayout = slNormal then
+      aDst := TNDABuffer<TC>.Create([fNRows, NDstCols])
+    else
+      aDst := TNDABuffer<TC>.Create([NDstCols, fNRows]);
+  end;
 
   // Rows FFT
 
@@ -5188,46 +5384,65 @@ begin
 
   // Colums FFT
 
-  pBuff := aDst.Data;
-  bStep := aDst.Strides[0];
-  rStep := fBuff.Strides[0];
-  cStep := fCBuff.Strides[0];
-  r0.Init(fBuff.Data, fNRows);
-  c0.Init(fCBuff.Data, 2 * fNRows, cCSz);
+  if fSpectrumLayout = slNormal then begin
+    pBuff := aDst.Data;
+    bStep := aDst.Strides[0];
+    rStep := fBuff.Strides[0];
+    cStep := fCBuff.Strides[0];
+    r0.Init(fBuff.Data, fNRows);
+    c0.Init(fCBuff.Data, 2 * fNRows, cCSz);
 
-  I := 0;
-  N := (NDstCols shr 2) shl 2;
-  while I < N do begin
-    c0.Data := fCBuff.Data;
-    fColFFT.Evaluate(r0, c0);
-    Inc(r0.Data, rStep);
-    Inc(c0.Data, cStep);
-    fColFFT.Evaluate(r0, c0);
-    Inc(r0.Data, rStep);
-    Inc(c0.Data, cStep);
-    fColFFT.Evaluate(r0, c0);
-    Inc(r0.Data, rStep);
-    Inc(c0.Data, cStep);
-    fColFFT.Evaluate(r0, c0);
-    Inc(r0.Data, rStep);
-    Inc(c0.Data, cStep);
+    I := 0;
+    N := (NDstCols shr 2) shl 2;
+    while I < N do begin
+      c0.Data := fCBuff.Data;
+      fColFFT.Evaluate(r0, c0);
+      Inc(r0.Data, rStep);
+      Inc(c0.Data, cStep);
+      fColFFT.Evaluate(r0, c0);
+      Inc(r0.Data, rStep);
+      Inc(c0.Data, cStep);
+      fColFFT.Evaluate(r0, c0);
+      Inc(r0.Data, rStep);
+      Inc(c0.Data, cStep);
+      fColFFT.Evaluate(r0, c0);
+      Inc(r0.Data, rStep);
+      Inc(c0.Data, cStep);
 
-    fFnc_Tr4(fCBuff.Data, pBuff, 4, fNRows, cStep, bStep);
-    Inc(pBuff, 4 * cCSz);
+      fFnc_Tr4(fCBuff.Data, pBuff, 4, fNRows, cStep, bStep);
+      Inc(pBuff, 4 * cCSz);
 
-    Inc(I, 4);
-  end;
+      Inc(I, 4);
+    end;
 
-  cStep := aDst.Strides[1];
-  c0.Init(pBuff, fNRows, bStep);
-  r1.Init(fColFFT.Buff.Data, fNRows);
+    cStep := aDst.Strides[1];
+    c0.Init(pBuff, fNRows, bStep);
+    r1.Init(fColFFT.Buff.Data, fNRows);
 
-  while I < NDstCols do begin
-    fColFFT.Evaluate(r0);
-    fFnc_Copy(r1, c0);
-    Inc(r0.Data, rStep);
-    Inc(c0.Data, cStep);
-    Inc(I);
+    while I < NDstCols do begin
+      fColFFT.Evaluate(r0);
+      fFnc_Copy(r1, c0);
+      Inc(r0.Data, rStep);
+      Inc(c0.Data, cStep);
+      Inc(I);
+    end;
+  end else begin  // fSpectrumLayout = slNative
+    pBuff := aDst.Data;
+    bStep := aDst.Strides[0];
+    rStep := fBuff.Strides[0];
+    cStep := fCBuff.Strides[0];
+    r0.Init(fBuff.Data, fNRows);
+    c0.Init(pBuff, fNRows);
+    r1.Init(fColFFT.Buff.Data, fNRows);
+
+    I := 0;
+    while I < NDstCols do begin
+      fColFFT.Evaluate(r0);
+      fFnc_Copy(r1, c0);
+      Inc(r0.Data, rStep);
+      Inc(c0.Data, bStep);
+      Inc(I);
+    end;
   end;
 end;
 
@@ -5238,22 +5453,31 @@ end;
 procedure TRealIFFTEval2D<TF, TC>.AfterConstruction;
 begin
   inherited;
+  fNormalize := False;
   fRowFFT.Direction := fdInverse;
   fColFFT.Direction := fdInverse;
 end;
 
+procedure TRealIFFTEval2D<TF, TC>.Init(aNRows, aNCols: NativeInt);
+begin
+  inherited;
+  fBuff := TNDABuffer<TC>.Create([fNRows, (fNCols div 2) + 1]);
+  fRowBuff := TNDABuffer<TC>.Create([fNCols]);
+  fCBuff := TNDABuffer<TC>.Create([5, Max(fNRows, (fNCols div 2) + 1)]);
+end;
+
 procedure TRealIFFTEval2D<TF, TC>.ColFFTNative(const aSrc, aDst: INDArray<TC>);
 var I, N, NSrcCols, bStep, rStep, cStep: NativeInt;
-    c, r: TVec<TC>;
+    c, r, b: TVec<TC>;
     pBuff: PByte;
 begin
   NSrcCols := aSrc.Shape[0];
 
   pBuff := aDst.Data;
   bStep := aDst.Strides[0];
-  rStep := fBuff.Strides[0];
+  rStep := aSrc.Strides[0];
   cStep := fCBuff.Strides[0];
-  r.Init(aDst.Data, fNRows);
+  r.Init(aSrc.Data, fNRows);
   c.Init(fCBuff.Data, 2 * fNRows);
 
   I := 0;
@@ -5281,14 +5505,59 @@ begin
 
   cStep := aDst.Strides[1];
   c.Init(pBuff, fNRows, bStep);
-  r.Init(fColFFT.Buff.Data, fNRows);
+  b.Init(fColFFT.Buff.Data, fNRows);
 
   while I < NSrcCols do begin
     fColFFT.Evaluate(r);
-    fFnc_Copy(r, c);
+    fFnc_Copy(b, c);
     Inc(r.Data, rStep);
     Inc(c.Data, cStep);
     Inc(I);
+  end;
+end;
+
+procedure TRealIFFTEval2D<TF, TC>.RowFFT(const aSrc: INDArray<TC>; aDst: INDArray<TF>);
+var I, N, NSrcCols, rStep, cStep: NativeInt;
+    c0, c1, b: TVec<TC>;
+    r0, r1, r: TVec<TF>;
+    nf: TF;
+begin
+  NSrcCols := aSrc.Shape[1];
+  cStep := aSrc.Strides[0];
+  rStep := aDst.Strides[0];
+  c0.Init(aSrc.Data, NSrcCols);
+  c1.Init(aSrc.Data + cStep, NSrcCols);
+  r0.Init(aDst.Data, fNCols);
+  r1.Init(aDst.Data + rStep, fNCols);
+  b.Init(fRowBuff.Data, fNCols);
+  r.Init(fRowFFT.Buff.Data, fNCols);
+
+  I := 0;
+  N := (fNRows shr 1) shl 1;
+  if fNormalize then begin
+    nf := GetNormFactor();
+    while I < N do begin
+      fFnc_RealRowPairReconstruction(c0, c1, b);
+      fRowFFT.Evaluate(b);
+      fFnc_Norm(r.Data, r.Data, 2*fNCols, nf);
+      fFnc_SplitRows(r.Data, r0.Data, r1.Data, fNCols);
+      Inc(r0.Data, 2*rStep);
+      Inc(r1.Data, 2*rStep);
+      Inc(c0.Data, 2*cStep);
+      Inc(c1.Data, 2*cStep);
+      Inc(I, 2);
+    end;
+  end else begin
+    while I < N do begin
+      fFnc_RealRowPairReconstruction(c0, c1, b);
+      fRowFFT.Evaluate(b);
+      fFnc_SplitRows(r.Data, r0.Data, r1.Data, fNCols);
+      Inc(r0.Data, 2*rStep);
+      Inc(r1.Data, 2*rStep);
+      Inc(c0.Data, 2*cStep);
+      Inc(c1.Data, 2*cStep);
+      Inc(I, 2);
+    end;
   end;
 end;
 
@@ -5299,23 +5568,25 @@ begin
   Assert(Assigned(aSrc) and (aSrc.NDim = 2));
 
   srcSh := aSrc.Shape;
+  if not Assigned(aDst) then
+    aDst := TNDABuffer<TF>.Create([fNRows, fNCols]);
+
   case fSpectrumLayout of
     slNormal: begin
-      if not Assigned(aDst) then
-        aDst := TNDABuffer<TF>.Create([srcSh[0], 2*(srcSh[1] - 1)]);
+      Assert((srcSh[0] = fNRows) and (srcSh[1] = (fNCols div 2) + 1));
 
-
+      raise ENotImplemented.Create('2D inverse FFT for a normal spectrum layout is not implemented yet.');
     end;
 
     slNative: begin
-      if not Assigned(aDst) then
-        aDst := TNDABuffer<TF>.Create([srcSh[1], 2*(srcSh[0] - 1)]);
-
+      Assert((srcSh[1] = fNRows) and (srcSh[0] = (fNCols div 2) + 1));
       ColFFTNative(aSrc, fBuff);
-    end;
+    end
   else
     raise EFFTError.Create('Unknown spectrum layout.');
   end;
+
+  RowFFT(fBuff, aDst);
 end;
 
 {$endregion}
@@ -5337,6 +5608,7 @@ begin
     fFnc_EvalTwiddleFactors := EvalTwiddleFactors;
     fFnc_pack := _pack;
     fFnc_split2 := _split2C64;
+    fFnc_split3 := _split3C64;
     fFnc_split4 := _split4C64;
     fFnc_BRP := _perm;
     fFnc_DLW := DLW;
@@ -5391,9 +5663,9 @@ end;
 
 {$region 'TRealIFFTEvalF32'}
 
-procedure NormalizeF32(pSrc, pDst: PByte; aCount: NativeInt);
+procedure NormalizeF32(pSrc, pDst: PByte; aCount: NativeInt; const s: Single);
 begin
-  VecMul(PSingle(pSrc), 1/aCount, PSingle(pDst), aCount);
+  VecMul(PSingle(pSrc), s, PSingle(pDst), aCount);
 end;
 
 procedure InitRealIFFTFunctionsF32(aFFT: TRealIFFTEval<Single, TCmplx64>);
@@ -5404,6 +5676,11 @@ begin
     fFnc_Norm := NormalizeF32;
     fFnc_FTReconstruct := RealFTReconstruct;
   end;
+end;
+
+function TRealIFFTEvalF32.GetNormFactor: Single;
+begin
+  Result := 1 / (2*fN);
 end;
 
 procedure TRealIFFTEvalF32.InitFunctions;
@@ -5516,6 +5793,136 @@ end;
 
 {$endregion}
 
+{$region 'TRealIFFTEval2DF32'}
+
+procedure _splitRowF32(pSrc, pRow1, pRow2: PByte; aCount: NativeInt);
+var pEnd: PByte;
+begin
+  pEnd := pSrc + aCount * cC64Sz;
+  while pSrc < pEnd do begin
+    with PCmplx64(pSrc)^ do begin
+      PSingle(pRow1)^ := Re;
+      PSingle(pRow2)^ := Im;
+    end;
+    Inc(pSrc, cC64Sz);
+    Inc(pRow1, cF32Sz);
+    Inc(pRow2, cF32Sz);
+  end;
+end;
+
+
+// it is supposed that all vectors are continuous
+procedure RealRowPairReconstruct(const c0, c1, y: TVec<TCmplx64>); overload;
+{$if defined(ASMx64)}
+// RCX <- @c0, RDX <- @c1, R8 <- @y
+asm
+  mov rax, [r8 + 16]        // RAX <- N
+  mov rcx, [rcx]            // RCX <- @c0[0]
+  mov rdx, [rdx]            // RDX <- @c1[0]
+  mov r8, [r8]              // R8 <- @y[0]
+  lea r9, r8 + 8*rax        // R9 <- @y[N]
+
+  mov r10d, [rdx]           // R10d <- c1[0].Re
+  shl r10, 32
+  mov r11d, [rcx]           // R11d <- c0[0].Re
+  or r10, r11
+  mov [r8], r10             // y[0] <- (c0[0].Re, c1[0].Re)
+
+  add rcx, 8                // RCX <- @c0[1]
+  add rdx, 8                // RDX <- @c1[1]
+  add r8, 8                 // R8 <- @y[1]
+  sub r9, 8                 // R9 <- @y[N - 1]
+
+  movupd xmm4, cReSgnMaskF32
+  movupd xmm5, cImSgnMaskF32
+  shr rax, 1                // RAX <- N/2
+  mov r10, rax              // R10 <- N/2
+  shr rax, 1
+  jz @rest
+  sub r9, 8
+@L:
+  movups xmm0, [rcx]        // xmm0 <- u := c0[k:k+1]
+  movups xmm2, [rdx]        // xmm2 <- v := c1[k:k+1]
+  pshufd xmm2, xmm2, $b1
+  xorps xmm2, xmm4          // xmm2 <- (-c1[k].im, c1[k].re, -c1[k+1].im, c1[k+1].re)
+  movaps xmm1, xmm0
+  addps xmm0, xmm2          // xmm0 <- u + v
+  subps xmm1, xmm2          // xmm1 <- u - v
+  movups [r8], xmm0         // y[k:k+1] <- u + v
+  xorps xmm1, xmm5
+  pshufd xmm1, xmm1, $4e
+  movups [r9], xmm1         // y[N-k,N-k-1] := (u - v).conj
+
+  add rcx, 16
+  add rdx, 16
+  add r8, 16
+  sub r9, 16
+  dec rax
+  jnz @L
+
+  add r9, 8
+@rest:
+  and r10, 1
+  jz @end
+  movq xmm0, [rcx]
+  movq xmm2, [rdx]
+  pshufd xmm2, xmm2, $1
+  xorps xmm2, xmm4
+  movaps xmm1, xmm0
+  addps xmm0, xmm2
+  subps xmm1, xmm2
+  movq [r8], xmm0
+  xorps xmm1, xmm5
+  movq [r9], xmm1
+@end:
+end;
+{$else}
+var k, N: NativeInt;
+    z, zc, u, v: TCmplx64;
+begin
+  Assert((c0.Stride = c1.Stride) and (y.Stride = SizeOf(TCmplx64)));
+
+  z.Init(c0[0].Re, c1[0].Re);
+  y[0] := z;
+
+  N := y.Length;
+  for k := 1 to N div 2 do begin
+    u := c0[k];
+    v := c1[k];
+    v.Init(-v.Im, v.Re);
+    z  := u + v;
+    zc := u - v;
+    y[k] := z;
+    y[N - k] := zc.Conjugate;
+  end;
+end;
+{$endif}
+
+procedure InitRealIFFT2DFunctionsF32(aFFT: TRealIFFTEval2D<Single, TCmplx64>);
+begin
+  with aFFT do begin
+    fFnc_RealRowPairReconstruction := RealRowPairReconstruct;
+    fFnc_SplitRows := _splitRowF32;
+    fFnc_Norm := NormalizeF32;
+    fFnc_Copy := _copyC64;
+    fFnc_Tr4 := CTr_8B;
+  end;
+end;
+
+function TRealIFFTEval2DF32.GetNormFactor: Single;
+begin
+  Result := 1 / (fNCols * fNRows);
+end;
+
+procedure TRealIFFTEval2DF32.InitFunctions;
+begin
+  InitRealIFFT2DFunctionsF32(Self);
+  InitFFTFunctionsF32(fRowFFT, fdInverse);
+  InitFFTFunctionsF32(fColFFT, fdInverse);
+end;
+
+{$endregion}
+
 {$region 'TFFTEvalF64'}
 
 procedure InitFFTFunctionsF64(aFFT: TFFTEvalBase<Double, TCmplx128>; aDir: TFFTDirection = fdForward);
@@ -5524,6 +5931,7 @@ begin
     fFnc_EvalTwiddleFactors := EvalTwiddleFactors;
     fFnc_pack := _pack;
     fFnc_split2 := _split2C128;
+    fFnc_split3 := _split3C128;
     fFnc_split4 := _split4C128;
     fFnc_BRP := _perm;
     fFnc_DLW := DLW;
@@ -5578,9 +5986,9 @@ end;
 
 {$region 'TRealIFFTEvalF64'}
 
-procedure NormalizeF64(pSrc, pDst: PByte; aCount: NativeInt);
+procedure NormalizeF64(pSrc, pDst: PByte; aCount: NativeInt; const s: Double);
 begin
-  VecMul(PDouble(pSrc), 1/aCount, PDouble(pDst), aCount);
+  VecMul(PDouble(pSrc), s, PDouble(pDst), aCount);
 end;
 
 procedure InitRealIFFTFunctionsF64(aFFT: TRealIFFTEval<Double, TCmplx128>);
@@ -5591,6 +5999,11 @@ begin
     fFnc_Norm := NormalizeF64;
     fFnc_FTReconstruct := RealFTReconstruct;
   end;
+end;
+
+function TRealIFFTEvalF64.GetNormFactor: Double;
+begin
+  Result := 1 / (2*fN);
 end;
 
 procedure TRealIFFTEvalF64.InitFunctions;
@@ -5754,23 +6167,11 @@ begin
   end;
 end;
 
-procedure RealRowPairReconstruct(const c0, c1, y: TVec<TCmplx128>);
+procedure RealRowPairReconstruct(const c0, c1, y: TVec<TCmplx128>); overload;
 var k, N: NativeInt;
     z, zc, u, v: TCmplx128;
 begin
   Assert((c0.Stride = c1.Stride) and (y.Stride = SizeOf(TCmplx128)));
-
-//  z := y[0];
-//  c0[0] := z.Re;
-//  c1[0] := z.Im;
-
-//  N := y.Length;
-//  for k := 1 to N div 2 do begin
-//    z := y[k];
-//    zc := y[N - k].Conjugate;
-//    c0[k] := 1/2*(z + zc);
-//    c1[k] := -1/2*I*(z - zc);
-//  end;
 
   z.Init(c0[0].Re, c1[0].Re);
   y[0] := z;
@@ -5792,14 +6193,22 @@ begin
   with aFFT do begin
     fFnc_RealRowPairReconstruction := RealRowPairReconstruct;
     fFnc_SplitRows := _splitRowF64;
+    fFnc_Norm := NormalizeF64;
     fFnc_Copy := _copyC128;
     fFnc_Tr4 := CTr_16B;
   end;
 end;
 
+function TRealIFFTEval2DF64.GetNormFactor: Double;
+begin
+  Result := 1/(fNCols * fNRows);
+end;
+
 procedure TRealIFFTEval2DF64.InitFunctions;
 begin
-  InitRealIFFT2DFunctionsF64(Self)
+  InitRealIFFT2DFunctionsF64(Self);
+  InitFFTFunctionsF64(fRowFFT, fdInverse);
+  InitFFTFunctionsF64(fColFFT, fdInverse);
 end;
 
 {$endregion}
@@ -5819,6 +6228,6 @@ end;
 
 initialization
 
-  g_FFTProps.RecursiveMethodThreshold := 2048;
+  g_FFTProps.RecursiveMethodThreshold := 1024;
 
 end.

@@ -93,6 +93,7 @@ type
     procedure RealFFTHalfSpectrum;
 
     procedure RealFFT2D_4x5;
+    procedure RealFFT2D_4x5_NatSpec; // native spectrum layout without a final transposition
 
     procedure InvDLW_4;
     procedure InvDLW_32;
@@ -107,6 +108,9 @@ type
 
     procedure FwdInvFFT_24;
     procedure FwdInvRealFFT_24;
+
+    procedure FwdInvRealFFT2D_4x5;
+    procedure FwdInvRealFFT2D_4x6;
   end;
 
   TFFT32Tests = class(TNDATestCase)
@@ -162,6 +166,10 @@ type
 
     procedure FwdInvFFT_25;
     procedure FwdInvRealFFT_24;
+
+    procedure FwdInvRealFFT2D_4x3;
+    procedure FwdInvRealFFT2D_4x5;
+    procedure FwdInvRealFFT2D_4x6;
   end;
 
 implementation
@@ -762,20 +770,15 @@ end;
 procedure TFFT64Tests.FFT_8_r2Comb;
 var data, exp: TArray<TCmplx128>;
     a, res: INDArray<TCmplx128>;
-    t, I: Integer;
+    I: Integer;
 begin
   data := ToCmplx128([1, 2, 3, 4, 3, 2, 1, 0]);
   exp := DirectDft(data);
   a := TDynArrWrapper<TCmplx128>.Create(data);
 
-  t := g_FFTProps.RecursiveMethodThreshold;
-  g_FFTProps.RecursiveMethodThreshold := 4; // to supress inplace method
-  try
-    fFFT.Init(Length(data));
-    fFFT.Execute(a, res);
-  finally
-    g_FFTProps.RecursiveMethodThreshold := t;
-  end;
+  fFFT.RecursiveMethodThreshold := 4; // to supress inplace method
+  fFFT.Init(Length(data));
+  fFFT.Execute(a, res);
 
   TNDAUt.TryAsDynArray<TCmplx128>(res, data);
   for I := 0 to High(data) do
@@ -1185,9 +1188,43 @@ begin
   CheckEquals(Length(exp), dst.Shape[0]);
   CheckEquals((Length(exp[0]) div 2) + 1, dst.Shape[1]);
   TNDAUt.TryAsDynArray2D<TCmplx128>(dst, dstItems);
-  for I := 0 to High(exp) do
+  for I := 0 to High(dstItems) do
     for J := 0 to High(dstItems[I]) do
       CheckEquals(exp[I, J], dstItems[I, J], dTol);
+end;
+
+procedure TFFT64Tests.RealFFT2D_4x5_NatSpec;
+var src: INDArray<Double>;
+    dst: INDArray<TCmplx128>;
+    srcItems: TArray<TArray<Double>>;
+    exp, dstItems: TArray<TArray<TCmplx128>>;
+    fft: TRealFFTEval2DF64;
+    I, J: Integer;
+begin
+  src := TNDAUt.AsArray<Double>([
+     [1, 2, 1, 0, 0],
+     [0, 1, 2, 1, 0],
+     [0, 0, 1, 2, 1],
+     [0, 0, 0, 1, 2]
+  ]);
+  TNDAUt.TryAsDynArray2D<Double>(src, srcItems);
+  exp := directDft2D(ToCmplx(srcItems));
+
+  fft := TRealFFTEval2DF64.Create;
+  try
+    fft.SpectrumLayout := slNative;
+    fft.Init(src.Shape[0], src.Shape[1]);
+    fft.Execute(src, dst);
+  finally
+    fft.Free;
+  end;
+
+  CheckEquals(Length(exp), dst.Shape[1]);
+  CheckEquals((Length(exp[0]) div 2) + 1, dst.Shape[0]);
+  TNDAUt.TryAsDynArray2D<TCmplx128>(dst, dstItems);
+  for I := 0 to High(dstItems) do
+    for J := 0 to High(dstItems[I]) do
+      CheckEquals(exp[J, I], dstItems[I, J], dTol);
 end;
 
 procedure TFFT64Tests.InvDLW_4;
@@ -1430,6 +1467,96 @@ begin
   TNDAUt.TryAsDynArray<Double>(res, resData);
   for I := 0 to High(data) do
     CheckEquals(data[I], resData[I], dTol);
+end;
+
+procedure TFFT64Tests.FwdInvRealFFT2D_4x5;
+var src, dst: INDArray<Double>;
+    tmp: INDArray<TCmplx128>;
+    srcItems, dstItems: TArray<TArray<Double>>;
+    fft: TRealFFTEval2DF64;
+    ifft: TRealIFFTEval2DF64;
+    w, h, I, J: Integer;
+begin
+  src := TNDAUt.AsArray<Double>([
+     [1, 2, 1, 0, 0],
+     [0, 1, 2, 1, 0],
+     [0, 0, 1, 2, 1],
+     [0, 0, 0, 1, 2]
+  ]);
+  TNDAUt.TryAsDynArray2D<Double>(src, srcItems);
+  w := src.Shape[1];
+  h := src.Shape[0];
+
+  fft := TRealFFTEval2DF64.Create;
+  try
+    fft.SpectrumLayout := slNative;
+    fft.Init(h, w);
+    fft.Execute(src, tmp);
+  finally
+    fft.Free;
+  end;
+
+  ifft := TRealIFFTEval2DF64.Create;
+  try
+    ifft.SpectrumLayout := slNative;
+    ifft.Normalize := True;
+    ifft.Init(h, w);
+    ifft.Execute(tmp, dst);
+  finally
+    ifft.Free;
+  end;
+
+  CheckEquals(h, dst.Shape[0]);
+  CheckEquals(w, dst.Shape[1]);
+  TNDAUt.TryAsDynArray2D<Double>(dst, dstItems);
+  for I := 0 to High(dstItems) do
+    for J := 0 to High(dstItems[I]) do
+      CheckEquals(srcItems[I, J], dstItems[I, J], dTol);
+end;
+
+procedure TFFT64Tests.FwdInvRealFFT2D_4x6;
+var src, dst: INDArray<Double>;
+    tmp: INDArray<TCmplx128>;
+    srcItems, dstItems: TArray<TArray<Double>>;
+    fft: TRealFFTEval2DF64;
+    ifft: TRealIFFTEval2DF64;
+    w, h, I, J: Integer;
+begin
+  src := TNDAUt.AsArray<Double>([
+     [1, 2, 1, 0, 0, 0],
+     [0, 1, 2, 1, 0, 0],
+     [0, 0, 1, 2, 1, 0],
+     [0, 0, 0, 1, 2, 1]
+  ]);
+  TNDAUt.TryAsDynArray2D<Double>(src, srcItems);
+  w := src.Shape[1];
+  h := src.Shape[0];
+
+  fft := TRealFFTEval2DF64.Create;
+  try
+    fft.SpectrumLayout := slNative;
+    fft.Init(h, w);
+    fft.Execute(src, tmp);
+  finally
+    fft.Free;
+  end;
+
+  ifft := TRealIFFTEval2DF64.Create;
+  try
+    ifft.SpectrumLayout := slNative;
+    ifft.Normalize := True;
+    ifft.Init(h, w);
+    ifft.Execute(tmp, dst);
+  finally
+    ifft.Free;
+  end;
+
+  CheckEquals(h, dst.Shape[0]);
+  CheckEquals(w, dst.Shape[1]);
+  TNDAUt.TryAsDynArray2D<Double>(dst, dstItems);
+  for I := 0 to High(dstItems) do
+    for J := 0 to High(dstItems[I]) do
+      CheckEquals(srcItems[I, J], dstItems[I, J], dTol);
 end;
 
 {$endregion}
@@ -2281,6 +2408,141 @@ begin
   TNDAUt.TryAsDynArray<Single>(res, resData);
   for I := 0 to High(data) do
     CheckEquals(data[I], resData[I], sTol);
+end;
+
+procedure TFFT32Tests.FwdInvRealFFT2D_4x3;
+var src, dst: INDArray<Single>;
+    tmp: INDArray<TCmplx64>;
+    srcItems, dstItems: TArray<TArray<Single>>;
+    fft: TRealFFTEval2DF32;
+    ifft: TRealIFFTEval2DF32;
+    w, h, I, J: Integer;
+begin
+  src := TNDAUt.AsArray<Single>([
+     [1, 2, 1],
+     [0, 1, 2],
+     [0, 0, 1],
+     [0, 0, 0]
+  ]);
+  TNDAUt.TryAsDynArray2D<Single>(src, srcItems);
+  w := src.Shape[1];
+  h := src.Shape[0];
+
+  fft := TRealFFTEval2DF32.Create;
+  try
+    fft.SpectrumLayout := slNative;
+    fft.Init(h, w);
+    fft.Execute(src, tmp);
+  finally
+    fft.Free;
+  end;
+
+  ifft := TRealIFFTEval2DF32.Create;
+  try
+    ifft.SpectrumLayout := slNative;
+    ifft.Normalize := True;
+    ifft.Init(h, w);
+    ifft.Execute(tmp, dst);
+  finally
+    ifft.Free;
+  end;
+
+  CheckEquals(h, dst.Shape[0]);
+  CheckEquals(w, dst.Shape[1]);
+  TNDAUt.TryAsDynArray2D<Single>(dst, dstItems);
+  for I := 0 to High(dstItems) do
+    for J := 0 to High(dstItems[I]) do
+      CheckEquals(srcItems[I, J], dstItems[I, J], sTol);
+end;
+
+procedure TFFT32Tests.FwdInvRealFFT2D_4x5;
+var src, dst: INDArray<Single>;
+    tmp: INDArray<TCmplx64>;
+    srcItems, dstItems: TArray<TArray<Single>>;
+    fft: TRealFFTEval2DF32;
+    ifft: TRealIFFTEval2DF32;
+    w, h, I, J: Integer;
+begin
+  src := TNDAUt.AsArray<Single>([
+     [1, 2, 1, 0, 0],
+     [0, 1, 2, 1, 0],
+     [0, 0, 1, 2, 1],
+     [0, 0, 0, 1, 2]
+  ]);
+  TNDAUt.TryAsDynArray2D<Single>(src, srcItems);
+  w := src.Shape[1];
+  h := src.Shape[0];
+
+  fft := TRealFFTEval2DF32.Create;
+  try
+    fft.SpectrumLayout := slNative;
+    fft.Init(h, w);
+    fft.Execute(src, tmp);
+  finally
+    fft.Free;
+  end;
+
+  ifft := TRealIFFTEval2DF32.Create;
+  try
+    ifft.SpectrumLayout := slNative;
+    ifft.Normalize := True;
+    ifft.Init(h, w);
+    ifft.Execute(tmp, dst);
+  finally
+    ifft.Free;
+  end;
+
+  CheckEquals(h, dst.Shape[0]);
+  CheckEquals(w, dst.Shape[1]);
+  TNDAUt.TryAsDynArray2D<Single>(dst, dstItems);
+  for I := 0 to High(dstItems) do
+    for J := 0 to High(dstItems[I]) do
+      CheckEquals(srcItems[I, J], dstItems[I, J], sTol);
+end;
+
+procedure TFFT32Tests.FwdInvRealFFT2D_4x6;
+var src, dst: INDArray<Single>;
+    tmp: INDArray<TCmplx64>;
+    srcItems, dstItems: TArray<TArray<Single>>;
+    fft: TRealFFTEval2DF32;
+    ifft: TRealIFFTEval2DF32;
+    w, h, I, J: Integer;
+begin
+  src := TNDAUt.AsArray<Single>([
+     [1, 2, 1, 0, 0, 0],
+     [0, 1, 2, 1, 0, 0],
+     [0, 0, 1, 2, 1, 0],
+     [0, 0, 0, 1, 2, 1]
+  ]);
+  TNDAUt.TryAsDynArray2D<Single>(src, srcItems);
+  w := src.Shape[1];
+  h := src.Shape[0];
+
+  fft := TRealFFTEval2DF32.Create;
+  try
+    fft.SpectrumLayout := slNative;
+    fft.Init(h, w);
+    fft.Execute(src, tmp);
+  finally
+    fft.Free;
+  end;
+
+  ifft := TRealIFFTEval2DF32.Create;
+  try
+    ifft.SpectrumLayout := slNative;
+    ifft.Normalize := True;
+    ifft.Init(h, w);
+    ifft.Execute(tmp, dst);
+  finally
+    ifft.Free;
+  end;
+
+  CheckEquals(h, dst.Shape[0]);
+  CheckEquals(w, dst.Shape[1]);
+  TNDAUt.TryAsDynArray2D<Single>(dst, dstItems);
+  for I := 0 to High(dstItems) do
+    for J := 0 to High(dstItems[I]) do
+      CheckEquals(srcItems[I, J], dstItems[I, J], sTol);
 end;
 
 {$endregion}

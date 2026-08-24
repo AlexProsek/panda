@@ -14,7 +14,7 @@ resourcestring
   csNotWriteable    = 'Array is not writeable.';
   csInvCastToVec    = 'Array with shape %s cannot be converted to vector.';
   csCContArrExp     = 'C contiguous array is expected.';
-  csBroadcastErr    = 'Operands cannot be broadcast together with shapes %s %s.';
+  csBroadcastErr    = 'Operands cannot be broadcast together with shapes %s, %s.';
   csBroadcastToErr  = 'Cannot broadcast input array from shape %s into shape %s.';
   csTooManyIndices  = 'Too many indices for array: array is %d-dimensional, but %d were indexed.';
 
