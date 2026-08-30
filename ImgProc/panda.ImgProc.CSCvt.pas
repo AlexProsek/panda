@@ -21,8 +21,12 @@ uses
 
   procedure HueSeparate(const aSrc: IImage<TRGB24>; var aDst: IImage<Single>); overload;
   procedure HSVSeparate(const aSrc: IImage<TRGB24>; var H, S, V: IImage<Single>); overload;
+  procedure RGBSeparate(const aSrc: IImage<TRGB24>; var R, G, B: IImage<Byte>); overload;
+  procedure RGBSeparate(const aSrc: IImage<TRGB24>; var R, G, B: IImage<Single>); overload;
 
   procedure HSVCombine(const aHue, aSat, aVal: IImage<Single>; var aDst: IImage<TRGB24>);
+  procedure RGBCombine(const R, G, B: IImage<Byte>; var aDst: IImage<TRGB24>); overload;
+  procedure RGBCombine(const R, G, B: IImage<Single>; var aDst: IImage<TRGB24>); overload;
 
 type
   TCSUt = class
@@ -67,7 +71,10 @@ procedure cssepRGB24ToHSV(pSrc, pH, pS, pV: PByte; aCount: NativeInt);
 procedure _combineUI8C3ToF32(pSrc, pDst: PByte; aCount: NativeInt; aC: PSingle);
 procedure _combineUI8C3ToUI8(pSrc, pDst: PByte; aCount: NativeInt; aC: PSingle);
 
+procedure _separateUI8C3(pSrc, pCh0, pCh1, pCh2: PByte; aCount: NativeInt);
+procedure _separateUI8ToF32C3(pSrc, pCh0, pCh1, pCh2: PByte; aCount: NativeInt);
 procedure _interleaveUI8C3(pCh0, pCh1, pCh2, pDst: PByte; aCount: NativeInt);
+procedure _interleaveF32ToUI8C3(pCh0, pCh1, pCh2, pDst: PByte; aCount: NativeInt);
 
 procedure _combineHSVToRGB24(pH, pS, pV, pDst: PByte; aCount: NativeInt);
 
@@ -469,6 +476,164 @@ begin
 end;
 {$endif}
 
+procedure _separateUI8C3(pSrc, pCh0, pCh1, pCh2: PByte; aCount: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- pSrc, RDX <- pCh0, R8 <- pCh1, R9 <- pCh2, [RBP + $30] <- aCount
+const
+  cCh0: array [0..15] of Byte = ( 0,  3,  6,  9,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80);
+  cCh1: array [0..15] of Byte = ( 1,  4,  7, 10,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80);
+  cCh2: array [0..15] of Byte = ( 2,  5,  8, 11,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80,$80);
+asm
+  mov r10, [rbp + $30]
+  shr r10, 2
+  jz @rest
+  movdqu xmm3, cCh0
+  movdqu xmm4, cCh1
+  movdqu xmm5, cCh2
+@L:
+  movq xmm0, [rcx]
+  movd xmm1, [rcx + 8]
+  punpcklqdq xmm0, xmm1
+  movdqu xmm2, xmm0
+  pshufb xmm2, xmm3
+  movdqu xmm1, xmm0
+  pshufb xmm1, xmm4
+  pshufb xmm0, xmm5
+  movd [rdx], xmm2
+  movd [r8], xmm1
+  movd [r9], xmm0
+  add rcx, 12
+  add rdx, 4
+  add r8, 4
+  add r9, 4
+  dec r10
+  jnz @L
+@rest:
+  mov r10, [rbp + $30]
+  and r10, 3
+  jz @end
+@Lrest:
+  mov al, [rcx]
+  mov [rdx], al
+  inc rcx
+  inc rdx
+  mov al, [rcx]
+  mov [r8], al
+  inc rcx
+  inc r8
+  mov al, [rcx]
+  mov [r9], al
+  inc rcx
+  inc r9
+  dec r10
+  jnz @Lrest
+@end:
+end;
+{$else}
+var pEnd: PByte;
+begin
+  pEnd := pCh0 + aCount;
+  while pCh0 < pEnd do begin
+    pCh0^ := pSrc[0];
+    pCh1^ := pSrc[1];
+    pCh2^ := pSrc[2];
+    Inc(pSrc, 3);
+    Inc(pCh0);
+    Inc(pCh1);
+    Inc(pCh2);
+  end;
+end;
+{$endif}
+
+procedure _separateUI8ToF32C3(pSrc, pCh0, pCh1, pCh2: PByte; aCount: NativeInt);
+const s: Single = 1/255;
+{$if defined(ASMx64)}
+// RCX <- pSrc, RDX <- pCh0, R8 <- pCh1, R9 <- pCh2, [RBP + $30] <- aCount
+const
+  cCh0: array [0..15] of Byte = ( 0,$80,$80,$80,  3,$80,$80,$80,  6,$80,$80,$80,  9,$80,$80,$80);
+  cCh1: array [0..15] of Byte = ( 1,$80,$80,$80,  4,$80,$80,$80,  7,$80,$80,$80, 10,$80,$80,$80);
+  cCh2: array [0..15] of Byte = ( 2,$80,$80,$80,  5,$80,$80,$80,  8,$80,$80,$80, 11,$80,$80,$80);
+asm
+  sub rsp, 24         // 16 for xmm6 + 8 for stack alignment
+  movdqu [rsp], xmm6
+  movss xmm6, s
+  mov r10, [rbp + $30]
+  shr r10, 2
+  jz @rest
+  movdqu xmm3, cCh0
+  movdqu xmm4, cCh1
+  movdqu xmm5, cCh2
+  pshufd xmm6, xmm6, 0
+@L:
+  movq xmm0, [rcx]
+  movd xmm1, [rcx + 8]
+  punpcklqdq xmm0, xmm1
+  movdqu xmm2, xmm0
+  pshufb xmm2, xmm3
+  movdqu xmm1, xmm0
+  pshufb xmm1, xmm4
+  pshufb xmm0, xmm5
+  cvtdq2ps xmm2, xmm2
+  cvtdq2ps xmm1, xmm1
+  cvtdq2ps xmm0, xmm0
+  mulps xmm2, xmm6
+  mulps xmm1, xmm6
+  mulps xmm0, xmm6
+  movups [rdx], xmm2
+  movups [r8], xmm1
+  movups [r9], xmm0
+  add rcx, 12
+  add rdx, 16
+  add r8, 16
+  add r9, 16
+  dec r10
+  jnz @L
+@rest:
+  mov r10, [rbp + $30]
+  and r10, 3
+  jz @end
+  xor rax, rax
+@Lrest:
+  mov al, [rcx]
+  cvtsi2ss xmm0, eax
+  mulss xmm0, xmm6
+  movd [rdx], xmm0
+  inc rcx
+  add rdx, 4
+  mov al, [rcx]
+  cvtsi2ss xmm0, eax
+  mulss xmm0, xmm6
+  movd [r8], xmm0
+  inc rcx
+  add r8, 4
+  mov al, [rcx]
+  cvtsi2ss xmm0, eax
+  mulss xmm0, xmm6
+  movd [r9], xmm0
+  inc rcx
+  add r9, 4
+  dec r10
+  jnz @Lrest
+@end:
+  movdqu xmm6, [rsp]
+  add rsp, 24
+end;
+{$else}
+var pEnd: PByte;
+begin
+  pEnd := pCh0 + aCount * cF32Sz;
+  while pCh0 < pEnd do begin
+    PSingle(pCh0)^ := s*pSrc[0];
+    PSingle(pCh1)^ := s*pSrc[1];
+    PSingle(pCh2)^ := s*pSrc[2];
+    Inc(pSrc, 3);
+    Inc(pCh0, cF32Sz);
+    Inc(pCh1, cF32Sz);
+    Inc(pCh2, cF32Sz);
+  end;
+end;
+{$endif}
+
 procedure _interleaveUI8C3(pCh0, pCh1, pCh2, pDst: PByte; aCount: NativeInt);
 {$if defined(ASMx64)}
 // RCX <- pCh0, RDX <- pCh1, R8 <- pCh2, R9 <- pDst, [RBP + $30] <- aCount
@@ -535,6 +700,92 @@ begin
     Inc(pCh0);
     Inc(pCh1);
     Inc(pCh2);
+  end;
+end;
+{$endif}
+
+procedure _interleaveF32ToUI8C3(pCh0, pCh1, pCh2, pDst: PByte; aCount: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- pCh0, RDX <- pCh1, R8 <- pCh2, R9 <- pDst, [RBP + $30] <- aCount
+const
+  cCh0: array [0..15] of Byte = (  0,$80,$80,  4,$80,$80,  8,$80,$80, 12,$80,$80,$80,$80,$80,$80);
+  cCh1: array [0..15] of Byte = ($80,  0,$80,$80,  4,$80,$80,  8,$80,$80, 12,$80,$80,$80,$80,$80);
+  cCh2: array [0..15] of Byte = ($80,$80,  0,$80,$80,  4,$80,$80,  8,$80,$80, 12,$80,$80,$80,$80);
+  s: Single = 255.0;
+asm
+  sub rsp, 24       // 16 for xmm5 + 8 for stack alignment
+  movdqu [rsp], xmm6
+  movss xmm6, s
+  mov r10, [rbp + $30]
+  shr r10, 2
+  jz @rest
+  pshufd xmm6, xmm6, 0
+  movdqu xmm3, cCh0
+  movdqu xmm4, cCh1
+  movdqu xmm5, cCh2
+@L:
+  movups xmm0, [rcx]
+  movups xmm1, [rdx]
+  movups xmm2, [r8]
+  mulps xmm0, xmm6
+  mulps xmm1, xmm6
+  mulps xmm2, xmm6
+  cvtps2dq xmm0, xmm0
+  cvtps2dq xmm1, xmm1
+  cvtps2dq xmm2, xmm2
+  pshufb xmm0, xmm3
+  pshufb xmm1, xmm4
+  pshufb xmm2, xmm5
+  por xmm0, xmm1
+  por xmm0, xmm2
+  movq [r9], xmm0
+  movhlps xmm1, xmm0
+  movd [r9 + 8], xmm1
+  add rcx, 16
+  add rdx, 16
+  add r8, 16
+  add r9, 12
+  dec r10
+  jnz @L
+@rest:
+  mov r10, [rbp + $30]
+  and r10, 3
+  jz @end
+@Lrest:
+  movss xmm0, [rcx]
+  mulss xmm0, xmm6
+  cvtss2si eax, xmm0
+  mov [r9], al
+  movss xmm1, [rdx]
+  mulss xmm1, xmm6
+  cvtss2si eax, xmm1
+  mov [r9 + 1], al
+  movss xmm2, [r8]
+  mulss xmm2, xmm6
+  cvtss2si eax, xmm2
+  mov [r9 + 2], al
+  add rcx, 4
+  add rdx, 4
+  add r8, 4
+  add r9, 3
+  dec r10
+  jnz @Lrest
+@end:
+  movdqu xmm6, [rsp]
+  add rsp, 24
+end;
+{$else}
+var pEnd: PByte;
+begin
+  pEnd := pCh0 + aCount;
+  while pCh0 < pEnd do begin
+    pDst[0] := Round(255*PSingle(pCh0)^);
+    pDst[1] := Round(255*PSingle(pCh1)^);
+    pDst[2] := Round(255*PSingle(pCh2)^);
+    Inc(pDst, 3);
+    Inc(pCh0, cF32Sz);
+    Inc(pCh1, cF32Sz);
+    Inc(pCh2, cF32Sz);
   end;
 end;
 {$endif}
@@ -1884,6 +2135,28 @@ begin
   _CSSepC3(cssepRGB24ToHSV, aSrc, H, S, V);
 end;
 
+procedure RGBSeparate(const aSrc: IImage<TRGB24>; var R, G, B: IImage<Byte>);
+begin
+  if not Assigned(R) then
+    R := TNDAImg<Byte>.Create(aSrc.Width, aSrc.Height);
+  if not Assigned(G) then
+    G := TNDAImg<Byte>.Create(aSrc.Width, aSrc.Height);
+  if not Assigned(B) then
+    B := TNDAImg<Byte>.Create(aSrc.Width, aSrc.Height);
+  _CSSepC3(_separateUI8C3, aSrc, B, G, R);
+end;
+
+procedure RGBSeparate(const aSrc: IImage<TRGB24>; var R, G, B: IImage<Single>);
+begin
+  if not Assigned(R) then
+    R := TNDAImg<Single>.Create(aSrc.Width, aSrc.Height);
+  if not Assigned(G) then
+    G := TNDAImg<Single>.Create(aSrc.Width, aSrc.Height);
+  if not Assigned(B) then
+    B := TNDAImg<Single>.Create(aSrc.Width, aSrc.Height);
+  _CSSepC3(_separateUI8ToF32C3, aSrc, B, G, R);
+end;
+
 procedure HSVCombine(const aHue, aSat, aVal: IImage<Single>; var aDst: IImage<TRGB24>);
 var I, w, h: NativeInt;
     hWs, sWs, vWs, dstWs: NativeInt;
@@ -1916,6 +2189,24 @@ begin
     Inc(pS, sWs);
     Inc(pV, vWs);
   end;
+end;
+
+procedure RGBCombine(const R, G, B: IImage<Byte>; var aDst: IImage<TRGB24>);
+begin
+  Assert(Assigned(R));
+  if not Assigned(aDst) then
+    aDst := TNDAImg<TRGB24>.Create(R.Width, R.Height);
+
+  _CSSepC3(_interleaveUI8C3, B, G, R, aDst)
+end;
+
+procedure RGBCombine(const R, G, B: IImage<Single>; var aDst: IImage<TRGB24>);
+begin
+  Assert(Assigned(R));
+  if not Assigned(aDst) then
+    aDst := TNDAImg<TRGB24>.Create(R.Width, R.Height);
+
+  _CSSepC3(_interleaveF32ToUI8C3, B, G, R, aDst);
 end;
 
 {$endregion}
