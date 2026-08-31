@@ -72,6 +72,18 @@ type
     procedure CvtHSV2RGB_YellowPlus360;
 
     procedure CvtHSV2RGB24;
+
+    procedure SepRGB24ToBGR_3;
+    procedure SepRGB24ToBGR_4;
+    procedure SepRGB24ToBGR_5;
+
+    procedure SepRGB24ToBGR_F32_3;
+    procedure SepRGB24ToBGR_F32_4;
+    procedure SepRGB24ToBGR_F32_5;
+
+    procedure InterleaveBGRToRGB24_F32_3;
+    procedure InterleaveBGRToRGB24_F32_4;
+    procedure InterleaveBGRToRGB24_F32_5;
   end;
 
 implementation
@@ -856,6 +868,192 @@ begin
   CheckEquals(255, rgb[5].R);
   CheckEquals(0,   rgb[5].G);
   CheckEquals(255, rgb[5].B);
+end;
+
+procedure TCSCvtTests.SepRGB24ToBGR_3;
+var r, g, b: TArray<Byte>;
+    rgb: TArray<TRGB24>;
+begin
+  rgb := TArray<TRGB24>.Create(RGB24(0, 10, 20), RGB24(1, 11, 21), RGB24(2, 12, 22));
+  SetLength(r, Length(rgb));
+  SetLength(g, Length(rgb));
+  SetLength(b, Length(rgb));
+
+  _separateUI8C3(PByte(rgb), PByte(b), PByte(g), PByte(r), Length(rgb));
+
+  CheckEquals([ 0,  1,  2], r);
+  CheckEquals([10, 11, 12], g);
+  CheckEquals([20, 21, 22], b);
+end;
+
+procedure TCSCvtTests.SepRGB24ToBGR_4;
+var r, g, b: TArray<Byte>;
+    rgb: TArray<TRGB24>;
+begin
+  rgb := TArray<TRGB24>.Create(RGB24(0, 10, 20), RGB24(1, 11, 21), RGB24(2, 12, 22), RGB24(3, 13, 23));
+  SetLength(r, Length(rgb));
+  SetLength(g, Length(rgb));
+  SetLength(b, Length(rgb));
+
+  _separateUI8C3(PByte(rgb), PByte(b), PByte(g), PByte(r), Length(rgb));
+
+  CheckEquals([ 0,  1,  2,  3], r);
+  CheckEquals([10, 11, 12, 13], g);
+  CheckEquals([20, 21, 22, 23], b);
+end;
+
+procedure TCSCvtTests.SepRGB24ToBGR_5;
+var r, g, b: TArray<Byte>;
+    rgb: TArray<TRGB24>;
+begin
+  rgb := TArray<TRGB24>.Create(
+    RGB24(0, 10, 20), RGB24(1, 11, 21), RGB24(2, 12, 22),
+    RGB24(3, 13, 23), RGB24(4, 14, 24)
+  );
+  SetLength(r, Length(rgb));
+  SetLength(g, Length(rgb));
+  SetLength(b, Length(rgb));
+
+  _separateUI8C3(PByte(rgb), PByte(b), PByte(g), PByte(r), Length(rgb));
+
+  CheckEquals([ 0,  1,  2,  3,  4], r);
+  CheckEquals([10, 11, 12, 13, 14], g);
+  CheckEquals([20, 21, 22, 23, 24], b);
+end;
+
+procedure TCSCvtTests.SepRGB24ToBGR_F32_3;
+var r, g, b: TArray<Single>;
+    rgb: TArray<TRGB24>;
+begin
+  rgb := TArray<TRGB24>.Create(RGB24(0, 10, 20), RGB24(1, 11, 21), RGB24(2, 12, 22));
+  SetLength(r, Length(rgb));
+  SetLength(g, Length(rgb));
+  SetLength(b, Length(rgb));
+
+  _separateUI8ToF32C3(PByte(rgb), PByte(b), PByte(g), PByte(r), Length(rgb));
+
+  CheckEquals([ 0/255,  1/255,  2/255], r, sTol);
+  CheckEquals([10/255, 11/255, 12/255], g, sTol);
+  CheckEquals([20/255, 21/255, 22/255], b, sTol);
+end;
+
+procedure TCSCvtTests.SepRGB24ToBGR_F32_4;
+var r, g, b: TArray<Single>;
+    rgb: TArray<TRGB24>;
+begin
+  rgb := TArray<TRGB24>.Create(RGB24(0, 10, 20), RGB24(1, 11, 21), RGB24(2, 12, 22), RGB24(3, 13, 23));
+  SetLength(r, Length(rgb));
+  SetLength(g, Length(rgb));
+  SetLength(b, Length(rgb));
+
+  _separateUI8ToF32C3(PByte(rgb), PByte(b), PByte(g), PByte(r), Length(rgb));
+
+  CheckEquals([ 0/255,  1/255,  2/255,  3/255], r, sTol);
+  CheckEquals([10/255, 11/255, 12/255, 13/255], g, sTol);
+  CheckEquals([20/255, 21/255, 22/255, 23/255], b, sTol);
+end;
+
+procedure TCSCvtTests.SepRGB24ToBGR_F32_5;
+var r, g, b: TArray<Single>;
+    rgb: TArray<TRGB24>;
+begin
+  rgb := TArray<TRGB24>.Create(
+    RGB24(0, 10, 20), RGB24(1, 11, 21), RGB24(2, 12, 22),
+    RGB24(3, 13, 23), RGB24(4, 14, 24)
+  );
+  SetLength(r, Length(rgb));
+  SetLength(g, Length(rgb));
+  SetLength(b, Length(rgb));
+
+  _separateUI8ToF32C3(PByte(rgb), PByte(b), PByte(g), PByte(r), Length(rgb));
+
+  CheckEquals([ 0/255,  1/255,  2/255,  3/255,  4/255], r, sTol);
+  CheckEquals([10/255, 11/255, 12/255, 13/255, 14/255], g, sTol);
+  CheckEquals([20/255, 21/255, 22/255, 23/255, 24/255], b, sTol);
+end;
+
+procedure TCSCvtTests.InterleaveBGRToRGB24_F32_3;
+var r, g, b: TArray<Single>;
+    rgb: TArray<TRGB24>;
+begin
+  r := TArray<Single>.Create (0/255,  1/255,  2/255);
+  g := TArray<Single>.Create(10/255, 11/255, 12/255);
+  b := TArray<Single>.Create(20/255, 21/255, 22/255);
+  SetLength(rgb, Length(r));
+
+  _interleaveF32ToUI8C3(PByte(b), PByte(g), PByte(r), PByte(rgb), Length(rgb));
+
+  CheckEquals( 0, rgb[0].R);
+  CheckEquals(10, rgb[0].G);
+  CheckEquals(20, rgb[0].B);
+
+  CheckEquals( 1, rgb[1].R);
+  CheckEquals(11, rgb[1].G);
+  CheckEquals(21, rgb[1].B);
+
+  CheckEquals( 2, rgb[2].R);
+  CheckEquals(12, rgb[2].G);
+  CheckEquals(22, rgb[2].B);
+end;
+
+procedure TCSCvtTests.InterleaveBGRToRGB24_F32_4;
+var r, g, b: TArray<Single>;
+    rgb: TArray<TRGB24>;
+begin
+  r := TArray<Single>.Create (0/255,  1/255,  2/255,  3/255);
+  g := TArray<Single>.Create(10/255, 11/255, 12/255, 13/255);
+  b := TArray<Single>.Create(20/255, 21/255, 22/255, 23/255);
+  SetLength(rgb, Length(r));
+
+  _interleaveF32ToUI8C3(PByte(b), PByte(g), PByte(r), PByte(rgb), Length(rgb));
+
+  CheckEquals( 0, rgb[0].R);
+  CheckEquals(10, rgb[0].G);
+  CheckEquals(20, rgb[0].B);
+
+  CheckEquals( 1, rgb[1].R);
+  CheckEquals(11, rgb[1].G);
+  CheckEquals(21, rgb[1].B);
+
+  CheckEquals( 2, rgb[2].R);
+  CheckEquals(12, rgb[2].G);
+  CheckEquals(22, rgb[2].B);
+
+  CheckEquals( 3, rgb[3].R);
+  CheckEquals(13, rgb[3].G);
+  CheckEquals(23, rgb[3].B);
+end;
+
+procedure TCSCvtTests.InterleaveBGRToRGB24_F32_5;
+var r, g, b: TArray<Single>;
+    rgb: TArray<TRGB24>;
+begin
+  r := TArray<Single>.Create (0/255,  1/255,  2/255,  3/255,  4/255);
+  g := TArray<Single>.Create(10/255, 11/255, 12/255, 13/255, 14/255);
+  b := TArray<Single>.Create(20/255, 21/255, 22/255, 23/255, 24/255);
+  SetLength(rgb, Length(r));
+
+  _interleaveF32ToUI8C3(PByte(b), PByte(g), PByte(r), PByte(rgb), Length(rgb));
+
+  CheckEquals( 0, rgb[0].R);
+  CheckEquals(10, rgb[0].G);
+  CheckEquals(20, rgb[0].B);
+
+  CheckEquals( 1, rgb[1].R);
+  CheckEquals(11, rgb[1].G);
+  CheckEquals(21, rgb[1].B);
+
+  CheckEquals( 2, rgb[2].R);
+  CheckEquals(12, rgb[2].G);
+  CheckEquals(22, rgb[2].B);
+
+  CheckEquals( 3, rgb[3].R);
+  CheckEquals(13, rgb[3].G);
+  CheckEquals(23, rgb[3].B);
+
+  CheckEquals( 4, rgb[4].R);
+  CheckEquals(14, rgb[4].G);
+  CheckEquals(24, rgb[4].B);
 end;
 
 {$endregion}

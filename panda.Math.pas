@@ -31,6 +31,7 @@ type
     class procedure DoOuterProd(const aA, aRes: INDArray; aFnc: TOuterProdFunc); static;
   public
     class function TotalAtLvl<T>(const aArr: INDArray<T>; aLvl: Integer; aTotFunc: TNDAFuncNS<T>): INDArray<T>; static;
+    class function TotalToLvl<T>(const aArr: INDArray<T>; aLvl: Integer; aTotFunc: TNDAFuncNS<T>): INDArray<T>; static;
   end;
 
 function ndaRange(aHi: Integer): INDArray<Integer>; overload;

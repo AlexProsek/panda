@@ -8,6 +8,9 @@ uses
   , panda.ImgProc.Images
   , panda.ImgProc.CsCvt
   , panda.Tests.NDATestCase
+  , panda.Intfs
+  , panda.Arrays
+  , panda.ArrManip
   ;
 
 type
@@ -26,6 +29,11 @@ type
 
     procedure CvtHSVToRGB;
     procedure CombineHSVToRGB24;
+
+    procedure SepRGB24ToBGR;
+    procedure SepRGB24ToBGR_F32;
+    procedure CombBGRToRGB24;
+    procedure CombBGRToRGB24_F32;
   end;
 
 implementation
@@ -220,6 +228,82 @@ begin
   SWStop;
 end;
 
+
+procedure TCsCvtTests.SepRGB24ToBGR;
+var rgb: IImage<TRGB24>;
+    r, g, b: IImage<Byte>;
+    rgbArr, chArr: INDArray<Byte>;
+const
+  w = 1024;
+  h = 768;
+begin
+  rgb := TImgUt.ConstantImage<TRGB24>(w, h, RGB24(0, 0, 0));
+  r := TImgUt.ConstantImage<Byte>(w, h, 0);
+  g := TImgUt.ConstantImage<Byte>(w, h, 0);
+  b := TImgUt.ConstantImage<Byte>(w, h, 0);
+
+  SWStart;
+  RGBSeparate(rgb, r, g, b);
+  SWStop;
+
+  rgbArr := TImgUt.AsArray<TRGB24, Byte>(rgb);
+  chArr := TNDAUt.Full<Byte>([3, h, w], 0);
+
+  SWStart;
+  TNDAMan.Transpose<Byte>(rgbArr, chArr, [2, 0, 1]);
+  SWStop('transposition');
+end;
+
+procedure TCsCvtTests.SepRGB24ToBGR_F32;
+var rgb: IImage<TRGB24>;
+    r, g, b: IImage<Single>;
+const
+  w = 1024;
+  h = 768;
+begin
+  rgb := TImgUt.ConstantImage<TRGB24>(w, h, RGB24(0, 0, 0));
+  r := TImgUt.ConstantImage<Single>(w, h, 0);
+  g := TImgUt.ConstantImage<Single>(w, h, 0);
+  b := TImgUt.ConstantImage<Single>(w, h, 0);
+
+  SWStart;
+  RGBSeparate(rgb, r, g, b);
+  SWStop;
+end;
+
+procedure TCsCvtTests.CombBGRToRGB24;
+var rgb: IImage<TRGB24>;
+    r, g, b: IImage<Byte>;
+const
+  w = 1024;
+  h = 768;
+begin
+  rgb := TImgUt.ConstantImage<TRGB24>(w, h, RGB24(0, 0, 0));
+  r := TImgUt.ConstantImage<Byte>(w, h, 0);
+  g := TImgUt.ConstantImage<Byte>(w, h, 0);
+  b := TImgUt.ConstantImage<Byte>(w, h, 0);
+
+  SWStart;
+  RGBCombine(r, g, b, rgb);
+  SWStop;
+end;
+
+procedure TCsCvtTests.CombBGRToRGB24_F32;
+var rgb: IImage<TRGB24>;
+    r, g, b: IImage<Single>;
+const
+  w = 1024;
+  h = 768;
+begin
+  rgb := TImgUt.ConstantImage<TRGB24>(w, h, RGB24(0, 0, 0));
+  r := TImgUt.ConstantImage<Single>(w, h, 0);
+  g := TImgUt.ConstantImage<Single>(w, h, 0);
+  b := TImgUt.ConstantImage<Single>(w, h, 0);
+
+  SWStart;
+  RGBCombine(r, g, b, rgb);
+  SWStop;
+end;
 
 {$endregion}
 
