@@ -236,6 +236,13 @@ type
     procedure AfterConstruction; override;
   end;
 
+  TMaxDCFilter2DUI8 = class(TDCMFilter2D<Byte>)
+  protected
+    procedure MGetV(aA, aB, aRes: PByte; aN: NativeInt);  override;
+  public
+    procedure AfterConstruction; override;
+  end;
+
   THistUI8 = array [0..255] of NativeInt;
   PHistUI8 = ^THistUI8;
 
@@ -983,8 +990,8 @@ end;
 procedure TDCMFilter2D.AfterConstruction;
 begin
   inherited;
-  fKerType := ktDiamond;
-  fRadius := 2;
+  fKerType := ktRect;
+  fRadius := 1;
 end;
 
 procedure  TDCMFilter2D.BeforeDestruction;
@@ -1134,6 +1141,21 @@ end;
 procedure TMinDCFilter2DUI8.MGetV(aA, aB, aRes: PByte; aN: NativeInt);
 begin
   VecMin(PUInt8(aA), PUInt8(aB), PUInt8(aRes), aN);
+end;
+
+{$endregion}
+
+{$region 'TMaxDCFilter2DUI8'}
+
+procedure TMaxDCFilter2DUI8.AfterConstruction;
+begin
+  fBoxFilter := TBoxMaxFilter2DUI8.Create;
+  fRestFilter := TMaxFilter2DUI8.Create;
+end;
+
+procedure TMaxDCFilter2DUI8.MGetV(aA, aB, aRes: PByte; aN: NativeInt);
+begin
+  VecMax(PUInt8(aA), PUInt8(aB), PUInt8(aRes), aN);
 end;
 
 {$endregion}

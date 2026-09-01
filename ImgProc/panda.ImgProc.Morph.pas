@@ -6,72 +6,45 @@ uses
     panda.ImgProc.Types
   , panda.ImgProc.Images
   , panda.ImgProc.Arithmetic
+  , panda.ImgProc.Filters
   , panda.Filters.OrderStatFilters
   ;
 
-procedure Dilation(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer); overload;
-procedure Erosion(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer); overload;
-procedure Opening(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer); overload;
-procedure Closing(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer); overload;
-procedure MorphGradient(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer); overload;
-procedure TopHat(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer); overload;
-procedure BottomHat(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer); overload;
+procedure Dilation(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer; aFlags: Cardinal = 0); overload;
+procedure Erosion(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer; aFlags: Cardinal = 0); overload;
+procedure Opening(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer; aFlags: Cardinal = 0); overload;
+procedure Closing(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer; aFlags: Cardinal = 0); overload;
+procedure MorphGradient(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer; aFlags: Cardinal = 0); overload;
+procedure TopHat(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer; aFlags: Cardinal = 0); overload;
+procedure BottomHat(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer; aFlags: Cardinal = 0); overload;
 
 implementation
 
-procedure Dilation(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer);
-var f: TBoxMaxFilter2DUI8;
+procedure Dilation(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer; aFlags: Cardinal);
 begin
-  Assert(Assigned(aSrc));
-
-  if not Assigned(aDst) then
-    aDst := TNDAImg<Byte>.Create(aSrc.Width, aSrc.Height);
-  Assert((aDst.Width = aSrc.Width) and (aDst.Height = aSrc.Height));
-
-  f := TBoxMaxFilter2DUI8.Create;
-  try
-    f.HRadius := aRadius;
-    f.VRadius := aRadius;
-    f.Execute(aSrc.Data, aDst.Data, aSrc.WidthStep, aDst.WidthStep, aSrc.Width, aSrc.Height);
-  finally
-    f.Free;
-  end;
+  MaxFilter(aSrc, aDst, aRadius, aRadius, aFlags);
 end;
 
-procedure Erosion(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer);
-var f: TBoxMinFilter2DUI8;
+procedure Erosion(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer; aFlags: Cardinal);
 begin
-  Assert(Assigned(aSrc));
-
-  if not Assigned(aDst) then
-    aDst := TNDAImg<Byte>.Create(aSrc.Width, aSrc.Height);
-  Assert((aDst.Width = aSrc.Width) and (aDst.Height = aSrc.Height));
-
-  f := TBoxMinFilter2DUI8.Create;
-  try
-    f.HRadius := aRadius;
-    f.VRadius := aRadius;
-    f.Execute(aSrc.Data, aDst.Data, aSrc.WidthStep, aDst.WidthStep, aSrc.Width, aSrc.Height);
-  finally
-    f.Free;
-  end;
+  MinFilter(aSrc, aDst, aRadius, aRadius, aFlags);
 end;
 
-procedure Opening(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer);
+procedure Opening(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer; aFlags: Cardinal);
 var tmp: IImage<Byte>;
 begin
   Erosion(aSrc, tmp, aRadius);
   Dilation(tmp, aDst, aRadius);
 end;
 
-procedure Closing(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer);
+procedure Closing(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer; aFlags: Cardinal);
 var tmp: IImage<Byte>;
 begin
   Dilation(aSrc, tmp, aRadius);
   Erosion(tmp, aDst, aRadius);
 end;
 
-procedure MorphGradient(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer);
+procedure MorphGradient(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer; aFlags: Cardinal);
 var tmp: IImage<Byte>;
 begin
   Dilation(aSrc, aDst, aRadius);
@@ -79,7 +52,7 @@ begin
   ImageSubtract(aDst, tmp, aDst);
 end;
 
-procedure TopHat(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer);
+procedure TopHat(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer; aFlags: Cardinal);
 var tmp: IImage<Byte>;
 begin
   Assert(Assigned(aSrc));
@@ -93,7 +66,7 @@ begin
   ImageSubtract(aDst, tmp, aDst);
 end;
 
-procedure BottomHat(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer);
+procedure BottomHat(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer; aFlags: Cardinal);
 var tmp: IImage<Byte>;
 begin
   Assert(Assigned(aSrc));

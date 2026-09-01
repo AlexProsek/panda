@@ -132,7 +132,7 @@ end;
 
 procedure MaxFilter(const aSrc: IImage<Byte>; var aDst: IImage<Byte>;
   aHRadius, aVRadius: Integer; const aFlags: Cardinal);
-var f: TBoxMaxFilter2DUI8;
+var f: TGMFilter2D;
 begin
   Assert(Assigned(aSrc) and (aHRadius > 0));
 
@@ -141,10 +141,36 @@ begin
   if aVRadius < 0 then
     aVRadius := aHRadius;
 
-  f := TBoxMaxFilter2DUI8.Create;
+  case aFlags and MFF_KERNEL_MASK of
+    MFF_KERNEL_DEFAULT, MFF_BOX_KERNEL: begin
+      f := TBoxMaxFilter2DUI8.Create;
+      with TBoxMaxFilter2DUI8(f) do begin
+        HRadius := aHRadius;
+        VRadius := aVRadius;
+      end;
+    end;
+
+    MFF_DIAMOND_KERNEL: begin
+      f := TMaxDCFilter2DUI8.Create;
+      with TMaxDCFilter2DUI8(f) do begin
+        Radius := aHRadius;
+        KernelType := ktDiamond;
+      end;
+    end;
+
+    MFF_CIRCLE_KERNEL: begin
+      f := TMaxDCFilter2DUI8.Create;
+      with TMaxDCFilter2DUI8(f) do begin
+        Radius := aHRadius;
+        KernelType := ktCircle;
+      end;
+    end
+  else
+    raise ENotImplemented.CreateFmt('Unknown kernel type %d', [aFlags and MFF_KERNEL_MASK]);
+  end;
+
   try
-    f.HRadius := aHRadius;
-    f.VRadius := aVRadius;
+    f.Parallelize := ((aFlags and MFF_PARALLELIZE) > 0);
     f.Execute(aSrc.Data, aDst.Data, aSrc.WidthStep, aDst.WidthStep, aSrc.Width, aSrc.Height);
   finally
     f.Free;
