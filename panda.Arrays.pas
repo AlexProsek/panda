@@ -606,6 +606,7 @@ type
   function NDIAllFrom(aFrom: NativeInt; aStep: NativeInt = 1): INDSpanIndex; inline;
   function NDIAllSeq(aCount: Integer): INDIndexSeq;
   function NDIIntSeq(aCount: Integer): INDIndexSeq; overload;
+  function NDIIntSeq(aIndices: array of NativeInt): INDIndexSeq; overload;
   // Returns span index [aLo[0]:aLo[0] + aSize[0] - 1, (aLo[1]:aLo[1] + aSize[1] - 1, ...]
   function NDIBlockSeq(const aLo, aSize: array of NativeInt): INDIndexSeq;
   function NDIFirst: INDIntIndex; inline;
@@ -1079,6 +1080,14 @@ begin
   SetLength(Result, aCount);
   for I := 0 to aCount - 1 do
     Result[I] := NDI(0);
+end;
+
+function NDIIntSeq(aIndices: array of NativeInt): INDIndexSeq;
+var I: NativeInt;
+begin
+  SetLength(Result, Length(aIndices));
+  for I := 0 to High(aIndices) do
+    Result[I] := NDI(aIndices[I]);
 end;
 
 function NDIBlockSeq(const aLo, aSize: array of NativeInt): INDIndexSeq;
