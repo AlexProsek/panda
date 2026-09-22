@@ -85,11 +85,11 @@ end;
 procedure LocalAdaptiveBinarize(const aSrc: IImage<Byte>; var aDst: IImage<Byte>;
   aRadius: Integer; aParams: array of Single); overload;
 var bf: TBoxFilter2DF32;
-    srcf32, src2, t, s: IImage<Single>;
+    srcf32, t, s: IImage<Single>;
     m: TTensorF32;
     row: TArray<Single>;
-    I, w, h, srcWs, dstWs, tWs, sWs: NativeInt;
-    pSrc, pDst, pT, pS: PByte;
+    I, w, h, srcWs, tWs, sWs: NativeInt;
+    pSrc, pT, pS: PByte;
     a, b, c: Single;
 begin
   Assert(Assigned(aSrc));

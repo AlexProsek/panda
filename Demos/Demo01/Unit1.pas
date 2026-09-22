@@ -11,6 +11,7 @@ uses
   , panda.ImgProc.Images
   , panda.ImgProc.VCLImages
   , panda.ImgProc.io
+  , System.UITypes
   ;
 
 type

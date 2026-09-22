@@ -32,6 +32,9 @@ procedure MaxFilter(const aSrc: IImage<Byte>; var aDst: IImage<Byte>;
 procedure MedianFilter(const aSrc: IImage<Byte>; var aDst: IImage<Byte>;
   aHRadius: Integer; aVRadius: Integer = -1; aFlags: Cardinal = 0); overload;
 
+procedure LocalEqualization(const aSrc: IImage<Byte>; var aDst: IImage<Byte>;
+  aHRadius: Integer; aVRadius: Integer = -1; aFlags: Cardinal = 0); overload;
+
 procedure MeanFilter(const aSrc: IImage<Single>; var aDst: IImage<Single>;
   aHRadius: Integer; aVRadius: Integer = -1; aFlags: Cardinal = 0); overload;
 
@@ -197,6 +200,27 @@ begin
     aVRadius := aHRadius;
 
   f := TMedianFilter2DUI8.Create;
+  try
+    f.HRadius := aHRadius;
+    f.VRadius := aVRadius;
+    f.Execute(aSrc.Data, aDst.Data, aSrc.WidthStep, aDst.WidthStep, aSrc.Width, aSrc.Height);
+  finally
+    f.Free;
+  end;
+end;
+
+procedure LocalEqualization(const aSrc: IImage<Byte>; var aDst: IImage<Byte>;
+  aHRadius, aVRadius: Integer; aFlags: Cardinal);
+var f: TLocEqFilter2DUI8;
+begin
+  Assert(Assigned(aSrc) and (aHRadius > 0));
+
+  if not Assigned(aDst) then
+    aDst := TNDAImg<Byte>.Create(aSrc.Width, aSrc.Height);
+  if aVRadius < 0 then
+    aVRadius := aHRadius;
+
+  f := TLocEqFilter2DUI8.Create;
   try
     f.HRadius := aHRadius;
     f.VRadius := aVRadius;

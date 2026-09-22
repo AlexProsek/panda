@@ -5430,7 +5430,6 @@ begin
     pBuff := aDst.Data;
     bStep := aDst.Strides[0];
     rStep := fBuff.Strides[0];
-    cStep := fCBuff.Strides[0];
     r0.Init(fBuff.Data, fNRows);
     c0.Init(pBuff, fNRows);
     r1.Init(fColFFT.Buff.Data, fNRows);
@@ -5562,8 +5561,7 @@ begin
 end;
 
 procedure TRealIFFTEval2D<TF, TC>.Execute(const aSrc: INDArray<TC>; var aDst: INDArray<TF>);
-var srcSh, dstSh: TNDAShape;
-    w, h: NativeInt;
+var srcSh: TNDAShape;
 begin
   Assert(Assigned(aSrc) and (aSrc.NDim = 2));
 

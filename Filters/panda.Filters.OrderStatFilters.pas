@@ -263,6 +263,9 @@ type
     procedure Remove(aOld: Byte); overload; inline;
     procedure Remove(aOld: PByte; aStep, aCount: NativeInt); overload; inline;
     function Median: Byte; inline;
+    function CDF(aX: Byte): NativeInt; inline;
+
+    property Count: NativeInt read fCount;
   end;
 
   TMedianFilter1DUI8 = class(TFilter1D)
@@ -283,23 +286,42 @@ type
     procedure Execute(pSrc, pDst: PByte; aCount: NativeInt); override;
   end;
 
-  TMedianFilter2DUI8 = class(TFilter2D)
+  THistFilter2DUI8 = class(TFilter2D)
   protected const
     MARGIN_H    = 1;
     MARGIN_V    = 2;
     MARGIN_ALL  = MARGIN_H or MARGIN_V;
   protected
     procedure UpdateHist(var aHist: THistUI8; pSrc: PByte; aSrcWStep, aW, aH: NativeInt);
+    procedure ExecMargins(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt;
+      aFlags: Integer = MARGIN_ALL);
+    procedure ExecHMargin(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt; aTop: Boolean); virtual; abstract;
+    procedure ExecVMargin(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt; aLeft: Boolean); virtual; abstract;
+    procedure ExecCorner(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt; aTop, aLeft: Boolean); virtual; abstract;
+  end;
+
+  TMedianFilter2DUI8 = class(THistFilter2DUI8)
+  protected
     procedure Exec(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt);
     procedure ExecCH_H32(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt);
     procedure ExecCH_H16(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt);
     procedure Exec3x3(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt);
     procedure Exec5x5(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt);
-    procedure ExecMargins(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt;
-      aFlags: Integer = MARGIN_ALL);
-    procedure ExecHMargin(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt; aTop: Boolean);
-    procedure ExecVMargin(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt; aLeft: Boolean);
-    procedure ExecCorner(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt; aTop, aLeft: Boolean);
+    procedure ExecHMargin(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt; aTop: Boolean); override;
+    procedure ExecVMargin(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt; aLeft: Boolean); override;
+    procedure ExecCorner(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt; aTop, aLeft: Boolean); override;
+  public
+    procedure Execute(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt); override;
+  end;
+
+  TLocEqFilter2DUI8 = class(THistFilter2DUI8)
+  protected
+    procedure Exec(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt);
+    procedure ExecCH_H32(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt);
+    procedure ExecCH_H16(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt);
+    procedure ExecHMargin(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt; aTop: Boolean); override;
+    procedure ExecVMargin(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt; aLeft: Boolean); override;
+    procedure ExecCorner(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt; aTop, aLeft: Boolean); override;
   public
     procedure Execute(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt); override;
   end;
@@ -1281,6 +1303,17 @@ begin
   Result := 255;
 end;
 
+function TMedianTrackerUI8.CDF(aX: Byte): NativeInt;
+var I, J: Integer;
+begin
+  Result := 0;
+  J := aX shr 4;
+  for I := 0 to J - 1 do
+    Inc(Result, fCHist[I]);
+  for I := 0 to (aX and 15) do
+    Inc(Result, fFHist[J, I]);
+end;
+
 {$endregion}
 
 {$region 'TMedianFilter1DUI8'}
@@ -1491,9 +1524,9 @@ end;
 
 {$endregion}
 
-{$region 'TMedianFilter2DUI8'}
+{$region 'THistFilter2DUI8'}
 
-procedure TMedianFilter2DUI8.UpdateHist(var aHist: THistUI8; pSrc: PByte; aSrcWStep, aW, aH: NativeInt);
+procedure THistFilter2DUI8.UpdateHist(var aHist: THistUI8; pSrc: PByte; aSrcWStep, aW, aH: NativeInt);
 var pEnd, pRow, pRowEnd: PByte;
 begin
   pRow := pSrc;
@@ -1509,6 +1542,31 @@ begin
     Inc(pRowEnd, aSrcWStep);
   end;
 end;
+
+procedure THistFilter2DUI8.ExecMargins(pSrc, pDst: PByte; aSrcWStep, aDstWStep,
+  aW, aH: NativeInt; aFlags: Integer);
+begin
+  if (aFlags and MARGIN_H) <> 0 then begin
+    ExecHMargin(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH, True);
+    ExecHMargin(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH, False);
+  end;
+
+  if (aFlags and MARGIN_V) <> 0 then begin
+    ExecVMargin(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH, True);
+    ExecVMargin(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH, False);
+  end;
+
+  if aFlags <> 0 then begin
+    ExecCorner(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH, True, True);
+    ExecCorner(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH, True, False);
+    ExecCorner(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH, False, True);
+    ExecCorner(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH, False, False);
+  end;
+end;
+
+{$endregion}
+
+{$region 'TMedianFilter2DUI8'}
 
 procedure TMedianFilter2DUI8.Exec(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt);
 var H: THistUI8;
@@ -1567,6 +1625,7 @@ type
     procedure Sub(aValue: Byte); overload; inline;
     procedure Sub(const aH: THistI32); overload; inline;
     function Median(aQ: Integer): Byte; inline;
+    function CDF(aX: Integer): Integer; inline;
   end;
 
 procedure THistI32.Add(aValue: Byte);
@@ -1624,6 +1683,17 @@ begin
   Result := 255;
 end;
 
+function THistI32.CDF(aX: Integer): Integer;
+var I, J: Integer;
+begin
+  Result := 0;
+  J := aX shr 4;
+  for I := 0 to J - 1 do
+    Inc(Result, C[I]);
+  for I := 0 to (aX and 15) do
+    Inc(Result, F[J, I]);
+end;
+
 type
   THistI16 = record
     C: array [0..15] of UInt16;
@@ -1633,6 +1703,7 @@ type
     procedure Sub(aValue: Byte); overload; inline;
     procedure Sub(const aH: THistI16); overload; inline;
     function Median(aQ: Integer): Byte; inline;
+    function CDF(aX: Integer): Integer; inline;
   end;
 
 procedure THistI16.Add(aValue: Byte);
@@ -1688,6 +1759,17 @@ begin
   end;
 
   Result := 255;
+end;
+
+function THistI16.CDF(aX: Integer): Integer;
+var I, J: Integer;
+begin
+  Result := 0;
+  J := aX shr 4;
+  for I := 0 to J - 1 do
+    Inc(Result, C[I]);
+  for I := 0 to (aX and 15) do
+    Inc(Result, F[J, I]);
 end;
 
 procedure TMedianFilter2DUI8.ExecCH_H32(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt);
@@ -1978,27 +2060,6 @@ begin
   end;
 end;
 
-procedure TMedianFilter2DUI8.ExecMargins(pSrc, pDst: PByte; aSrcWStep, aDstWStep,
-  aW, aH: NativeInt; aFlags: Integer);
-begin
-  if (aFlags and MARGIN_H) <> 0 then begin
-    ExecHMargin(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH, True);
-    ExecHMargin(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH, False);
-  end;
-
-  if (aFlags and MARGIN_V) <> 0 then begin
-    ExecVMargin(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH, True);
-    ExecVMargin(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH, False);
-  end;
-
-  if aFlags <> 0 then begin
-    ExecCorner(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH, True, True);
-    ExecCorner(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH, True, False);
-    ExecCorner(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH, False, True);
-    ExecCorner(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH, False, False);
-  end;
-end;
-
 procedure TMedianFilter2DUI8.ExecHMargin(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt; aTop: Boolean);
 var H: THistUI8;
     mt: TMedianTrackerUI8;
@@ -2162,6 +2223,344 @@ begin
     ((not CPU_X86_V3) and (fHRadius <= V3_R_THRESHOLD) and (fVRadius <= V3_R_THRESHOLD)) or
     ((fHRadius <= V2_R_THRESHOLD) and (fVRadius <= V2_R_THRESHOLD))
   then begin
+    Exec(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH);
+    ExecMargins(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH);
+    exit;
+  end;
+
+  if (2*fHRadius + 1) * (2*fVRadius + 1) < High(UInt16) then
+    ExecCH_H16(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH)
+  else
+    ExecCH_H32(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH);
+  ExecMargins(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH, MARGIN_H);
+end;
+
+{$endregion}
+
+{$region 'TLocEqFilter2DUI8'}
+
+procedure TLocEqFilter2DUI8.Exec(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt);
+var H: THistUI8;
+    mt: TMedianTrackerUI8;
+    winSzX, winSzY, I, J: Nativeint;
+    pInRow, pOutRow, pInOld, pInNew, pInC: PByte;
+    bForward: Boolean;
+begin
+  winSzX := 2*fHRadius + 1;
+  winSzY := 2*fVRadius + 1;
+  pDst := pDst + fVRadius * aDstWStep + fHRadius;
+
+  //initialize histogram
+  FillChar(H, SizeOf(H), 0);
+  UpdateHist(H, pSrc, aSrcWStep, winSzX, winSzY);
+  mt.Init(H);
+
+  bForward := True;
+  for I := 0 to aH - winSzY do begin
+    pOutRow := pDst + I * aDstWStep;
+    pInRow := pSrc + I * aSrcWStep;
+    pInC := pInRow + fVRadius * aSrcWStep + fHRadius;
+    if bForward then begin
+      for J := 0 to aW - winSzX - 1 do begin // J-index of the old column
+        (pOutRow + J)^ := Round(255 * mt.CDF((pInC + J)^) / mt.Count);
+        pInOld := pInRow + J;
+        pInNew := pInOld + winSzX;
+        mt.Replace(pInOld, pInNew, aSrcWStep, winSzY);
+      end;
+      J := aW - winSzX;
+    end else begin
+      for J :=  aW - winSzX - 1 downto 0 do begin // J-index of the new column
+        (pOutRow + J + 1)^ := Round(255 * mt.CDF((pInC + J + 1)^) / mt.Count);
+        pInNew := pInRow + J;
+        pInOld := pInNew + winSzX;
+        mt.Replace(pInOld, pInNew, aSrcWStep, winSzY);
+      end;
+      J := 0;
+    end;
+    (pOutRow + J)^ := Round(255 * mt.CDF((pInC + J)^) / mt.Count);
+    bForward := not bForward;
+    //update the histogram on moving along the y axis
+    if I < aH - winSzY then begin
+      pInOld := pSrc + I * aSrcWStep + J;
+      pInNew := pInOld + winSzY * aSrcWstep;
+      mt.Replace(pInOld, pInNew, 1, winSzX);
+    end;
+  end;
+end;
+
+procedure TLocEqFilter2DUI8.ExecCH_H32(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt);
+var H: THistI32;
+    CH: TArray<THistI32>;
+    winSzX, winSzY, I, J, kCnt: Nativeint;
+    pInRow, pOutRow, pInOld, pInNew, pInC: PByte;
+begin
+  winSzX := 2*fHRadius + 1;
+  winSzY := 2*fVRadius + 1;
+  pDst := pDst + fVRadius * aDstWStep;
+
+  SetLength(CH, aW);
+  pInRow := pSrc;
+  for I := 0 to winSzY - 1 do begin
+    for J := 0 to aW - 1 do
+      CH[J].Add((pInRow + J)^);
+    Inc(pInRow, aSrcWStep);
+  end;
+
+  pOutRow := pDst;
+  pInC := pSrc + fVRadius * aSrcWStep;
+  for I := 0 to aH - winSzY do begin
+    FillChar(H, SizeOf(H), 0);
+    for J := 0 to fHRadius do
+      H.Add(CH[J]);
+
+    kCnt := (fHRadius + 1) * winSzY;
+    for J := 0 to fHRadius - 1 do begin
+      (pOutRow + J)^ := Round(255 * H.CDF((pInC + J)^) / kCnt);
+      H.Add(CH[J + fHRadius + 1]);
+      Inc(kCnt, winSzY);
+    end;
+
+    for J := fHRadius to aW - winSzX do begin
+      (pOutRow + J)^ := Round(255 * H.CDF((pInC + J)^) / kCnt);
+      H.Sub(CH[J - fHRadius]);
+      H.Add(CH[J + fHRadius + 1]);
+    end;
+
+    for J := aW - winSzX + 1 to aW - 1 do begin
+      (pOutRow + J)^ := Round(255 * H.CDF((pInC + J)^) / kCnt);
+      H.Sub(CH[J - fHRadius]);
+      Dec(kCnt, winSzY);
+    end;
+
+    if I < aH - winSzY then begin
+      pInOld := pSrc;
+      pInNew := pSrc + winSzY * aSrcWStep;
+      for J := 0 to aW - 1 do begin
+        with CH[J] do begin
+          Sub(pInOld^);
+          Add(pInNew^);
+        end;
+        Inc(pInOld);
+        Inc(pInNew);
+      end;
+
+      Inc(pOutRow, aDstWStep);
+      Inc(pSrc, aSrcWStep);
+      Inc(pInC, aSrcWStep);
+    end;
+  end;
+end;
+
+procedure TLocEqFilter2DUI8.ExecCH_H16(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt);
+var H: THistI16;
+    CH: TArray<THistI16>;
+    winSzX, winSzY, I, J, kCnt: Nativeint;
+    pInRow, pOutRow, pInOld, pInNew, pInC: PByte;
+begin
+  winSzX := 2*fHRadius + 1;
+  winSzY := 2*fVRadius + 1;
+  pDst := pDst + fVRadius * aDstWStep;
+
+  SetLength(CH, aW);
+  pInRow := pSrc;
+  for I := 0 to winSzY - 1 do begin
+    for J := 0 to aW - 1 do
+      CH[J].Add((pInRow + J)^);
+    Inc(pInRow, aSrcWStep);
+  end;
+
+  pOutRow := pDst;
+  pInC := pSrc + fVRadius * aSrcWStep;
+  for I := 0 to aH - winSzY do begin
+    FillChar(H, SizeOf(H), 0);
+    for J := 0 to fHRadius do
+      H.Add(CH[J]);
+
+    kCnt := (fHRadius + 1) * winSzY;
+    for J := 0 to fHRadius - 1 do begin
+      (pOutRow + J)^ := Round(255 * H.CDF((pInC + J)^) / kCnt);
+      H.Add(CH[J + fHRadius + 1]);
+      Inc(kCnt, winSzY);
+    end;
+
+    for J := fHRadius to aW - winSzX do begin
+      (pOutRow + J)^ := Round(255 * H.CDF((pInC + J)^) / kCnt);
+      H.Sub(CH[J - fHRadius]);
+      H.Add(CH[J + fHRadius + 1]);
+    end;
+
+    for J := aW - winSzX + 1 to aW - 1 do begin
+      (pOutRow + J)^ := Round(255 * H.CDF((pInC + J)^) / kCnt);
+      H.Sub(CH[J - fHRadius]);
+      Dec(kCnt, winSzY);
+    end;
+
+    if I < aH - winSzY then begin
+      pInOld := pSrc;
+      pInNew := pSrc + winSzY * aSrcWStep;
+      for J := 0 to aW - 1 do begin
+        with CH[J] do begin
+          Sub(pInOld^);
+          Add(pInNew^);
+        end;
+        Inc(pInOld);
+        Inc(pInNew);
+      end;
+
+      Inc(pOutRow, aDstWStep);
+      Inc(pSrc, aSrcWStep);
+      Inc(pInC, aSrcWStep);
+    end;
+  end;
+end;
+
+
+procedure TLocEqFilter2DUI8.ExecHMargin(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt; aTop: Boolean);
+var H: THistUI8;
+    mt: TMedianTrackerUI8;
+    winSzX, winSzY, I, J: NativeInt;
+    pOutRow, pInC: PByte;
+    bForward: Boolean;
+begin
+  winSzX := 2*fHRadius + 1;
+  winSzY := fVRadius + 1;
+  pDst := pDst + fHRadius;
+  FillChar(H, SizeOf(H), 0);
+  if not aTop then begin
+    pSrc := pSrc + (aH - 1) * aSrcWStep;
+    pDst := pDst + (aH - 1) * aDstWStep;
+    aSrcWStep := -aSrcWStep;
+    aDstWStep := -aDstWStep;
+  end;
+  UpdateHist(H, pSrc, aSrcWStep, winSzX, winSzY);
+  mt.Init(H);
+
+  bForward := True;
+  for I := 0 to fVRadius - 1 do begin
+    pOutRow := pDst + I * aDstWStep;
+    pInC := pSrc + I * aSrcWStep + fHRadius;
+    if bForward then begin
+      for J := 0 to aW - winSzX - 1 do begin // J-index of the old column
+        (pOutRow + J)^ := Round(255 * mt.CDF((pInC + J)^) / mt.Count);
+        mt.Replace(pSrc + J, pSrc + J + winSzX, aSrcWStep, winSzY);
+      end;
+      J := aW - winSzX;
+    end else begin
+      for J :=  aW - winSzX - 1 downto 0 do begin // J-index of the new column
+        (pOutRow + J + 1)^ := Round(255 * mt.CDF((pInC + J + 1)^) / mt.Count);
+        mt.Replace(pSrc + J + winSzX, pSrc + J, aSrcWStep, winSzY);
+      end;
+      J := 0;
+    end;
+    (pOutRow + J)^ := Round(255 * mt.CDF((pInC + J)^) / mt.Count);
+    bForward := not bForward;
+    //update the histogram on moving along the y axis
+    mt.Add(pSrc + J + winSzY * aSrcWStep, 1, winSzX);
+    Inc(winSzY);
+  end;
+end;
+
+procedure TLocEqFilter2DUI8.ExecVMargin(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt; aLeft: Boolean);
+var H: THistUI8;
+    mt: TMedianTrackerUI8;
+    winSzX, winSzY, I, J, xStep: NativeInt;
+    pOutCol, pInC: PByte;
+    bForward: Boolean;
+begin
+  winSzX := fHRadius + 1;
+  winSzY := 2*fVRadius + 1;
+  pDst := pDst + fVRadius * aDstWStep;
+  FillChar(H, SizeOf(H), 0);
+  if aLeft then begin
+    UpdateHist(H, pSrc, aSrcWStep, winSzX, winSzY);
+    xStep := 1;
+  end else begin
+    UpdateHist(H, pSrc + aW - winSzX, aSrcWStep, winSzX, winSzY);
+    pSrc := pSrc + aW - 1;
+    pDst := pDst + aW - 1;
+    xStep := -1;
+  end;
+  mt.Init(H);
+
+  bForward := True;
+  for I := 0 to fHRadius - 1 do begin
+    pOutCol := pDst + xStep * I;
+    pInC := pSrc + xStep * I + fVRadius * aSrcWStep;
+    if bForward then begin
+      for J := 0 to aH - winSzY - 1 do begin // J-index of the old row
+        (pOutCol + J * aDstWStep)^ := Round(255 * mt.CDF((pInC + J * aSrcWStep)^) / mt.Count);;
+        mt.Replace(pSrc + J * aSrcWStep, pSrc + (J + winSzY) * aSrcWStep, xStep, winSzX);
+      end;
+      J := aH - winSzY;
+    end else begin
+      for J :=  aH - winSzY - 1 downto 0 do begin // J-index of the new row
+        (pOutCol + (J + 1) * aDstWStep)^ := Round(255 * mt.CDF((pInC + (J + 1) * aSrcWStep)^) / mt.Count);
+        mt.Replace(pSrc + (J + winSzY) * aSrcWStep, pSrc + J * aSrcWStep, xStep, winSzX);
+      end;
+      J := 0;
+    end;
+    (pOutCol + J * aDstWStep)^ := Round(255 * mt.CDF((pInC + J * aSrcWStep)^) / mt.Count);
+    bForward := not bForward;
+    //update the histogram on moving along the x axis
+    mt.Add(pSrc + J * aSrcWStep + xStep * winSzX, aSrcWStep, winSzY);
+    Inc(winSzX);
+  end;
+end;
+
+procedure TLocEqFilter2DUI8.ExecCorner(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt; aTop, aLeft: Boolean);
+var H: THistUI8;
+    mt: TMedianTrackerUI8;
+    I, J, winSzX, winSzY, xStep: Integer;
+    pOutRow, pInC: PByte;
+    bForward: Boolean;
+begin
+  winSzX := fHRadius + 1;
+  winSzY := fVRadius + 1;
+  FillChar(H, SizeOf(H), 0);
+  if not aTop then begin
+    pSrc := pSrc + (aH - 1) * aSrcWStep;
+    pDst := pDst + (aH - 1) * aDstWStep;
+    aSrcWStep := -aSrcWStep;
+    aDstWStep := -aDstWStep;
+  end;
+  if aLeft then begin
+    UpdateHist(H, pSrc, aSrcWStep, winSzX, winSzY);
+    xStep := 1;
+  end else begin
+    UpdateHist(H, pSrc + aW - winSzX, aSrcWStep, winSzX, winSzY);
+    xStep := -1;
+    pSrc := pSrc + aW - 1;
+    pDst := pDst + aW - 1;
+  end;
+  mt.Init(H);
+
+  bForward := True;
+  for I := 0 to fVRadius - 1 do begin
+    pOutRow := pDst + I * aDstWStep;
+    pInC := pSrc + I * aDstWStep;
+    if bForward then begin
+      for J := 0 to fHRadius - 1 do begin
+        (pOutRow + J * xStep)^ := Round(255 * mt.CDF((pInC + J * xStep)^) / mt.Count);
+        mt.Add(pSrc + (J + fHRadius) * xStep, aSrcWStep, winSzY);
+      end;
+      J := fHRadius;
+    end else begin
+      for J :=  fHRadius - 1 downto 0 do begin
+        (pOutRow + (J + 1) * xStep)^ := Round(255 * mt.CDF((pInC + (J + 1) * xStep)^) / mt.Count);
+        mt.Remove(pSrc + (J + fHRadius) * xStep, aSrcWStep, winSzY);
+      end;
+      J := 0;
+    end;
+    (pOutRow + J * xStep)^ := Round(255 * mt.CDF((pInC + J * xStep)^) / mt.Count);
+    bForward := not bForward;
+    mt.Add(pSrc + winSzY * aSrcWStep, xStep, J + fHRadius + 1);
+    Inc(winSzY);
+  end;
+end;
+
+procedure TLocEqFilter2DUI8.Execute(pSrc, pDst: PByte; aSrcWStep, aDstWStep, aW, aH: NativeInt);
+begin
+  if not (CPU_X86_V2 or CPU_X86_V3) then begin
     Exec(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH);
     ExecMargins(pSrc, pDst, aSrcWStep, aDstWStep, aW, aH);
     exit;

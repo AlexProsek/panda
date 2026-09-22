@@ -67,7 +67,6 @@ begin
 end;
 
 procedure BottomHat(const aSrc: IImage<Byte>; var aDst: IImage<Byte>; aRadius: Integer; aFlags: Cardinal);
-var tmp: IImage<Byte>;
 begin
   Assert(Assigned(aSrc));
 

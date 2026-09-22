@@ -15,6 +15,7 @@ uses
   , panda.ImgProc.io
   , System.Diagnostics
   , System.Math
+  , System.UITypes
   ;
 
 type

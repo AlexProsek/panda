@@ -5,13 +5,15 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
-  VCLTee.TeEngine, VCLTee.TeeProcs, VCLTee.Chart, VCLTee.Series, Vcl.ComCtrls
+  VCLTee.TeEngine, VCLTee.TeeProcs, VCLTee.Chart, VCLTee.Series, Vcl.ComCtrls,
+  Vcl.Samples.Spin
 
   , panda.Intfs
   , panda.Arrays
   , panda.MAT4io
   , panda.Nums
-  , panda.fft, Vcl.Samples.Spin
+  , panda.fft
+  , System.UITypes
   ;
 
 type
