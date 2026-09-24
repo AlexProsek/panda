@@ -8,6 +8,7 @@ uses
   , panda.Consts
   , panda.Intfs
   , panda.Arrays
+  , panda.Nums
 {$ifdef BLAS}
   , libCBLAS
 {$endif}

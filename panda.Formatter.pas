@@ -295,6 +295,7 @@ begin
           sb.Append(fArrBegin);
         while it.MoveNext do begin
           WriteArray1D(sb, it.Current, hiSz, step);
+          lvl := hiLvl;
           I := hiLvl - 1;
           while I >= 0 do begin
             if it.IsLast(I) then
@@ -342,7 +343,7 @@ end;
 
 function TTokenTreeParser.Push(aChar: Char): Integer;
 begin
-
+  Result := -1;
 end;
 
 procedure TTokenTreeParser.Reset;

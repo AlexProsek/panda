@@ -37,7 +37,7 @@ begin
     VecSubWithSat(PUInt8(pA), PUInt8(pB), PUInt8(pRes), w);
     Inc(pRes, ResWs);
     Inc(pA, AWs);
-    Inc(pB, AWs);
+    Inc(pB, BWs);
   end;
 end;
 

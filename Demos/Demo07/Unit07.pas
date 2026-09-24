@@ -5,7 +5,7 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls, Vcl.ComCtrls,
-  Vcl.Samples.Spin
+  Vcl.Samples.Spin, Vcl.Menus
 
   , panda.Intfs
   , panda.Arrays
@@ -16,7 +16,7 @@ uses
   , panda.ImgProc.Filters
   , panda.ImgProc.io
   , System.Diagnostics
-  , System.UITypes, Vcl.Menus
+  , System.UITypes
   ;
 
 type
@@ -70,6 +70,7 @@ type
     procedure ApplyTVFilter;
     procedure ApplyMeanFilter;
     procedure ApplyGuidedFilter;
+    procedure ApplyLocEqFilter;
   end;
 
 var
@@ -87,6 +88,7 @@ const
   FIDX_TV_FILTER      = 3;
   FIDX_MEAN_FILTER    = 4;
   FIDX_GUIDED_FILTER  = 5;
+  FIDX_LOC_EQ_FILTER  = 6;
 
   // kernel indices
   KIDX_BOX            = 0;
@@ -148,6 +150,7 @@ begin
     Add('Total variation filter');
     Add('Mean filter');
     Add('Guided filter');
+    Add('Local equalization');
   end;
   cbFilter.ItemIndex := FIDX_MIN_FILTER;
 
@@ -286,6 +289,18 @@ begin
   ShowImage(dstui8);
 end;
 
+procedure TForm7.ApplyLocEqFilter;
+var dst: IImage<Byte>;
+begin
+  dst := TBmpUI8.Create(fSrcImg.Width, fSrcImg.Height);
+
+  SWStart;
+  LocalEqualization(fSrcImg, dst, edRadius.Value, edRadius.Value);
+  SWStop;
+
+  ShowImage(dst);
+end;
+
 procedure TForm7.btApplyClick(Sender: TObject);
 begin
   case cbFilter.ItemIndex of
@@ -295,6 +310,7 @@ begin
     FIDX_TV_FILTER:     ApplyTVFilter;
     FIDX_MEAN_FILTER:   ApplyMeanFilter;
     FIDX_GUIDED_FILTER: ApplyGuidedFilter;
+    FIDX_LOC_EQ_FILTER: ApplyLocEqFilter;
   end;
 end;
 
@@ -459,7 +475,7 @@ begin
       ShowGuideFilterControls(False);
       ShowMinMaxFilterControls(True);
     end;
-    FIDX_MEDIAN_FILTER, FIDX_MEAN_FILTER: begin
+    FIDX_MEDIAN_FILTER, FIDX_MEAN_FILTER, FIDX_LOC_EQ_FILTER: begin
       ShowMinMaxFilterControls(False);
       ShowTVFilterControls(False);
       ShowGuideFilterControls(False);

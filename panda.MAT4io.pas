@@ -287,11 +287,11 @@ end;
 procedure TMAT4Exporter.WriteMatrix(const aMat: INDArray; const aName: String);
 var it: TNDAIt;
     h: TMAT4Header;
-    elSz: Integer;
+    elSz: Cardinal;
     buff: TBytes;
     pRe, pIm: PByte;
 begin
-  elSz := aMat.ItemSize;
+  elSz := Cardinal(aMat.ItemSize);
   h.Init(aMat, Length(aName), cMAT4NumType);
   WriteHeader(h);
   WriteName(aName);
