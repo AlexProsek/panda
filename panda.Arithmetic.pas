@@ -80,6 +80,10 @@ type
     class operator Add(const A, B: TTensorI64): TTensorI64;
     class operator Subtract(const A, B: TTensorI64): TTensorI64;
     class operator Multiply(const A, B: TTensorI64): TTensorI64;
+    procedure AddTo(const aArr: TTensorI64); overload;
+    procedure AddTo(const aValue: Int64); overload;
+    procedure MultiplyBy(const aArr: TTensorI64); overload;
+    procedure MultiplyBy(const aValue: Int64); overload;
 
     property NDA: INDArray<Int64> read fArr;
     property Shape: TNDAShape read GetShape;
@@ -133,8 +137,12 @@ type
     class operator Implicit(const aArr: TTensorF64): INDArray<Double>;
     class operator Implicit(const aArr: INDArray<Single>): TTensorF64;
     class operator Add(const A, B: TTensorF64): TTensorF64;
+    class operator Add(const A: TTensorF64; const B: Double): TTensorF64;
+    class operator Add(const A: Double; const B: TTensorF64): TTensorF64;
     class operator Subtract(const A, B: TTensorF64): TTensorF64;
     class operator Multiply(const A, B: TTensorF64): TTensorF64;
+    class operator Multiply(const A: TTensorF64; const B: Double): TTensorF64;
+    class operator Multiply(const A: Double; const B: TTensorF64): TTensorF64;
     class operator Divide(const A, B: TTensorF64): TTensorF64;
     class operator Divide(const A: TTensorF64; B: Double): TTensorF64;
     class operator Divide(A: Double; const B: TTensorF64): TTensorF64;
@@ -1230,6 +1238,26 @@ begin
   TNDAUt.Map<Int64>(A, B, Result.fArr, MulL_I64, MulR_I64);
 end;
 
+procedure TTensorI64.AddTo(const aArr: TTensorI64);
+begin
+  TNDAArith.MapR(fArr, aArr.fArr, AddR_I64);
+end;
+
+procedure TTensorI64.AddTo(const aValue: Int64);
+begin
+  TNDAArith.MapR(fArr, @aValue, AddR_I64);
+end;
+
+procedure TTensorI64.MultiplyBy(const aArr: TTensorI64);
+begin
+  TNDAArith.MapR(fArr, aArr.fArr, MulR_I64);
+end;
+
+procedure TTensorI64.MultiplyBy(const aValue: Int64);
+begin
+  TNDAArith.MapR(fArr, @aValue, MulR_I64);
+end;
+
 function TTensorI64.GetPart(const aIdx: INDIndexSeq): TTensorI64;
 begin
   Result := fArr[aIdx];
@@ -1789,6 +1817,18 @@ begin
   TNDAUt.Map<Double>(A, B, Result.fArr, AddL_F64, AddR_F64);
 end;
 
+class operator TTensorF64.Add(const A: TTensorF64; const B: Double): TTensorF64;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Double>(A, B, Result.fArr, AddR_F64);
+end;
+
+class operator TTensorF64.Add(const A: Double; const B: TTensorF64): TTensorF64;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Double>(A, B, Result.fArr, AddL_F64);
+end;
+
 class operator TTensorF64.Subtract(const A, B: TTensorF64): TTensorF64;
 begin
   Result.fArr := nil;
@@ -1799,6 +1839,18 @@ class operator TTensorF64.Multiply(const A, B: TTensorF64): TTensorF64;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Double>(A, B, Result.fArr, MulL_F64, MulR_F64);
+end;
+
+class operator TTensorF64.Multiply(const A: TTensorF64; const B: Double): TTensorF64;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Double>(A, B, Result.fArr, MulR_F64);
+end;
+
+class operator TTensorF64.Multiply(const A: Double; const B: TTensorF64): TTensorF64;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Double>(A, B, Result.fArr, MulL_F64);
 end;
 
 class operator TTensorF64.Divide(const A, B: TTensorF64): TTensorF64;
