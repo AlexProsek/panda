@@ -2383,13 +2383,13 @@ begin
       Inc(kCnt, winSzY);
     end;
 
-    for J := fHRadius to aW - winSzX do begin
+    for J := fHRadius to aW - fHRadius - 2 do begin
       (pOutRow + J)^ := Round(255 * H.CDF((pInC + J)^) / kCnt);
       H.Sub(CH[J - fHRadius]);
       H.Add(CH[J + fHRadius + 1]);
     end;
 
-    for J := aW - winSzX + 1 to aW - 1 do begin
+    for J := aW - fHRadius - 1 to aW - 1 do begin
       (pOutRow + J)^ := Round(255 * H.CDF((pInC + J)^) / kCnt);
       H.Sub(CH[J - fHRadius]);
       Dec(kCnt, winSzY);
@@ -2541,13 +2541,13 @@ begin
     if bForward then begin
       for J := 0 to fHRadius - 1 do begin
         (pOutRow + J * xStep)^ := Round(255 * mt.CDF((pInC + J * xStep)^) / mt.Count);
-        mt.Add(pSrc + (J + fHRadius) * xStep, aSrcWStep, winSzY);
+        mt.Add(pSrc + (J + fHRadius + 1) * xStep, aSrcWStep, winSzY);
       end;
       J := fHRadius;
     end else begin
       for J :=  fHRadius - 1 downto 0 do begin
         (pOutRow + (J + 1) * xStep)^ := Round(255 * mt.CDF((pInC + (J + 1) * xStep)^) / mt.Count);
-        mt.Remove(pSrc + (J + fHRadius) * xStep, aSrcWStep, winSzY);
+        mt.Remove(pSrc + (J + fHRadius + 1) * xStep, aSrcWStep, winSzY);
       end;
       J := 0;
     end;

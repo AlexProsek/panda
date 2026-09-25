@@ -15,7 +15,6 @@ uses
   , panda.fft
   , System.Math
   , System.SysUtils
-  , VUTS.Common.PFFFT
 {$ifdef OCV}
   , ocv.imgproc_c
   , ocv.imgproc.types_c
@@ -59,8 +58,6 @@ type
     procedure OcvRealFFT2D_1024x1024;
     procedure OcvRealFFT2D_1024x765;
   {$endif}
-    procedure PFFFT_RealFFT_LargeData;
-    procedure PFFFT_RealFFT2D_1024x768;
   end;
 
 procedure TransposeBlocked(src, dst: PSingle; H, W: Integer);
@@ -745,103 +742,6 @@ begin
   end;
 end;
 {$endif}
-
-procedure TFFT32Tests.PFFFT_RealFFT_LargeData;
-type
-  TSingleArr = array[0..MaxInt div SizeOf(Single) - 1] of Single;
-  PSingleArr = ^TSingleArr;
-const
-  cPwr = 18;
-var
-  setup: PFFFT_Setup;
-  inp, outp, work: PSingle;
-  arr: PSingleArr;
-  i, count: Integer;
-begin
-  count := 1 shl cPwr;
-
-  setup := pffft_new_setup(count, PFFFT_REAL);
-  inp  := pffft_aligned_malloc(count * SizeOf(Single));
-  outp := pffft_aligned_malloc(count * SizeOf(Single));
-  work := pffft_aligned_malloc(count * SizeOf(Single));
-  try
-    arr := PSingleArr(inp);
-    for i := 0 to count - 1 do
-      arr^[i] := i mod 100;
-
-    pffft_transform(setup, inp, outp, work, PFFFT_FORWARD);
-
-    SWStart;
-    DoTestLoop(procedure begin
-      pffft_transform(setup, inp, outp, work, PFFFT_FORWARD);
-    end, 50);
-    SWStop(Format('2^%d samples (pffft)', [cPwr]));
-  finally
-    pffft_aligned_free(inp);
-    pffft_aligned_free(outp);
-    pffft_aligned_free(work);
-    pffft_destroy_setup(setup);
-  end;
-end;
-
-procedure TFFT32Tests.PFFFT_RealFFT2D_1024x768;
-type
-  TSingleArr = array[0..MaxInt div SizeOf(Single) - 1] of Single;
-  PSingleArr = ^TSingleArr;
-const
-  W = 1024;
-  H = 768;
-var
-  setupW, setupH: PFFFT_Setup;
-  img, rowOut, colBuf, transp, work: PSingle;
-  arr: PSingleArr;
-  i: Integer;
-begin
-  setupW := pffft_new_setup(W, PFFFT_REAL);
-  setupH := pffft_new_setup(H, PFFFT_REAL);
-
-
-  img    := pffft_aligned_malloc(W * H * SizeOf(Single));
-  rowOut := pffft_aligned_malloc(W * H * SizeOf(Single));
-  transp := pffft_aligned_malloc(W * H * SizeOf(Single));
-  colBuf := pffft_aligned_malloc(H * SizeOf(Single));
-  work   := pffft_aligned_malloc(W * SizeOf(Single));
-  try
-    arr := PSingleArr(img);
-    for i := 0 to W * H - 1 do
-      arr^[i] := i mod 100;
-
-    // warm-up
-    pffft_transform(setupW, img, rowOut, work, PFFFT_FORWARD);
-
-    SWStart;
-    DoTestLoop(procedure
-    var rr, cc: Integer;
-    begin
-      for rr := 0 to H - 1 do
-        pffft_transform(setupW,
-          PSingle(NativeUInt(img)    + NativeUInt(rr) * W * SizeOf(Single)),
-          PSingle(NativeUInt(rowOut) + NativeUInt(rr) * W * SizeOf(Single)),
-          work, PFFFT_FORWARD);
-
-      TransposeBlocked(rowOut, transp, H, W);
-
-      for cc := 0 to W - 1 do
-        pffft_transform(setupH,
-          PSingle(NativeUInt(transp) + NativeUInt(cc) * H * SizeOf(Single)),
-          colBuf, work, PFFFT_FORWARD);
-    end, 50);
-    SWStop(Format('%dx%d (pffft, S TRANSPOZICI)', [W, H]));
-  finally
-    pffft_aligned_free(img);
-    pffft_aligned_free(rowOut);
-    pffft_aligned_free(transp);
-    pffft_aligned_free(colBuf);
-    pffft_aligned_free(work);
-    pffft_destroy_setup(setupW);
-    pffft_destroy_setup(setupH);
-  end;
-end;
 
 {$endregion}
 
