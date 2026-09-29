@@ -52,8 +52,14 @@ type
     class operator Implicit(const aArr: INDArray<Integer>): TTensorI32; inline;
     class operator Implicit(const aArr: TTensorI32): INDArray<Integer>; inline;
     class operator Add(const A, B: TTensorI32): TTensorI32;
+    class operator Add(const A: TTensorI32; B: Integer): TTensorI32;
+    class operator Add(A: Integer; const B: TTensorI32): TTensorI32;
     class operator Subtract(const A, B: TTensorI32): TTensorI32;
+    class operator Subtract(const A: TTensorI32; B: Integer): TTensorI32;
+    class operator Subtract(A: Integer; const B: TTensorI32): TTensorI32;
     class operator Multiply(const A, B: TTensorI32): TTensorI32;
+    class operator Multiply(const A: TTensorI32; B: Integer): TTensorI32;
+    class operator Multiply(A: Integer; const B: TTensorI32): TTensorI32;
     class operator Equal(const A, B: TTensorI32): TTensorBool;
     class operator NotEqual(const A, B: TTensorI32): TTensorBool;
     class operator GreaterThan(const A, B: TTensorI32): TTensorBool;
@@ -78,8 +84,14 @@ type
     class operator Implicit(const aArr: INDArray<Int64>): TTensorI64;
     class operator Implicit(const aArr: TTensorI64): INDArray<Int64>;
     class operator Add(const A, B: TTensorI64): TTensorI64;
+    class operator Add(const A: TTensorI64; const B: Int64): TTensorI64;
+    class operator Add(const A: Int64; const B: TTensorI64): TTensorI64;
     class operator Subtract(const A, B: TTensorI64): TTensorI64;
+    class operator Subtract(const A: TTensorI64; const B: Int64): TTensorI64;
+    class operator Subtract(const A: Int64; const B: TTensorI64): TTensorI64;
     class operator Multiply(const A, B: TTensorI64): TTensorI64;
+    class operator Multiply(const A: TTensorI64; const B: Int64): TTensorI64;
+    class operator Multiply(const A: Int64; const B: TTensorI64): TTensorI64;
     procedure AddTo(const aArr: TTensorI64); overload;
     procedure AddTo(const aValue: Int64); overload;
     procedure MultiplyBy(const aArr: TTensorI64); overload;
@@ -140,6 +152,8 @@ type
     class operator Add(const A: TTensorF64; const B: Double): TTensorF64;
     class operator Add(const A: Double; const B: TTensorF64): TTensorF64;
     class operator Subtract(const A, B: TTensorF64): TTensorF64;
+    class operator Subtract(const A: TTensorF64; const B: Double): TTensorF64;
+    class operator Subtract(const A: Double; const B: TTensorF64): TTensorF64;
     class operator Multiply(const A, B: TTensorF64): TTensorF64;
     class operator Multiply(const A: TTensorF64; const B: Double): TTensorF64;
     class operator Multiply(const A: Double; const B: TTensorF64): TTensorF64;
@@ -186,8 +200,13 @@ type
     class operator Implicit(const aArr: INDArray<TCmplx128>): TTensorC128;
     class operator Implicit(const aArr: TTensorC128): INDArray<TCmplx128>;
     class operator Add(const A, B: TTensorC128): TTensorC128;
+    class operator Add(const A: TTensorC128; const B: TCmplx128): TTensorC128;
+    class operator Add(const A: TCmplx128; const B: TTensorC128): TTensorC128;
     class operator Subtract(const A, B: TTensorC128): TTensorC128;
+    class operator Subtract(const A: TTensorC128; const B: TCmplx128): TTensorC128;
+    class operator Subtract(const A: TCmplx128; const B: TTensorC128): TTensorC128;
     class operator Multiply(const A, B: TTensorC128): TTensorC128;
+    class operator Multiply(const A: TTensorC128; const B: TCmplx128): TTensorC128;
     class operator Multiply(const A: TCmplx128; const B: TTensorC128): TTensorC128;
     class operator Divide(const A, B: TTensorC128): TTensorC128;
     class operator Divide(const A: TTensorC128; const B: TCmplx128): TTensorC128;
@@ -1022,16 +1041,52 @@ begin
   TNDAUt.Map<Integer>(A, B, Result.fArr, AddL_I32, AddR_I32);
 end;
 
+class operator TTensorI32.Add(const A: TTensorI32; B: Integer): TTensorI32;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Integer>(A, B, Result.fArr, AddR_I32);
+end;
+
+class operator TTensorI32.Add(A: Integer; const B: TTensorI32): TTensorI32;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Integer>(A, B, Result.fArr, AddL_I32);
+end;
+
 class operator TTensorI32.Subtract(const A, B: TTensorI32): TTensorI32;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Integer>(A, B, Result.fArr, SubL_I32, SubR_I32);
 end;
 
+class operator TTensorI32.Subtract(const A: TTensorI32; B: Integer): TTensorI32;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Integer>(A, B, Result.fArr, SubR_I32);
+end;
+
+class operator TTensorI32.Subtract(A: Integer; const B: TTensorI32): TTensorI32;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Integer>(A, B, Result.fArr, SubL_I32);
+end;
+
 class operator TTensorI32.Multiply(const A, B: TTensorI32): TTensorI32;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Integer>(A, B, Result.fArr, MulL_I32, MulR_I32);
+end;
+
+class operator TTensorI32.Multiply(const A: TTensorI32; B: Integer): TTensorI32;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Integer>(A, B, Result.fArr, MulR_I32);
+end;
+
+class operator TTensorI32.Multiply(A: Integer; const B: TTensorI32): TTensorI32;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Integer>(A, B, Result.fArr, MulL_I32);
 end;
 
 class operator TTensorI32.Equal(const A, B: TTensorI32): TTensorBool;
@@ -1104,7 +1159,7 @@ var pEnd: PByte;
 begin
   if IncL = 0 then begin
     // R <- L + R
-    s := PInteger(L)^;
+    s := PInt64(L)^;
     pEnd := R + N * IncR;
     while R < pEnd do begin
       PInt64(R)^ := s + PInt64(R)^;
@@ -1134,7 +1189,7 @@ var pEnd: PByte;
 begin
   if IncL = 0 then begin
     // R <- L - R
-    s := PInteger(L)^;
+    s := PInt64(L)^;
     pEnd := R + N * IncR;
     while R < pEnd do begin
       PInt64(R)^ := s - PInt64(R)^;
@@ -1159,7 +1214,7 @@ var pEnd: PByte;
 begin
   if IncR = 0 then begin
     // L <- L - R
-    s := PInteger(R)^;
+    s := PInt64(R)^;
     pEnd := L + N * IncL;
     while L < pEnd do begin
       PInt64(L)^ := PInt64(L)^ - s;
@@ -1180,11 +1235,11 @@ end;
 
 procedure MulL_I64(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
 var pEnd: PByte;
-    s: Integer;
+    s: Int64;
 begin
   if IncL = 0 then begin
     // R <- L * R
-    s := PInteger(L)^;
+    s := PInt64(L)^;
     pEnd := R + N * IncR;
     while R < pEnd do begin
       PInt64(R)^ := s * PInt64(R)^;
@@ -1226,16 +1281,52 @@ begin
   TNDAUt.Map<Int64>(A, B, Result.fArr, AddL_I64, AddR_I64);
 end;
 
+class operator TTensorI64.Add(const A: TTensorI64; const B: Int64): TTensorI64;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Int64>(A, B, Result.fArr, AddR_I64);
+end;
+
+class operator TTensorI64.Add(const A: Int64; const B: TTensorI64): TTensorI64;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Int64>(A, B, Result.fArr, AddL_I64);
+end;
+
 class operator TTensorI64.Subtract(const A, B: TTensorI64): TTensorI64;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Int64>(A, B, Result.fArr, SubL_I64, SubR_I64);
 end;
 
+class operator TTensorI64.Subtract(const A: TTensorI64; const B: Int64): TTensorI64;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Int64>(A, B, Result.fArr, SubR_I64);
+end;
+
+class operator TTensorI64.Subtract(const A: Int64; const B: TTensorI64): TTensorI64;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Int64>(A, B, Result.fArr, SubL_I64);
+end;
+
 class operator TTensorI64.Multiply(const A, B: TTensorI64): TTensorI64;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Int64>(A, B, Result.fArr, MulL_I64, MulR_I64);
+end;
+
+class operator TTensorI64.Multiply(const A: Int64; const B: TTensorI64): TTensorI64;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Int64>(A, B, Result.fArr, MulL_I64);
+end;
+
+class operator TTensorI64.Multiply(const A: TTensorI64; const B: Int64): TTensorI64;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Int64>(A, B, Result.fArr, MulR_I64);
 end;
 
 procedure TTensorI64.AddTo(const aArr: TTensorI64);
@@ -1670,7 +1761,7 @@ var pEnd: PByte;
 begin
   if IncL = 0 then begin
     // R <- L - R
-    s := PSingle(L)^;
+    s := PDouble(L)^;
     pEnd := R + N * IncR;
     while R < pEnd do begin
       PDouble(R)^ := s - PDouble(R)^;
@@ -1721,6 +1812,11 @@ begin
   if IncL = 0 then begin
     // R <- L * R
     s := PDouble(L)^;
+    if IncR = cF64Sz then begin
+      VecMul(PDouble(R), s, PDouble(R), N);
+      exit;
+    end;
+
     pEnd := R + N * IncR;
     while R < pEnd do begin
       PDouble(R)^ := s * PDouble(R)^;
@@ -1731,6 +1827,11 @@ begin
   end;
 
   // R <- L * R
+  if (IncR = cF64Sz) and (IncL = cF64Sz) then begin
+    VecMul(PDouble(R), PDouble(L), PDouble(R), N);
+    exit;
+  end;
+
   pEnd := R + N * IncR;
   while R < pEnd do begin
     PDouble(R)^ := PDouble(L)^ * PDouble(R)^;
@@ -1833,6 +1934,18 @@ class operator TTensorF64.Subtract(const A, B: TTensorF64): TTensorF64;
 begin
   Result.fArr := nil;
   TNDAUt.Map<Double>(A, B, Result.fArr, SubL_F64, SubR_F64);
+end;
+
+class operator TTensorF64.Subtract(const A: TTensorF64; const B: Double): TTensorF64;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Double>(A, B, Result.fArr, SubR_F64);
+end;
+
+class operator TTensorF64.Subtract(const A: Double; const B: TTensorF64): TTensorF64;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Double>(A, B, Result.fArr, SubL_F64);
 end;
 
 class operator TTensorF64.Multiply(const A, B: TTensorF64): TTensorF64;
@@ -2333,16 +2446,46 @@ begin
   TNDAUt.Map<TCmplx128>(A, B, Result.fArr, AddL_C128, AddR_C128);
 end;
 
+class operator TTensorC128.Add(const A: TTensorC128; const B: TCmplx128): TTensorC128;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<TCmplx128>(A, B, Result.fArr, AddR_C128);
+end;
+
+class operator TTensorC128.Add(const A: TCmplx128; const B: TTensorC128): TTensorC128;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<TCmplx128>(A, B, Result.fArr, AddL_C128);
+end;
+
 class operator TTensorC128.Subtract(const A, B: TTensorC128): TTensorC128;
 begin
   Result.fArr := nil;
   TNDAUt.Map<TCmplx128>(A, B, Result.fArr, SubL_C128, SubR_C128);
 end;
 
+class operator TTensorC128.Subtract(const A: TTensorC128; const B: TCmplx128): TTensorC128;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<TCmplx128>(A, B, Result.fArr, SubR_C128);
+end;
+
+class operator TTensorC128.Subtract(const A: TCmplx128; const B: TTensorC128): TTensorC128;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<TCmplx128>(A, B, Result.fArr, SubL_C128);
+end;
+
 class operator TTensorC128.Multiply(const A, B: TTensorC128): TTensorC128;
 begin
   Result.fArr := nil;
   TNDAUt.Map<TCmplx128>(A, B, Result.fArr, MulL_C128, MulR_C128);
+end;
+
+class operator TTensorC128.Multiply(const A: TTensorC128; const B: TCmplx128): TTensorC128;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<TCmplx128>(A, B, Result.fArr, MulR_C128);
 end;
 
 class operator TTensorC128.Multiply(const A: TCmplx128; const B: TTensorC128): TTensorC128;
