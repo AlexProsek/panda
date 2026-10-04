@@ -31,6 +31,8 @@ type
     procedure LongShift_NoShift;
     procedure LongShift_SHL;
     procedure LongShift_SHR;
+
+    procedure Dec_UI128;
   end;
 
   TInt128Tests = class(TNDATestCase)
@@ -97,14 +99,22 @@ type
     procedure Sub_SameExp;
     procedure MulDbl;
     procedure Reciprocal;
+    procedure Reciprocal_OffByOne;
+    procedure Reciprocal_LargeExp;
     procedure DivideDbl;
     procedure Sqrt;
+    procedure Sqrt_OffByOne;
   end;
 
   TCmplx256Tests = class(TNDATestCase)
   published
-    procedure AddDbl;
-    procedure SubDbl;
+    procedure Add;
+    procedure Sub;
+    procedure Multiply;
+    procedure MultiplyByReal;
+    procedure Divide;
+    procedure DivideByReal;
+    procedure Negate;
   end;
 
 implementation
@@ -458,6 +468,24 @@ begin
   CheckEquals(4, a[0]);
   CheckEquals(6, a[1]);
   CheckEquals(0, a[2]);
+end;
+
+procedure TLowLvlTests.Dec_UI128;
+var x: TUInt128;
+begin
+  x.Init(2, 1);
+
+  _DecUI128(@x, 2);
+
+  CheckEquals(0, x.Lo);
+  CheckEquals(1, x.Hi);
+
+  x.Init(1, 1);
+
+  _DecUI128(@x, 2);
+
+  CheckEquals(I64_MASK, x.Lo);
+  CheckEquals(0, x.Hi);
 end;
 
 {$endregion}
@@ -1279,6 +1307,49 @@ begin
   CheckEquals($3ffc249249249249, a.Hi);
 end;
 
+procedure TReal128Tests.Reciprocal_OffByOne;
+var a, b: TReal128;
+begin
+  a.Init(0, $3FFF040000000000); // 65/64
+
+  b := a.Reciprocal;
+
+  CheckEquals($F81F81F81F81F820, b.Lo);
+  CheckEquals($3FFEF81F81F81F81, b.Hi);
+
+  a.Init(0, $3FFF200000000000); // 9/8
+
+  b := a.Reciprocal;
+
+  CheckEquals($C71C71C71C71C71C, b.Lo);
+  CheckEquals($3FFEC71C71C71C71, b.Hi);
+
+  a.Init(0, $BFFF040000000000); // -65/64
+
+  b := a.Reciprocal;
+
+  CheckEquals($F81F81F81F81F820, b.Lo);
+  CheckEquals($BFFEF81F81F81F81, b.Hi);
+end;
+
+procedure TReal128Tests.Reciprocal_LargeExp;
+var a: TReal128;
+begin
+  a.Init(0, $7F8F3E0000000000); // (1 + 31/128) * 2^16272
+
+  a := a.Reciprocal;
+
+  CheckEquals($19C2D14EE4A1019C, a.Lo);
+  CheckEquals($006E9C2D14EE4A10, a.Hi);
+
+  a.Init(0, $FF8F3E0000000000); // -(1 + 31/128) * 2^16272
+
+  a := a.Reciprocal;
+
+  CheckEquals($19C2D14EE4A1019C, a.Lo);
+  CheckEquals($806E9C2D14EE4A10, a.Hi);
+end;
+
 procedure TReal128Tests.DivideDbl;
 var a, b, c: TReal128;
     d: Double;
@@ -1295,28 +1366,118 @@ var a: TReal128;
 begin
   a := 2;
   a := a.Sqrt;
+
   CheckEquals($C908B2FB1366EA95, a.Lo);
   CheckEquals($3FFF6A09E667F3BC, a.Hi);
+
+  a.Init($60C03217B382E4B3, $400059D53F5E2271);
+  a := a.Sqrt;
+
+  CheckEquals($CA0387C067CB4679, a.Lo);
+  CheckEquals($3FFFA4CAEE48F294, a.Hi);
+end;
+
+procedure TReal128Tests.Sqrt_OffByOne;
+var a: TReal128;
+begin
+  a.Init(1, $3FFF000000000000); // 1 + 2^-112
+
+  a := a.Sqrt;
+
+  CheckEquals(0, a.Lo);
+  CheckEquals($3FFF000000000000, a.Hi);
+
+  a.Init(0, $3FFF800000000000); // 3/2
+
+  a := a.Sqrt;
+
+  CheckEquals($E7D0321914321A55, a.Lo);
+  CheckEquals($3FFF3988E1409212, a.Hi);
 end;
 
 {$endregion}
 
 {$region 'TCmplx256Tests'}
 
-procedure TCmplx256Tests.AddDbl;
+procedure TCmplx256Tests.Add;
 var a, b, c: TCmplx256;
 begin
+  a.Init(1, 2);
+  b.Init(3, 4);
 
   c := a + b;
 
+  CheckEquals(4.0, c.Re.AsDouble);
+  CheckEquals(6.0, c.Im.AsDouble);
 end;
 
-procedure TCmplx256Tests.SubDbl;
+procedure TCmplx256Tests.Sub;
 var a, b, c: TCmplx256;
 begin
+  a.Init(5, 7);
+  b.Init(2, 3);
 
   c := a - b;
 
+  CheckEquals(3.0, c.Re.AsDouble);
+  CheckEquals(4.0, c.Im.AsDouble);
+end;
+
+procedure TCmplx256Tests.Multiply;
+var a, b, c: TCmplx256;
+begin
+  a.Init(1, 2);
+  b.Init(3, 4);
+
+  c := a * b;
+
+  CheckEquals(-5.0, c.Re.AsDouble);
+  CheckEquals(10.0, c.Im.AsDouble);
+end;
+
+procedure TCmplx256Tests.MultiplyByReal;
+var a, c: TCmplx256;
+begin
+  a.Init(2, -3);
+
+  c := TReal128(4) * a;
+
+  CheckEquals(8.0, c.Re.AsDouble);
+  CheckEquals(-12.0, c.Im.AsDouble);
+end;
+
+procedure TCmplx256Tests.Divide;
+var a, b, c: TCmplx256;
+begin
+  a.Init(1, 2);
+  b.Init(3, 4);
+
+  c := a / b;
+
+  CheckEquals(0.44, c.Re.AsDouble, 1e-15);
+  CheckEquals(0.08, c.Im.AsDouble, 1e-15);
+end;
+
+procedure TCmplx256Tests.DivideByReal;
+var a, c: TCmplx256;
+begin
+  a.Init(6, -8);
+
+  c := a / TReal128(2);
+
+  CheckEquals(3.0, c.Re.AsDouble);
+  CheckEquals(-4.0, c.Im.AsDouble);
+end;
+
+procedure TCmplx256Tests.Negate;
+var a, c: TCmplx256;
+begin
+  a.Init(2, -3);
+
+  c := -a;
+
+  CheckEquals(-2.0, c.Re.AsDouble);
+  CheckEquals(3.0, c.Im.AsDouble);
 end;
 
 {$endregion}
