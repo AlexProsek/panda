@@ -46,6 +46,10 @@ function ndaRange(aLo, aHi: Double; aStep: Double = 1): INDArray<Double>; overlo
 
 function ndaExp(const aArr: INDArray<Single>): INDArray<Single>;
 
+function ndaSin(const aArr: INDArray<Single>): INDArray<Single>; overload;
+function ndaSin(const aArr: INDArray<Double>): INDArray<Double>; overload;
+function ndaSin(const aArr: INDArray<TCmplx128>): INDArray<Double>; overload;
+
 /// <summary>
 ///   Gives the total of the elements in <c>aArr</c>.
 /// </summary>
@@ -82,6 +86,8 @@ uses
   , panda.Arithmetic
   , panda.DynArrayUtils
   ;
+
+{$EXCESSPRECISION OFF} // to prevent Single -> Double conversion by x64 compiler
 
 {$region 'TNDAMath'}
 
@@ -374,6 +380,25 @@ end;
 
 {$endregion}
 
+{$region 'ndaSin'}
+
+function ndaSin(const aArr: INDArray<Single>): INDArray<Single>;
+begin
+
+end;
+
+function ndaSin(const aArr: INDArray<Double>): INDArray<Double>;
+begin
+  Sin(PDouble(aArr.Data)^);
+end;
+
+function ndaSin(const aArr: INDArray<TCmplx128>): INDArray<Double>;
+begin
+
+end;
+
+{$endregion}
+
 {$region 'ndaTotal'}
 
 function ndaTotal(const aArr: INDArray<Integer>): INDArray<Integer>;
@@ -391,6 +416,17 @@ begin
   Result := ndaTotalAtLvl(aArr, 0);
 end;
 
+function _TotalI32(aData: PByte; aStep, aCount: NativeInt): Integer;
+var pEnd: PByte;
+begin
+  Result := 0;
+  pEnd := aData + aStep * aCount;
+  while aData < pEnd do begin
+    Inc(Result, PInteger(aData)^);
+    Inc(aData, aStep);
+  end;
+end;
+
 procedure Total(const aArr: INDArray<Integer>; var aRes: Integer); overload;
 var it: TNDAIt;
     sz: NativeInt;
@@ -401,6 +437,11 @@ begin
     exit
   end;
 
+  if aArr.NDim = 1 then begin
+    aRes := _TotalI32(aArr.Data, aArr.Strides[0], aArr.Size);
+    exit;
+  end;
+
   aRes := 0;
   lvl := GetCContLvl(aArr, sz);
   it := TNDAIt.Create(aArr, lvl - 1);
@@ -409,11 +450,23 @@ begin
       while it.MoveNext do
         Inc(aRes, PInteger(it.Current)^);
     end else begin
+      sz := sz div SizeOf(Integer);
       while it.MoveNext do
         Inc(aRes, cvTotal(PInteger(it.Current), sz));
     end;
   finally
     it.Free;
+  end;
+end;
+
+function _TotalF32(aData: PByte; aStep, aCount: NativeInt): Single;
+var pEnd: PByte;
+begin
+  Result := 0;
+  pEnd := aData + aStep * aCount;
+  while aData < pEnd do begin
+    Result := Result + PSingle(aData)^;
+    Inc(aData, aStep);
   end;
 end;
 
@@ -427,6 +480,11 @@ begin
     exit;
   end;
 
+  if aArr.NDim = 1 then begin
+    aRes := _TotalF32(aArr.Data, aArr.Strides[0], aArr.Size);
+    exit;
+  end;
+
   aRes := 0;
   lvl := GetCContLvl(aArr, sz);
   it := TNDAIt.Create(aArr, lvl - 1);
@@ -435,11 +493,23 @@ begin
       while it.MoveNext do
         aRes := aRes + PSingle(it.Current)^;
     end else begin
+      sz := sz div SizeOf(Single);
       while it.MoveNext do
         aRes := aRes + cvTotal(PSingle(it.Current), sz);
     end;
   finally
     it.Free;
+  end;
+end;
+
+function _TotalF64(aData: PByte; aStep, aCount: NativeInt): Double;
+var pEnd: PByte;
+begin
+  Result := 0;
+  pEnd := aData + aStep * aCount;
+  while aData < pEnd do begin
+    Result := Result + PDouble(aData)^;
+    Inc(aData, aStep);
   end;
 end;
 
@@ -453,6 +523,11 @@ begin
     exit;
   end;
 
+  if aArr.NDim = 1 then begin
+    aRes := _TotalF64(aArr.Data, aArr.Strides[0], aArr.Size);
+    exit;
+  end;
+
   aRes := 0;
   lvl := GetCContLvl(aArr, sz);
   it := TNDAIt.Create(aArr, lvl - 1);
@@ -461,6 +536,7 @@ begin
       while it.MoveNext do
         aRes := aRes + PDouble(it.Current)^;
     end else begin
+      sz := sz div SizeOf(Double);
       while it.MoveNext do
         aRes := aRes + cvTotal(PDouble(it.Current), sz);
     end;

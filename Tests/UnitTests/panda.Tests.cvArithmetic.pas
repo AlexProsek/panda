@@ -55,6 +55,8 @@ type
     procedure SubScalarWithSat16_UInt8;
     procedure SubScalarWithSat3_UInt16;
     procedure SubScalarWithSat8_UInt16;
+    procedure MulVec3_Double;
+    procedure MulVec4_Double;
     procedure MulVec1_Cmplx64;
     procedure MulVec2_Cmplx64;
     procedure MulVec3_Cmplx64;
@@ -721,6 +723,34 @@ begin
   CheckEquals(3, res[5]);
   CheckEquals(4, res[6]);
   CheckEquals(5, res[7]);
+end;
+
+procedure TTestVectorMath.MulVec3_Double;
+var a, b, c: TArray<Double>;
+    I: Integer;
+begin
+  a := TArray<Double>.Create(1, 2, 3);
+  b := TArray<Double>.Create(4, 5, 6);
+  SetLength(c, Length(a));
+
+  VecMul(PDouble(a), PDouble(b), PDouble(c), Length(a));
+
+  for I := 0 to High(a) do
+    CheckEquals(a[I]*b[I], c[I], dtol);
+end;
+
+procedure TTestVectorMath.MulVec4_Double;
+var a, b, c: TArray<Double>;
+    I: Integer;
+begin
+  a := TArray<Double>.Create(1, 2, 3, 4);
+  b := TArray<Double>.Create(4, 5, 6, 7);
+  SetLength(c, Length(a));
+
+  VecMul(PDouble(a), PDouble(b), PDouble(c), Length(a));
+
+  for I := 0 to High(a) do
+    CheckEquals(a[I]*b[I], c[I], dtol);
 end;
 
 procedure TTestVectorMath.MulVec1_Cmplx64;

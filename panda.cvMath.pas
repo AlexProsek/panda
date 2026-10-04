@@ -33,6 +33,8 @@ procedure cvAccum(aData, aRes: PDouble; aCount: NativeInt); overload;
 procedure cvMinMax(pData: PSingle; aCount: NativeInt; var aMin, aMax: Single); overload;
 procedure cvMinMax(pData: PDouble; aCount: NativeInt; var aMin, aMax: Double); overload;
 
+procedure cvMaxPos(pData: PSingle; aCount: NativeInt; var aPos: NativeInt); overload;
+
 procedure cvAbsMax(pData: PSingle; aCount: NativeInt; var aMax: Single); overload;
 procedure cvAbsMax(pData: PDouble; aCount: NativeInt; var aMax: Double); overload;
 
@@ -735,6 +737,25 @@ begin
   end;
 end;
 {$endif}
+
+procedure cvMaxPos(pData: PSingle; aCount: NativeInt; var aPos: NativeInt);
+var p, pEnd: PByte;
+    v, ma: Single;
+begin
+  Assert(aCount > 0);
+  ma := pData^;
+  aPos := 0;
+  p := PByte(pData);
+  pEnd := p + aCount * cF32Sz;
+  while p < pEnd do begin
+    v := PSingle(p)^;
+    if v > ma then begin
+      ma := v;
+      aPos := (p - PByte(pData)) shr 2;
+    end;
+    Inc(p, cF32Sz);
+  end;
+end;
 
 {$endregion}
 

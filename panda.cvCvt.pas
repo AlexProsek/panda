@@ -8,6 +8,7 @@ procedure cvt(pSrc: PByte; pDst: PSingle; aCount: NativeInt); overload;
 procedure cvt(pSrc: PSingle; pDst: PByte; aCount: NativeInt); overload;
 procedure cvt(pSrc: PInteger; pDst: PSingle; aCount: NativeInt); overload;
 procedure cvt(pSrc: PInteger; pDst: PInt64; aCount: NativeInt); overload;
+procedure cvt(pSrc: PInt64; pDst: PDouble; aCount: NativeInt); overload;
 procedure cvt(pSrc: PSingle; pDst: PDouble; aCount: NativeInt); overload;
 procedure cvt(pSrc: PDouble; pDst: PSingle; aCount: NativeInt); overload;
 
@@ -403,6 +404,118 @@ end;
 var pEnd: PByte;
 begin
   pEnd := PByte(pSrc) + aCount * SizeOf(Integer);
+  while PByte(pSrc) < pEnd do begin
+    pDst^ := pSrc^;
+    Inc(pSrc);
+    Inc(pDst);
+  end;
+end;
+{$endif}
+
+procedure cvt(pSrc: PInt64; pDst: PDouble; aCount: NativeInt);
+{$if defined(ASMx64)}
+{$ifdef AVX}
+  {$define AVXCVT_I64F64}
+{$endif}
+// RCX <- pSrc, RDX <- pDst, R8 <- aCount
+const
+  cSgnBit32Mask: UInt32 = $80000000;
+  cTwo31: Double = 2147483648.0;
+  cTwo32: Double = 4294967296.0;
+asm
+  sub rsp, 56 // 48 for xmm backup + 8 stack alignment
+  movupd [rsp], xmm6
+  movupd [rsp + 16], xmm7
+  movupd [rsp + 32], xmm8
+
+  mov r9, r8
+  shr r8, 2
+  jz @rest
+{$ifdef AVXCVT_I64F64}
+  vmovd xmm8, cSgnBit32Mask
+  vpshufd ymm8, ymm8, 0
+  vmovddup xmm7, cTwo32
+  vinsertf128 ymm7, ymm7, xmm7, 1
+  vmovddup xmm6, cTwo31
+  vinsertf128 ymm6, ymm6, xmm6, 1
+{$else}
+  movd xmm8, cSgnBit32Mask
+  pshufd xmm8, xmm8, 0
+  movddup xmm7, cTwo32
+  movddup xmm6, cTwo31
+{$endif}
+@L:
+{$ifdef AVXCVT_I64F64}
+  vmovdqu ymm0, [rcx]         // ymm0 <- x[k:k+3]
+  vpshufd ymm1, ymm0, $08     // ymm1 <- (x[k:k+1].lo, ?, ?, x[k+2:k+3].lo, ?, ?)
+  vextracti128 xmm2, ymm1, 1  // xmm2 <- x[k+2:k+3].lo
+  vmovlhps xmm1, xmm1, xmm2   // xmm1 <- x[k:k+3].lo
+  vpxor ymm1, ymm1, ymm8
+  vcvtdq2pd ymm2, xmm1        // ymm2 <- Double(x[k:k+3].lo)
+  vaddpd ymm2, ymm2, ymm6     // ymm2 <- ymm2 * 2^31
+
+  vpshufd ymm1, ymm0, $0D     // ymm1 <- (x[k:k+1].hi, ?, ?, x[k+2:k+3].hi, ?, ?)
+  vextracti128 xmm3, ymm1, 1  // xmm3 <- x[k+2:k+3].hi
+  vmovlhps xmm1, xmm1, xmm3   // xmm1 <- x[k:k+3].hi
+  vcvtdq2pd ymm3, xmm1        // ymm3 <- Double(x[k:k+3].hi)
+  vmulpd ymm3, ymm3, ymm7     // ymm3 <- ymm3 * 2^32
+  vaddpd ymm2, ymm2, ymm3
+  vmovupd [rdx], ymm2
+{$else}
+  movdqu xmm0, [rcx]        // xmm0 <- (x[k], x[k+1])
+  pshufd xmm1, xmm0, $08    // xmm1 <- (x[k].lo, x[k+1].lo)
+  pxor xmm1, xmm8
+  cvtdq2pd xmm1, xmm1       // xmm1 < (Double(x[k].lo), Double(x[k+1].lo))
+  addpd xmm1, xmm6          // xmm1 <- xmm1 * 2^31
+
+  pshufd xmm2, xmm0, $0D    // xmm2 <- (x[k].hi, x[k+1].hi)
+  cvtdq2pd xmm2, xmm2       // xmm2 <- (Double(x[k].hi), Doulbe(x[k+1].hi))
+  mulpd xmm2, xmm7          // xmm2 <- xmm2 * 2^32
+  addpd xmm1, xmm2          // xmm1 <- (Double(x[k]), Double(x[k+1]))
+  movupd [rdx], xmm1
+
+  movdqu xmm3, [rcx + 16]   // xmm3 <- (x[k+2], x[k+3])
+  pshufd xmm4, xmm3, $08    // xmm4 <- (x[k+2].lo, x[k+3].lo)
+  pxor xmm4, xmm8
+  cvtdq2pd xmm4, xmm4       // xmm4 < (Double(x[k+2].lo), Double(x[k+3].lo))
+  addpd xmm4, xmm6          // xmm4 <- xmm4 * 2^31
+
+  pshufd xmm5, xmm3, $0D    // xmm5 <- (x[k+2].hi, x[k+3].hi)
+  cvtdq2pd xmm5, xmm5       // xmm5 <- (Double(x[k+2].hi), Doulbe(x[k+3].hi))
+  mulpd xmm5, xmm7          // xmm5 <- xmm5 * 2^32
+  addpd xmm4, xmm5          // xmm4 <- (Double(x[k+2]), Double(x[k+3]))
+  movupd [rdx + 16], xmm4
+{$endif}
+  add rcx, 32
+  add rdx, 32
+  dec r8
+  jnz @L
+
+{$ifdef AVXCVT_I64F64}
+  vzeroupper
+{$endif}
+
+@rest:
+  and r9, 3
+  jz @end
+@Lrest:
+  mov rax, [rcx]
+  cvtsi2sd xmm0, rax
+  movsd [rdx], xmm0
+  add rcx, 8
+  add rdx, 8
+  dec r9
+  jnz @Lrest
+@end:
+  movupd xmm8, [rsp + 32]
+  movupd xmm7, [rsp + 16]
+  movupd xmm6, [rsp]
+  add rsp, 56
+end;
+{$else}
+var pEnd: PByte;
+begin
+  pEnd := PByte(pSrc) + aCount * SizeOf(Int64);
   while PByte(pSrc) < pEnd do begin
     pDst^ := pSrc^;
     Inc(pSrc);

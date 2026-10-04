@@ -7,6 +7,7 @@ uses
   , panda.Intfs
   , panda.Arrays
   , panda.IntFactor
+  , panda.NumsQP
   , panda.Tests.NDATestCase
   ;
 
@@ -15,6 +16,8 @@ type
   published
     procedure WheelSmallFactors;
     procedure WheelTwoLargePrimes;
+    procedure PrimeQLargeValue;
+    procedure UInt128ModulusLargeOperands;
   end;
 
 implementation
@@ -66,6 +69,33 @@ begin
   CheckEquals(1,  fs[0].Power);
   CheckEquals(52528036667, fs[1].Value);
   CheckEquals(1,  fs[1].Power);
+end;
+
+procedure TIntFactorTests.PrimeQLargeValue;
+begin
+  TLCG64.SetSeed(12345);
+
+  CheckTrue(PrimeQ(52528036667));
+end;
+
+procedure TIntFactorTests.UInt128ModulusLargeOperands;
+var A, B, M, R: TUInt128;
+begin
+  A := 1528080477;
+  B := 1;
+  M := 52528036667;
+
+  R := (A * B) mod M;
+
+  CheckEquals(UInt64(1528080477), UInt64(R));
+
+  A := 26005733175;
+  B := 1528080477;
+  M := 52528036667;
+
+  R := (A * B) mod M;
+
+  CheckEquals(UInt64(4974558966), UInt64(R));
 end;
 
 {$endregion}

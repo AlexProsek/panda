@@ -22,28 +22,31 @@ type
   TBmp = class abstract(TNDAImg, IImage, IBitmapImage)
   protected
     fBmp: TBitmap;
+    fOwnBmp: Boolean;
     procedure Init(aElSz: Integer); virtual;
   public
     destructor Destroy; override;
     function Data: PByte; override;
     function GetBitmap: TBitmap;
+    class function PixelFormat: TPixelFormat; virtual; abstract;
   end;
 
   TBmp<T> = class(TBmp, IImage<T>)
   protected
     function GetItemType: PTypeInfo; override;
+  public
+    constructor Create(const aBmp: TBitmap; aOwnBmp: Boolean = True); overload;
+    constructor Create(aW, aH: Integer); overload;
   end;
 
   TBmpUI8 = class(TBmp<Byte>)
   public
-    constructor Create(const aBmp: TBitmap); overload;
-    constructor Create(aW, aH: Integer); overload;
+    class function PixelFormat: TPixelFormat; override;
   end;
 
   TBmpRGB24 = class(TBmp<TRGB24>)
   public
-    constructor Create(const aBmp: TBitmap); overload;
-    constructor Create(aW, aH: Integer); overload;
+    class function PixelFormat: TPixelFormat; override;
   end;
 
 implementation
@@ -52,7 +55,8 @@ implementation
 
 destructor TBmp.Destroy;
 begin
-  fBmp.Free;
+  if fOwnBmp then
+    fBmp.Free;
   inherited;
 end;
 
@@ -61,6 +65,9 @@ begin
   fW := fBmp.Width;
   fH := fBmp.Height;
   fWStep := ((aElSz * fW + 3) div 4) * 4;
+
+  if fWStep = fW * aElSz then
+    fFlags := fFlags or NDAF_C_CONTIGUOUS;
 end;
 
 function TBmp.Data: PByte;
@@ -84,40 +91,41 @@ end;
 
 {$endregion}
 
-{$region 'TBmpUI8'}
+{$region 'TBmp<T>'}
 
-constructor TBmpUI8.Create(const aBmp: TBitmap);
+constructor TBmp<T>.Create(const aBmp: TBitmap; aOwnBmp: Boolean);
 begin
-  Assert(fBmp.PixelFormat = pf8bit);
+  Assert(aBmp.PixelFormat = PixelFormat);
   fBmp := aBmp;
-  Init(SizeOf(Byte));
+  fOwnBmp := aOwnBmp;
+  Init(SizeOf(T));
 end;
 
-constructor TBmpUI8.Create(aW, aH: Integer);
+constructor TBmp<T>.Create(aW, aH: Integer);
 begin
   fBmp := TBitmap.Create(aW, aH);
-  fBmp.PixelFormat := pf8bit;
-  Init(SizeOf(Byte));
+  fBmp.PixelFormat := PixelFormat;
+  fBmp.SetSize(aW, aH);
+  Init(SizeOf(T));
+  fFlags := fFlags or NDAF_WRITEABLE;
+end;
+
+{$endregion}
+
+{$region 'TBmpUI8'}
+
+class function TBmpUI8.PixelFormat: TPixelFormat;
+begin
+  Result := pf8bit;
 end;
 
 {$endregion}
 
 {$region 'TBmpRGB24'}
 
-constructor TBmpRGB24.Create(const aBmp: TBitmap);
+class function TBmpRGB24.PixelFormat: TPixelFormat;
 begin
-  Assert(aBmp.PixelFormat = pf24bit);
-  fBmp := aBmp;
-  Init(SizeOf(TRGB24));
-end;
-
-constructor TBmpRGB24.Create(aW, aH: Integer);
-begin
-  fBmp := TBitmap.Create(aW, aH);
-  fBmp.PixelFormat := pf24bit;
-  fBmp.SetSize(aW, aH);
-  Init(SizeOf(TRGB24));
-  fFlags := NDAF_WRITEABLE;
+  Result := pf24bit;
 end;
 
 {$endregion}

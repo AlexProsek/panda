@@ -27,6 +27,9 @@ type
     procedure TestCvtI32I64_2;
     procedure TestCvtI32I64_4;
     procedure TestCvtI32I64_6;
+    procedure TestCvtI64F64_3;
+    procedure TestCvtI64F64_4;
+    procedure TestCvtI64F64_5;
     procedure TestCvtF32F64_2;
     procedure TestCvtF32F64_4;
     procedure TestCvtF32F64_6;
@@ -225,6 +228,42 @@ begin
   cvt(PInteger(x), PInt64(y), Length(x));
 
   CheckEquals([1, 2, 3, 4, 5, 6], y);
+end;
+
+procedure TCvtTests.TestCvtI64F64_3;
+var x: TArray<Int64>;
+    y: TArray<Double>;
+begin
+  x := TArray<Int64>.Create(1, -1, Int64($100000000));
+  y := TArray<Double>.Create(0, 0, 0);
+
+  cvt(PInt64(x), PDouble(y), Length(x));
+
+  CheckEquals([1, -1, Double($100000000)], y, dTol);
+end;
+
+procedure TCvtTests.TestCvtI64F64_4;
+var x: TArray<Int64>;
+    y: TArray<Double>;
+begin
+  x := TArray<Int64>.Create(1, -1, Int64($100000000), -Int64($100000000));
+  y := TArray<Double>.Create(0, 0, 0, 0);
+
+  cvt(PInt64(x), PDouble(y), Length(x));
+
+  CheckEquals([1, -1, Double($100000000), -Double($100000000)], y, dTol);
+end;
+
+procedure TCvtTests.TestCvtI64F64_5;
+var x: TArray<Int64>;
+    y: TArray<Double>;
+begin
+  x := TArray<Int64>.Create(1, -1, Int64($100000000), -Int64($100000000), -5);
+  y := TArray<Double>.Create(0, 0, 0, 0, 0);
+
+  cvt(PInt64(x), PDouble(y), Length(x));
+
+  CheckEquals([1, -1, Double($100000000), -Double($100000000), -5], y, dTol);
 end;
 
 procedure TCvtTests.TestCvtF32F64_2;

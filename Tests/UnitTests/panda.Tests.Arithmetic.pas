@@ -47,6 +47,7 @@ type
     procedure Add_VV;
     procedure Add_MV;
     procedure Add_VM;
+    procedure Add_MVCol;
     procedure Subtract_VS;
     procedure Subtract_SV;
     procedure Subtract_VV;
@@ -178,7 +179,6 @@ end;
 procedure TTensorF64Tests.Add_MV;
 var a, b: TTensorF64;
     m: TArray<TArray<Double>>;
-    v: TArray<Double>;
 begin
   a := TNDAUt.AsArray<Double>([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
   b := TNDAUt.AsArray<Double>([1, 2, 3]);
@@ -507,6 +507,21 @@ begin
   CheckEquals(2, Length(m));
   CheckEquals([14, 27, 40], m[0]);
   CheckEquals([50, 63, 76], m[1]);
+end;
+
+procedure TTensorI32Tests.Add_MVCol;
+var a: TTensorI32;
+    b: TTensorI32;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[12, 24, 36], [48, 60, 72]]);
+  b := TNDAUt.AsArray<Integer>([[2], [3]]);
+  a := a + b;
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(a, m));
+  CheckEquals(2, Length(m));
+  CheckEquals([14, 26, 38], m[0]);
+  CheckEquals([51, 63, 75], m[1]);
 end;
 
 procedure TTensorI32Tests.Subtract_VS;
