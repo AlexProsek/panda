@@ -11,6 +11,7 @@ resourcestring
   csInvArrayElem    = 'Setting an array element with a sequence.';
   csInvReshape      = 'Cannot reshape array of size %d into shape %s.';
   csInvIdxForScalar = 'Invalid index to scalar varibale.';
+  csInvReinterpret  = 'Invalid reinterpretation.';
   csNotWriteable    = 'Array is not writeable.';
   csInvCastToVec    = 'Array with shape %s cannot be converted to vector.';
   csCContArrExp     = 'C contiguous array is expected.';

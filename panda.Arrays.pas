@@ -229,6 +229,13 @@ type
     function Data: PByte; override;
   end;
 
+  TNDArrayReinterpretWrapper<T> = class(TNDA<T>)
+  protected
+    fArray: INDArray;
+    constructor Create(const aArray: INDArray); overload;
+    function Data: PByte; override;
+  end;
+
   TDynArrWrapper<T> = class(TNDA<T>)
   protected
     fArray: TArray<T>;
@@ -568,6 +575,7 @@ type
     class function AsType<T>(const aArr: INDArray; aForceCopy: Boolean = False): INDArray<T>; overload; static;
     class function AsType<T>(const aArrays: array of INDArray; aForceCopy: Boolean = False): TArray<INDArray<T>>; overload; static;
     class function AsContiguousArray<T>(const aArr: INDArray<T>): INDArray<T>; overload; static;
+    class function View<T>(const aArr: INDArray): INDArray<T>; overload; static;
   end;
 
   function SameQ(const aIdx1, aIdx2: array of NativeInt): Boolean; overload;
@@ -2191,6 +2199,47 @@ begin
 end;
 
 function TNDArrayWrapper<T>.Data: PByte;
+begin
+  Result := fArray.Data;
+end;
+
+{$endregion}
+
+{$region 'TNDArrayReinterpretWrapper<T>'}
+
+constructor TNDArrayReinterpretWrapper<T>.Create(const aArray: INDArray);
+var s: TArray<NativeInt>;
+    itSz, nDim: Integer;
+    bSz: NativeInt;
+begin
+  itSz := aArray.ItemSize;
+  if
+    ((itSz mod SizeOf(T)) <> 0) and ((SizeOf(T) mod itSz) <> 0)
+  then
+    raise ENDACastError.Create(csInvReinterpret);
+
+  nDim := aArray.NDim;
+  fArray := aArray;
+  if itSz > SizeOf(T) then begin
+    fShape := Copy(aArray.Shape);
+    fStrides := Copy(aArray.Strides);
+    fShape[nDim - 1] := fShape[nDim - 1] * (itSz div SizeOf(T));
+    fStrides[nDim - 1] :=  SizeOf(T);
+  end else
+  if itSz < SizeOf(T) then begin
+    GetCContLvl(fArray, bSz);
+    if bSz < SizeOf(T) then
+      raise ENDACastError.Create(csInvReinterpret);
+
+    fShape := Copy(aArray.Shape);
+    fStrides := Copy(aArray.Strides);
+    fShape[nDim - 1] := fShape[nDim - 1] div (SizeOf(T) div itSz);
+    fStrides[nDim - 1] := SizeOf(T);
+  end;
+  fFlags := fArray.Flags;
+end;
+
+function TNDArrayReinterpretWrapper<T>.Data: PByte;
 begin
   Result := fArray.Data;
 end;
@@ -4071,6 +4120,19 @@ begin
     Result := aArr
   else
     Result := Copy<T>(aArr);
+end;
+
+class function TNDAUt.View<T>(const aArr: INDArray): INDArray<T>;
+begin
+  if
+    ((aArr.ItemSize mod SizeOf(T)) = 0) or
+    ((SizeOf(T) mod aArr.ItemSize) = 0)
+  then begin
+    Result := TNDArrayReinterpretWrapper<T>.Create(aArr);
+    exit;
+  end;
+
+  raise ENDACastError.Create(csInvReinterpret);
 end;
 
 class function TNDAUt.Permute<T>(const aData: TArray<T>; const aIndices: array of Integer): TArray<T>;

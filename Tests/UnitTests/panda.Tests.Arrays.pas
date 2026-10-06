@@ -17,6 +17,7 @@ uses
   , SysUtils
   , panda.Intfs
   , panda.Arrays
+  , panda.Nums
   , panda.Tests.NDATestCase
   ;
 
@@ -182,6 +183,8 @@ type
   end;
 
   TNDAUtTests = class(TNDATestCase)
+  protected const
+    dTol = 1e-12;
   published
     procedure FullArray2D;
     procedure MakeArray2D;
@@ -211,6 +214,11 @@ type
 
     procedure FillVecByConst;
     procedure FillVecByVec;
+
+    procedure ReinterpretArray_Cmplx1D_Dbl1D;
+    procedure ReinterpretArray_Dbl1D_Cmplx1D;
+    procedure ReinterpretArray_Cmplx2D_Dbl2D;
+    procedure ReinterpretArray_Dbl2D_Cmplx2D;
   end;
 
   TBinMapTests = class(TNDATestCase)
@@ -2758,6 +2766,63 @@ begin
   CheckTrue(TNDAUt.TryAsDynArray<Integer>(a, v));
   CheckEquals(3, Length(v));
   CheckEquals([1, 2, 3], v);
+end;
+
+procedure TNDAUtTests.ReinterpretArray_Cmplx1D_Dbl1D;
+var a: INDArray<TCmplx128>;
+    b: INDArray<Double>;
+    v: TArray<Double>;
+begin
+  a := TNDAUt.AsArray<TCmplx128>([Cmplx(1, 2), Cmplx(3, 4), Cmplx(5, 6)]);
+  b := TNDAUt.View<Double>(a);
+
+  CheckTrue(TNDAUt.TryAsDynArray<Double>(b, v));
+  CheckEquals([1, 2, 3, 4, 5, 6], v, dTol);
+end;
+
+procedure TNDAUtTests.ReinterpretArray_Dbl1D_Cmplx1D;
+var a: INDArray<Double>;
+    b: INDArray<TCmplx128>;
+    v: TArray<TCmplx128>;
+begin
+  a := TNDAUt.AsArray<Double>([1, 2, 3, 4, 5, 6]);
+  b := TNDAUt.View<TCmplx128>(a);
+
+  CheckTrue(TNDAUt.TryAsDynArray<TCmplx128>(b, v));
+  CheckEquals(3, Length(v));
+  CheckEquals(Cmplx(1, 2), v[0], dTol);
+  CheckEquals(Cmplx(3, 4), v[1], dtol);
+  CheckEquals(Cmplx(5, 6), v[2], dTol);
+end;
+
+procedure TNDAUtTests.ReinterpretArray_Cmplx2D_Dbl2D;
+var a: INDArray<TCmplx128>;
+    b: INDArray<Double>;
+    m: TArray<TArray<Double>>;
+begin
+  a := TNDAUt.AsArray<TCmplx128>([[Cmplx(1, 2)], [Cmplx(3, 4)], [Cmplx(5, 6)]]);
+  b := TNDAUt.View<Double>(a);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Double>(b, m));
+  CheckEquals(3, Length(m));
+  CheckEquals([1, 2], m[0], dTol);
+  CheckEquals([3, 4], m[1], dTol);
+  CheckEquals([5, 6], m[2], dTol);
+end;
+
+procedure TNDAUtTests.ReinterpretArray_Dbl2D_Cmplx2D;
+var a: INDArray<Double>;
+    b: INDArray<TCmplx128>;
+    m: TArray<TArray<TCmplx128>>;
+begin
+  a := TNDAUt.AsArray<Double>([[1, 2], [3, 4], [5, 6]]);
+  b := TNDAUt.View<TCmplx128>(a);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<TCmplx128>(b, m));
+  CheckEquals(3, Length(m));
+  CheckEquals(Cmplx(1, 2), m[0, 0], dTol);
+  CheckEquals(Cmplx(3, 4), m[1, 0], dTol);
+  CheckEquals(Cmplx(5, 6), m[2, 0], dTol);
 end;
 
 {$endregion}
