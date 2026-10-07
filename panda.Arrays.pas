@@ -232,6 +232,7 @@ type
   TNDArrayReinterpretWrapper<T> = class(TNDA<T>)
   protected
     fArray: INDArray;
+  public
     constructor Create(const aArray: INDArray); overload;
     function Data: PByte; override;
   end;
@@ -2208,8 +2209,7 @@ end;
 {$region 'TNDArrayReinterpretWrapper<T>'}
 
 constructor TNDArrayReinterpretWrapper<T>.Create(const aArray: INDArray);
-var s: TArray<NativeInt>;
-    itSz, nDim: Integer;
+var itSz, nDim: Integer;
     bSz: NativeInt;
 begin
   itSz := aArray.ItemSize;
