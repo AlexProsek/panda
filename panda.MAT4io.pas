@@ -85,6 +85,8 @@ type
     function TryReadTextArray(I: NativeInt; out aArr: TArray<String>): Boolean;
     function MatType(I: NativeInt): TMAT4Type;
     function MatElementType(I: NativeInt): TElType;
+    /// <summary>Returns the array shape recorded in the MAT4 matrix header.</summary>
+    function MatShape(I: NativeInt): TNDAShape;
   end;
 
   EMAT4Error = class(Exception);
@@ -642,6 +644,24 @@ function TMAT4Importer.MatElementType(I: NativeInt): TElType;
 begin
   if not fIndexLoaded then ReadIndex;
   Result := fIndex[I].ElType;
+end;
+
+function TMAT4Importer.MatShape(I: NativeInt): TNDAShape;
+begin
+  if not fIndexLoaded then ReadIndex;
+
+  with fIndex[I] do begin
+    if MRows = 1 then begin
+      if NCols = 1 then
+        Result := nil
+      else
+        Result := TNDAShape.Create(fIndex[I].NCols);
+    end else
+    if NCols = 1 then
+      Result := TNDAShape.Create(fIndex[I].MRows, 1)
+    else
+      Result := TNDAShape.Create(fIndex[I].MRows, fIndex[I].NCols);
+  end;
 end;
 
 {$endregion}
