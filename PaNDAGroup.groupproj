@@ -30,6 +30,12 @@
         <Projects Include="ImgProc\PerformanceTests\ImgProcPerformanceTests.dproj">
             <Dependencies/>
         </Projects>
+        <Projects Include="NN\UnitTests\NNTests.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="NN\PerformanceTests\NNPerformanceTests.dproj">
+            <Dependencies/>
+        </Projects>
     </ItemGroup>
     <ProjectExtensions>
         <Borland.Personality>Default.Personality.12</Borland.Personality>
@@ -119,14 +125,32 @@
     <Target Name="ImgProcPerformanceTests:Make">
         <MSBuild Projects="ImgProc\PerformanceTests\ImgProcPerformanceTests.dproj" Targets="Make"/>
     </Target>
+    <Target Name="NNTests">
+        <MSBuild Projects="NN\UnitTests\NNTests.dproj"/>
+    </Target>
+    <Target Name="NNTests:Clean">
+        <MSBuild Projects="NN\UnitTests\NNTests.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="NNTests:Make">
+        <MSBuild Projects="NN\UnitTests\NNTests.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="NNPerformanceTests">
+        <MSBuild Projects="NN\PerformanceTests\NNPerformanceTests.dproj"/>
+    </Target>
+    <Target Name="NNPerformanceTests:Clean">
+        <MSBuild Projects="NN\PerformanceTests\NNPerformanceTests.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="NNPerformanceTests:Make">
+        <MSBuild Projects="NN\PerformanceTests\NNPerformanceTests.dproj" Targets="Make"/>
+    </Target>
     <Target Name="Build">
-        <CallTarget Targets="panda4PyTests;NDAPyTest;pandapy;PandaTests;PerformanceTests;FilterTests;FilterPerformanceTests;ImgProcTests;ImgProcPerformanceTests"/>
+        <CallTarget Targets="panda4PyTests;NDAPyTest;pandapy;PandaTests;PerformanceTests;FilterTests;FilterPerformanceTests;ImgProcTests;ImgProcPerformanceTests;NNTests;NNPerformanceTests"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="panda4PyTests:Clean;NDAPyTest:Clean;pandapy:Clean;PandaTests:Clean;PerformanceTests:Clean;FilterTests:Clean;FilterPerformanceTests:Clean;ImgProcTests:Clean;ImgProcPerformanceTests:Clean"/>
+        <CallTarget Targets="panda4PyTests:Clean;NDAPyTest:Clean;pandapy:Clean;PandaTests:Clean;PerformanceTests:Clean;FilterTests:Clean;FilterPerformanceTests:Clean;ImgProcTests:Clean;ImgProcPerformanceTests:Clean;NNTests:Clean;NNPerformanceTests:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="panda4PyTests:Make;NDAPyTest:Make;pandapy:Make;PandaTests:Make;PerformanceTests:Make;FilterTests:Make;FilterPerformanceTests:Make;ImgProcTests:Make;ImgProcPerformanceTests:Make"/>
+        <CallTarget Targets="panda4PyTests:Make;NDAPyTest:Make;pandapy:Make;PandaTests:Make;PerformanceTests:Make;FilterTests:Make;FilterPerformanceTests:Make;ImgProcTests:Make;ImgProcPerformanceTests:Make;NNTests:Make;NNPerformanceTests:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>

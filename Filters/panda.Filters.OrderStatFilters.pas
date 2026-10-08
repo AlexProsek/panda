@@ -1804,13 +1804,13 @@ begin
     end;
 
     q := kCnt div 2;
-    for J := fHRadius to aW - winSzX do begin
+    for J := fHRadius to aW - fHRadius - 2 do begin
       (pOutRow + J)^ := H.Median(q);
       H.Sub(CH[J - fHRadius]);
       H.Add(CH[J + fHRadius + 1]);
     end;
 
-    for J := aW - winSzX + 1 to aW - 1 do begin
+    for J := aW - fHRadius - 1 to aW - 1 do begin
       (pOutRow + J)^ := H.Median(kCnt div 2);
       H.Sub(CH[J - fHRadius]);
       Dec(kCnt, winSzY);
@@ -1866,13 +1866,13 @@ begin
     end;
 
     q := kCnt div 2;
-    for J := fHRadius to aW - winSzX do begin
+    for J := fHRadius to aW - fHRadius - 2 do begin
       (pOutRow + J)^ := H.Median(q);
       H.Sub(CH[J - fHRadius]);
       H.Add(CH[J + fHRadius + 1]);
     end;
 
-    for J := aW - winSzX + 1 to aW - 1 do begin
+    for J := aW - fHRadius - 1 to aW - 1 do begin
       (pOutRow + J)^ := H.Median(kCnt div 2);
       H.Sub(CH[J - fHRadius]);
       Dec(kCnt, winSzY);
@@ -1905,56 +1905,57 @@ begin
   pDst := pDst + aDstWStep + 1;
 
   w := ((aW - 2) div 16) * 16;
-//  w := aW - 2;
-  SetLength(buff, 9 * w);
-  for I := 0 to High(q) do
-    q[I] := @buff[I * w];
+  if w > 0 then begin
+    SetLength(buff, 9 * w);
+    for I := 0 to High(q) do
+      q[I] := @buff[I * w];
 
-  p[0] := pSrc;
-  p[1] := p[0] + 1;
-  p[2] := p[0] + 2;
-  p[3] := pSrc + aSrcWStep;
-  p[4] := p[3] + 1;
-  p[5] := p[3] + 2;
-  p[6] := pSrc + 2 * aSrcWStep;
-  p[7] := p[6] + 1;
-  p[8] := p[6] + 2;
+    p[0] := pSrc;
+    p[1] := p[0] + 1;
+    p[2] := p[0] + 2;
+    p[3] := pSrc + aSrcWStep;
+    p[4] := p[3] + 1;
+    p[5] := p[3] + 2;
+    p[6] := pSrc + 2 * aSrcWStep;
+    p[7] := p[6] + 1;
+    p[8] := p[6] + 2;
 
-  pDstRow := pDst;
-  for I := 0 to aH - 3 do begin
-    //  This sorting network is used:
-    //  0 -o-----o---o-----o-------------------------------
-    //  1 -o--o--o---|-----|---o-----o---------------------
-    //  2 ----o------|-----|---|-----|------o------o-----o-
-    //  3 -o-----o---o--o--o---|-----|------|------|-----|-
-    //  4 -o--o--o------|------o--o--o------|------o--o--o-
-    //  5 ----o---------|---------|------o--o--o------|----
-    //  6 -o-----o------o---------|------|-----|------o----
-    //  7 -o--o--o----------------o------|-----|-----------
-    //  8 ----o--------------------------o-----o-----------
+    pDstRow := pDst;
+    for I := 0 to aH - 3 do begin
+      //  This sorting network is used:
+      //  0 -o-----o---o-----o-------------------------------
+      //  1 -o--o--o---|-----|---o-----o---------------------
+      //  2 ----o------|-----|---|-----|------o------o-----o-
+      //  3 -o-----o---o--o--o---|-----|------|------|-----|-
+      //  4 -o--o--o------|------o--o--o------|------o--o--o-
+      //  5 ----o---------|---------|------o--o--o------|----
+      //  6 -o-----o------o---------|------|-----|------o----
+      //  7 -o--o--o----------------o------|-----|-----------
+      //  8 ----o--------------------------o-----o-----------
 
-    SortPairs(p[0], p[1], q[0], q[1], w);
-    SortPairs(p[3], p[4], q[3], q[4], w);
-    SortPairs(p[6], p[7], q[6], q[7], w);
-    SortPairs(q[1], p[2], q[1], q[2], w);
-    SortPairs(q[4], p[5], q[4], q[5], w);
-    SortPairs(q[7], p[8], q[7], q[8], w);
+      SortPairs(p[0], p[1], q[0], q[1], w);
+      SortPairs(p[3], p[4], q[3], q[4], w);
+      SortPairs(p[6], p[7], q[6], q[7], w);
+      SortPairs(q[1], p[2], q[1], q[2], w);
+      SortPairs(q[4], p[5], q[4], q[5], w);
+      SortPairs(q[7], p[8], q[7], q[8], w);
 
-    SortPairs(q[0], q[1], w); SortPairs(q[3], q[4], w); SortPairs(q[6], q[7], w);
-    SortPairs(q[0], q[3], w); SortPairs(q[3], q[6], w); SortPairs(q[0], q[3], w);
-    SortPairs(q[1], q[4], w); SortPairs(q[4], q[7], w); SortPairs(q[1], q[4], w);
-    SortPairs(q[5], q[8], w); SortPairs(q[2], q[5], w); SortPairs(q[5], q[8], w);
-    SortPairs(q[2], q[4], w); SortPairs(q[4], q[6], w); SortPairs(q[2], q[4], w);
+      SortPairs(q[0], q[1], w); SortPairs(q[3], q[4], w); SortPairs(q[6], q[7], w);
+      SortPairs(q[0], q[3], w); SortPairs(q[3], q[6], w); SortPairs(q[0], q[3], w);
+      SortPairs(q[1], q[4], w); SortPairs(q[4], q[7], w); SortPairs(q[1], q[4], w);
+      SortPairs(q[5], q[8], w); SortPairs(q[2], q[5], w); SortPairs(q[5], q[8], w);
+      SortPairs(q[2], q[4], w); SortPairs(q[4], q[6], w); SortPairs(q[2], q[4], w);
 
-    Move(q[4]^, pDstRow^, w);
-    for J := 0 to High(p) do
-      Inc(p[J], aSrcWStep);
-    Inc(pDstRow, aDstWStep);
+      Move(q[4]^, pDstRow^, w);
+      for J := 0 to High(p) do
+        Inc(p[J], aSrcWStep);
+      Inc(pDstRow, aDstWStep);
+    end;
   end;
 
   if aW - 2 - w > 0 then begin
     pDst := pDst - aDstWStep + w - 1;
-    Exec(pSrc + w - 1, pDst, aSrcWStep, aDstWStep, aW - w, aH);
+    Exec(pSrc + w, pDst, aSrcWStep, aDstWStep, aW - w, aH);
   end;
 end;
 
@@ -1967,96 +1968,98 @@ begin
   pDst := pDst + 2 * aDstWStep + 2;
 
   w := ((aW - 4) div 16) * 16;
-  SetLength(buff, 25 * w);
-  for I := 0 to High(q) do
-    q[I] := @buff[I * w];
+  if w > 0 then begin
+    SetLength(buff, 25 * w);
+    for I := 0 to High(q) do
+      q[I] := @buff[I * w];
 
-  for I := 0 to 4 do
-    for J := 0 to 4 do
-      p[5*I + J] := pSrc + I * aSrcWStep + J;
+    for I := 0 to 4 do
+      for J := 0 to 4 do
+        p[5*I + J] := pSrc + I * aSrcWStep + J;
 
-  pDstRow := pDst;
-  for I := 0 to aH - 5 do begin
-    SortPairs(p[0], p[1], q[0], q[1], w);
-    SortPairs(p[2], p[3], q[2], q[3], w);
-    SortPairs(p[4], p[5], q[4], q[5], w);
-    SortPairs(p[6], p[7], q[6], q[7], w);
-    SortPairs(p[8], p[9], q[8], q[9], w);
-    SortPairs(p[10], p[11], q[10], q[11], w);
-    SortPairs(p[12], p[13], q[12], q[13], w);
-    SortPairs(p[14], p[15], q[14], q[15], w);
-    SortPairs(p[16], p[17], q[16], q[17], w);
-    SortPairs(p[18], p[19], q[18], q[19], w);
-    SortPairs(p[20], p[21], q[20], q[21], w);
-    SortPairs(p[22], p[23], q[22], q[23], w);
+    pDstRow := pDst;
+    for I := 0 to aH - 5 do begin
+      SortPairs(p[0], p[1], q[0], q[1], w);
+      SortPairs(p[2], p[3], q[2], q[3], w);
+      SortPairs(p[4], p[5], q[4], q[5], w);
+      SortPairs(p[6], p[7], q[6], q[7], w);
+      SortPairs(p[8], p[9], q[8], q[9], w);
+      SortPairs(p[10], p[11], q[10], q[11], w);
+      SortPairs(p[12], p[13], q[12], q[13], w);
+      SortPairs(p[14], p[15], q[14], q[15], w);
+      SortPairs(p[16], p[17], q[16], q[17], w);
+      SortPairs(p[18], p[19], q[18], q[19], w);
+      SortPairs(p[20], p[21], q[20], q[21], w);
+      SortPairs(p[22], p[23], q[22], q[23], w);
 
-    SortPairs(q[0], q[2], w);
-    SortPairs(q[1], q[3], w);
-    SortPairs(q[4], q[6], w);
-    SortPairs(q[5], q[7], w);
-    SortPairs(q[8], q[10], w);
-    SortPairs(q[9], q[11], w);
-    SortPairs(q[12], q[14], w);
-    SortPairs(q[13], q[15], w);
-    SortPairs(q[16], q[18], w);
-    SortPairs(q[17], q[19], w);
-    SortPairs(q[21], q[22], w);
-    SortPairs(q[23], p[24], q[23], q[24], w);
+      SortPairs(q[0], q[2], w);
+      SortPairs(q[1], q[3], w);
+      SortPairs(q[4], q[6], w);
+      SortPairs(q[5], q[7], w);
+      SortPairs(q[8], q[10], w);
+      SortPairs(q[9], q[11], w);
+      SortPairs(q[12], q[14], w);
+      SortPairs(q[13], q[15], w);
+      SortPairs(q[16], q[18], w);
+      SortPairs(q[17], q[19], w);
+      SortPairs(q[21], q[22], w);
+      SortPairs(q[23], p[24], q[23], q[24], w);
 
-    SortPairs(q[0],  q[4], w);  SortPairs(q[1],  q[5], w);  SortPairs(q[2],  q[6], w);
-    SortPairs(q[3],  q[7], w);  SortPairs(q[8],  q[12], w); SortPairs(q[9],  q[13], w);
-    SortPairs(q[10], q[14], w); SortPairs(q[11], q[15], w); SortPairs(q[18], q[21], w);
-    SortPairs(q[20], q[23], w); SortPairs(q[22], q[24], w);
+      SortPairs(q[0],  q[4], w);  SortPairs(q[1],  q[5], w);  SortPairs(q[2],  q[6], w);
+      SortPairs(q[3],  q[7], w);  SortPairs(q[8],  q[12], w); SortPairs(q[9],  q[13], w);
+      SortPairs(q[10], q[14], w); SortPairs(q[11], q[15], w); SortPairs(q[18], q[21], w);
+      SortPairs(q[20], q[23], w); SortPairs(q[22], q[24], w);
 
-    SortPairs(q[0],  q[8], w);  SortPairs(q[1],  q[9], w);  SortPairs(q[2],  q[10], w);
-    SortPairs(q[3],  q[11], w); SortPairs(q[4],  q[12], w); SortPairs(q[5],  q[13], w);
-    SortPairs(q[6],  q[14], w); SortPairs(q[7],  q[15], w); SortPairs(q[16], q[20], w);
-    SortPairs(q[17], q[22], w); SortPairs(q[19], q[24], w); SortPairs(q[21], q[23], w);
+      SortPairs(q[0],  q[8], w);  SortPairs(q[1],  q[9], w);  SortPairs(q[2],  q[10], w);
+      SortPairs(q[3],  q[11], w); SortPairs(q[4],  q[12], w); SortPairs(q[5],  q[13], w);
+      SortPairs(q[6],  q[14], w); SortPairs(q[7],  q[15], w); SortPairs(q[16], q[20], w);
+      SortPairs(q[17], q[22], w); SortPairs(q[19], q[24], w); SortPairs(q[21], q[23], w);
 
-    SortPairs(q[1],  q[18], w); SortPairs(q[3],  q[21], w); SortPairs(q[5],  q[23], w);
-    SortPairs(q[6],  q[19], w); SortPairs(q[11], q[14], w); SortPairs(q[15], q[24], w);
+      SortPairs(q[1],  q[18], w); SortPairs(q[3],  q[21], w); SortPairs(q[5],  q[23], w);
+      SortPairs(q[6],  q[19], w); SortPairs(q[11], q[14], w); SortPairs(q[15], q[24], w);
 
-    SortPairs(q[1],  q[16], w); SortPairs(q[3],  q[17], w); SortPairs(q[6],  q[9], w);
-    SortPairs(q[7],  q[11], w); SortPairs(q[13], q[19], w); SortPairs(q[14], q[23], w);
+      SortPairs(q[1],  q[16], w); SortPairs(q[3],  q[17], w); SortPairs(q[6],  q[9], w);
+      SortPairs(q[7],  q[11], w); SortPairs(q[13], q[19], w); SortPairs(q[14], q[23], w);
 
-    SortPairs(q[0],  q[1], w);  SortPairs(q[2],  q[16], w); SortPairs(q[3],  q[8], w);
-    SortPairs(q[7],  q[20], w); SortPairs(q[10], q[13], w); SortPairs(q[11], q[22], w);
-    SortPairs(q[15], q[23], w);
+      SortPairs(q[0],  q[1], w);  SortPairs(q[2],  q[16], w); SortPairs(q[3],  q[8], w);
+      SortPairs(q[7],  q[20], w); SortPairs(q[10], q[13], w); SortPairs(q[11], q[22], w);
+      SortPairs(q[15], q[23], w);
 
-    SortPairs(q[1],  q[2], w);  SortPairs(q[5],  q[10], w); SortPairs(q[7],  q[18], w);
-    SortPairs(q[11], q[21], w); SortPairs(q[15], q[20], w); SortPairs(q[19], q[22], w);
+      SortPairs(q[1],  q[2], w);  SortPairs(q[5],  q[10], w); SortPairs(q[7],  q[18], w);
+      SortPairs(q[11], q[21], w); SortPairs(q[15], q[20], w); SortPairs(q[19], q[22], w);
 
-    SortPairs(q[4],  q[7], w);  SortPairs(q[5],  q[6], w);  SortPairs(q[9],  q[18], w);
-    SortPairs(q[10], q[17], w); SortPairs(q[11], q[12], w); SortPairs(q[13], q[21], w);
-    SortPairs(q[14], q[15], w); SortPairs(q[19], q[20], w); SortPairs(q[22], q[23], w);
+      SortPairs(q[4],  q[7], w);  SortPairs(q[5],  q[6], w);  SortPairs(q[9],  q[18], w);
+      SortPairs(q[10], q[17], w); SortPairs(q[11], q[12], w); SortPairs(q[13], q[21], w);
+      SortPairs(q[14], q[15], w); SortPairs(q[19], q[20], w); SortPairs(q[22], q[23], w);
 
-    SortPairs(q[7],  q[8], w);  SortPairs(q[9],  q[10], w); SortPairs(q[11], q[16], w);
-    SortPairs(q[12], q[17], w); SortPairs(q[13], q[18], w); SortPairs(q[19], q[21], w);
-    SortPairs(q[20], q[22], w);
+      SortPairs(q[7],  q[8], w);  SortPairs(q[9],  q[10], w); SortPairs(q[11], q[16], w);
+      SortPairs(q[12], q[17], w); SortPairs(q[13], q[18], w); SortPairs(q[19], q[21], w);
+      SortPairs(q[20], q[22], w);
 
-    SortPairs(q[5],  q[11], w); SortPairs(q[6],  q[16], w); SortPairs(q[7],  q[9], w);
-    SortPairs(q[8],  q[10], w); SortPairs(q[12], q[13], w); SortPairs(q[14], q[19], w);
-    SortPairs(q[15], q[18], w);
+      SortPairs(q[5],  q[11], w); SortPairs(q[6],  q[16], w); SortPairs(q[7],  q[9], w);
+      SortPairs(q[8],  q[10], w); SortPairs(q[12], q[13], w); SortPairs(q[14], q[19], w);
+      SortPairs(q[15], q[18], w);
 
-    SortPairs(q[6], q[9], w);   SortPairs(q[8],  q[11], w); SortPairs(q[10], q[16], w);
-    SortPairs(q[12], q[14], w); SortPairs(q[15], q[17], w);
+      SortPairs(q[6], q[9], w);   SortPairs(q[8],  q[11], w); SortPairs(q[10], q[16], w);
+      SortPairs(q[12], q[14], w); SortPairs(q[15], q[17], w);
 
-    SortPairs(q[9], q[11], w);  SortPairs(q[10], q[12], w); SortPairs(q[13], q[14], w);
-    SortPairs(q[15], q[16], w);
+      SortPairs(q[9], q[11], w);  SortPairs(q[10], q[12], w); SortPairs(q[13], q[14], w);
+      SortPairs(q[15], q[16], w);
 
-    SortPairs(q[11], q[12], w);
-    SortPairs(q[13], q[15], w);
-    SortPairs(q[12], q[13], w);
+      SortPairs(q[11], q[12], w);
+      SortPairs(q[13], q[15], w);
+      SortPairs(q[12], q[13], w);
 
-    Move(q[12]^, pDstRow^, w);
-    for J := 0 to High(p) do
-      Inc(p[J], aSrcWStep);
-    Inc(pDstRow, aDstWStep);
+      Move(q[12]^, pDstRow^, w);
+      for J := 0 to High(p) do
+        Inc(p[J], aSrcWStep);
+      Inc(pDstRow, aDstWStep);
+    end;
   end;
 
   if aW - 4 - w > 0 then begin
     pDst := pDst - 2 * aDstWStep + w - 2;
-    Exec(pSrc + w - 2, pDst, aSrcWStep, aDstWStep, aW - w, aH);
+    Exec(pSrc + w, pDst, aSrcWStep, aDstWStep, aW - w, aH);
   end;
 end;
 
@@ -2182,14 +2185,14 @@ begin
   for I := 0 to fVRadius - 1 do begin
     pOutRow := pDst + I * aDstWStep;
     if bForward then begin
-      for J := 0 to fHRadius - 1 do begin
+      for J := 0 to fHRadius - 2 do begin
         (pOutRow + J * xStep)^ := mt.Median;
-        mt.Add(pSrc + (J + fHRadius) * xStep, aSrcWStep, winSzY);
+        mt.Add(pSrc + (J + fHRadius + 1) * xStep, aSrcWStep, winSzY);
       end;
-      J := fHRadius;
+      J := fHRadius - 1;
     end else begin
-      for J :=  fHRadius - 1 downto 0 do begin
-        (pOutRow + (J + 1) * xStep)^ := mt.Median;
+      for J :=  fHRadius - 1 downto 1 do begin
+        (pOutRow + J * xStep)^ := mt.Median;
         mt.Remove(pSrc + (J + fHRadius) * xStep, aSrcWStep, winSzY);
       end;
       J := 0;
@@ -2320,13 +2323,13 @@ begin
       Inc(kCnt, winSzY);
     end;
 
-    for J := fHRadius to aW - winSzX do begin
+    for J := fHRadius to aW - fHRadius - 2 do begin
       (pOutRow + J)^ := Round(255 * H.CDF((pInC + J)^) / kCnt);
       H.Sub(CH[J - fHRadius]);
       H.Add(CH[J + fHRadius + 1]);
     end;
 
-    for J := aW - winSzX + 1 to aW - 1 do begin
+    for J := aW - fHRadius - 1 to aW - 1 do begin
       (pOutRow + J)^ := Round(255 * H.CDF((pInC + J)^) / kCnt);
       H.Sub(CH[J - fHRadius]);
       Dec(kCnt, winSzY);
@@ -2539,15 +2542,15 @@ begin
     pOutRow := pDst + I * aDstWStep;
     pInC := pSrc + I * aDstWStep;
     if bForward then begin
-      for J := 0 to fHRadius - 1 do begin
+      for J := 0 to fHRadius - 2 do begin
         (pOutRow + J * xStep)^ := Round(255 * mt.CDF((pInC + J * xStep)^) / mt.Count);
         mt.Add(pSrc + (J + fHRadius + 1) * xStep, aSrcWStep, winSzY);
       end;
-      J := fHRadius;
+      J := fHRadius - 1;
     end else begin
-      for J :=  fHRadius - 1 downto 0 do begin
-        (pOutRow + (J + 1) * xStep)^ := Round(255 * mt.CDF((pInC + (J + 1) * xStep)^) / mt.Count);
-        mt.Remove(pSrc + (J + fHRadius + 1) * xStep, aSrcWStep, winSzY);
+      for J :=  fHRadius - 1 downto 1 do begin
+        (pOutRow + J * xStep)^ := Round(255 * mt.CDF((pInC + J * xStep)^) / mt.Count);
+        mt.Remove(pSrc + (J + fHRadius) * xStep, aSrcWStep, winSzY);
       end;
       J := 0;
     end;

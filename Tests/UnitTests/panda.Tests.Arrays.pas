@@ -17,6 +17,7 @@ uses
   , SysUtils
   , panda.Intfs
   , panda.Arrays
+  , panda.Nums
   , panda.Tests.NDATestCase
   ;
 
@@ -182,6 +183,8 @@ type
   end;
 
   TNDAUtTests = class(TNDATestCase)
+  protected const
+    dTol = 1e-12;
   published
     procedure FullArray2D;
     procedure MakeArray2D;
@@ -202,6 +205,7 @@ type
     procedure BreadcastLvlArr2DArr2D;
 
     procedure BroadcastableQ2D;
+    procedure RBroadcastableQ2D;
 
     procedure Copy2DPacked;
     procedure Copy2DStridesLvl0;
@@ -210,6 +214,11 @@ type
 
     procedure FillVecByConst;
     procedure FillVecByVec;
+
+    procedure ReinterpretArray_Cmplx1D_Dbl1D;
+    procedure ReinterpretArray_Dbl1D_Cmplx1D;
+    procedure ReinterpretArray_Cmplx2D_Dbl2D;
+    procedure ReinterpretArray_Dbl2D_Cmplx2D;
   end;
 
   TBinMapTests = class(TNDATestCase)
@@ -244,6 +253,13 @@ type
     procedure Arr2D_Arr1D;
 
     procedure Arr1D_Arr2DInv;
+
+    procedure CCArr2D_ColVec;
+    procedure ColVec_CCArr2D;
+    procedure ColVec_CCArr2D_invalidRMap;
+
+    procedure CCArr3D_ColVec;
+    procedure ColVec_CCArr3D;
   end;
 
   TFncMapTests = class(TNDATestCase)
@@ -2602,11 +2618,15 @@ begin
 
   CheckTrue(BroadcastableQ(a, b, axis));
   CheckEquals(0, axis);
+  CheckTrue(BroadcastableQ(b, a, axis));
+  CheckEquals(0, axis);
 
   a := TNDAUt.Full<Integer>([3, 2], 0);
   b := TNDAUt.Full<Integer>([3, 1], 0);
 
   CheckTrue(BroadcastableQ(a, b, axis));
+  CheckEquals(1, axis);
+  CheckTrue(BroadcastableQ(b, a, axis));
   CheckEquals(1, axis);
 
   a := TNDAUt.Full<Integer>([3, 2], 0);
@@ -2619,6 +2639,28 @@ begin
   b := TNDAUt.Full<Integer>([3, 3], 0);
 
   CheckFalse(BroadcastableQ(a, b, axis));
+  CheckFalse(BroadcastableQ(b, a, axis));
+end;
+
+procedure TNDAUtTests.RBroadcastableQ2D;
+var a, b: INDArray<Integer>;
+    axis: Integer;
+begin
+  a := TNDAUt.Full<Integer>([3, 2], 0);
+  b := TNDAUt.Full<Integer>([1, 2], 0);
+
+  CheckTrue(RBroadcastableQ(a, b, axis));
+  CheckEquals(0, axis);
+  CheckFalse(RBroadcastableQ(b, a, axis));
+  CheckEquals(-1, axis);
+
+  a := TNDAUt.Full<Integer>([3, 2], 0);
+  b := TNDAUt.Full<Integer>([3, 1], 0);
+
+  CheckTrue(RBroadcastableQ(a, b, axis));
+  CheckEquals(1, axis);
+  CheckFalse(RBroadcastableQ(b, a, axis));
+  CheckEquals(-1, axis);
 end;
 
 procedure TNDAUtTests.Copy2DPacked;
@@ -2724,6 +2766,63 @@ begin
   CheckTrue(TNDAUt.TryAsDynArray<Integer>(a, v));
   CheckEquals(3, Length(v));
   CheckEquals([1, 2, 3], v);
+end;
+
+procedure TNDAUtTests.ReinterpretArray_Cmplx1D_Dbl1D;
+var a: INDArray<TCmplx128>;
+    b: INDArray<Double>;
+    v: TArray<Double>;
+begin
+  a := TNDAUt.AsArray<TCmplx128>([Cmplx(1, 2), Cmplx(3, 4), Cmplx(5, 6)]);
+  b := TNDAUt.View<Double>(a);
+
+  CheckTrue(TNDAUt.TryAsDynArray<Double>(b, v));
+  CheckEquals([1, 2, 3, 4, 5, 6], v, dTol);
+end;
+
+procedure TNDAUtTests.ReinterpretArray_Dbl1D_Cmplx1D;
+var a: INDArray<Double>;
+    b: INDArray<TCmplx128>;
+    v: TArray<TCmplx128>;
+begin
+  a := TNDAUt.AsArray<Double>([1, 2, 3, 4, 5, 6]);
+  b := TNDAUt.View<TCmplx128>(a);
+
+  CheckTrue(TNDAUt.TryAsDynArray<TCmplx128>(b, v));
+  CheckEquals(3, Length(v));
+  CheckEquals(Cmplx(1, 2), v[0], dTol);
+  CheckEquals(Cmplx(3, 4), v[1], dtol);
+  CheckEquals(Cmplx(5, 6), v[2], dTol);
+end;
+
+procedure TNDAUtTests.ReinterpretArray_Cmplx2D_Dbl2D;
+var a: INDArray<TCmplx128>;
+    b: INDArray<Double>;
+    m: TArray<TArray<Double>>;
+begin
+  a := TNDAUt.AsArray<TCmplx128>([[Cmplx(1, 2)], [Cmplx(3, 4)], [Cmplx(5, 6)]]);
+  b := TNDAUt.View<Double>(a);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Double>(b, m));
+  CheckEquals(3, Length(m));
+  CheckEquals([1, 2], m[0], dTol);
+  CheckEquals([3, 4], m[1], dTol);
+  CheckEquals([5, 6], m[2], dTol);
+end;
+
+procedure TNDAUtTests.ReinterpretArray_Dbl2D_Cmplx2D;
+var a: INDArray<Double>;
+    b: INDArray<TCmplx128>;
+    m: TArray<TArray<TCmplx128>>;
+begin
+  a := TNDAUt.AsArray<Double>([[1, 2], [3, 4], [5, 6]]);
+  b := TNDAUt.View<TCmplx128>(a);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<TCmplx128>(b, m));
+  CheckEquals(3, Length(m));
+  CheckEquals(Cmplx(1, 2), m[0, 0], dTol);
+  CheckEquals(Cmplx(3, 4), m[1, 0], dTol);
+  CheckEquals(Cmplx(5, 6), m[2, 0], dTol);
 end;
 
 {$endregion}
@@ -3229,6 +3328,89 @@ begin
   ExpectedException := ENDAMapError;
   TNDAUt.MapL(a, b, Fa);
 end;
+
+procedure TBinMapTests.CCArr2D_ColVec;
+var a, b: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+  b := TNDAUt.AsArray<Integer>([[1], [2], [3]]);
+
+  TNDAUt.MapR(a, b, Fb);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(a, m));
+  CheckEquals(3, Length(m));
+  CheckEquals([1,   3,  5], m[0]);
+  CheckEquals([6,   8, 10], m[1]);
+  CheckEquals([11, 13, 15], m[2]);
+end;
+
+procedure TBinMapTests.ColVec_CCArr2D;
+var a, b: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1], [2], [3]]);
+  b := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+
+  TNDAUt.MapL(a, b, Fa);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(b, m));
+  CheckEquals(3, Length(m));
+  CheckEquals([ 1,  0, -1], m[0]);
+  CheckEquals([ 0, -1, -2], m[1]);
+  CheckEquals([-1, -2, -3], m[2]);
+end;
+
+procedure TBinMapTests.ColVec_CCArr2D_invalidRMap;
+var a, b: INDArray<Integer>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1], [2], [3]]);
+  b := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+
+  ExpectedException := ENDAMapError;
+
+  TNDAUt.MapR(a, b, Fb);
+end;
+
+procedure TBinMapTests.CCArr3D_ColVec;
+var a, b: INDArray<Integer>;
+    t: TArray<TArray<TArray<Integer>>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[[1, 2, 3], [4, 5, 6]], [[7, 8, 9], [10, 11, 12]]]);
+  b := TNDAUt.AsArray<Integer>([[1], [2]]);
+
+  TNDAUt.MapR(a, b, Fb);
+
+  CheckTrue(TNDAUt.TryAsDynArray3D<Integer>(a, t));
+  CheckEquals(2, Length(t));
+
+  CheckEquals([ 1,  3,  5], t[0, 0]);
+  CheckEquals([ 6,  8, 10], t[0, 1]);
+
+  CheckEquals([13, 15, 17], t[1, 0]);
+  CheckEquals([18, 20, 22], t[1, 1]);
+end;
+
+procedure TBinMapTests.ColVec_CCArr3D;
+var a, b: INDArray<Integer>;
+    t: TArray<TArray<TArray<Integer>>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1], [2]]);
+  b := TNDAUt.AsArray<Integer>([[[1, 2, 3], [4, 5, 6]], [[7, 8, 9], [10, 11, 12]]]);
+
+  TNDAUt.MapL(a, b, Fa);
+
+  CheckTrue(TNDAUt.TryAsDynArray3D<Integer>(b, t));
+  CheckEquals(2, Length(t));
+
+  CheckEquals([ 1,  0, -1], t[0, 0]);
+  CheckEquals([ 0, -1, -2], t[0, 1]);
+
+  CheckEquals([-5, -6, -7], t[1, 0]);
+  CheckEquals([-6, -7, -8], t[1, 1]);
+end;
+
+
 
 {$endregion}
 

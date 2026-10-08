@@ -44,8 +44,7 @@ uses
   panda.Nums in '..\..\panda.Nums.pas',
   panda.NumsLowLvl in '..\..\panda.NumsLowLvl.pas',
   panda.NumsQP in '..\..\panda.NumsQP.pas',
-  panda.PTests.FFT in 'panda.PTests.FFT.pas',
-  VUTS.Common.PFFFT in 'PFFFT\VUTS.Common.PFFFT.pas';
+  panda.PTests.FFT in 'panda.PTests.FFT.pas';
 
 {$R *.RES}
 

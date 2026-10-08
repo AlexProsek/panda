@@ -6,6 +6,7 @@ uses
     TestFramework
   , panda.Tests.NDATestCase
   , panda.Intfs
+  , panda.Arrays
   , pandalib
   ;
 
@@ -16,6 +17,9 @@ type
     procedure Outer_VxV;
     procedure Outer_MxV;
     procedure Outer_VxM;
+
+    procedure TotalAtLvl_M;
+    procedure TotalAtLvl_M_Gaps;
   end;
 
   TMathPascalImplTests = class(TNDAPerformanceTestCase)
@@ -23,6 +27,8 @@ type
     procedure Dot_Mat_Pascal;
     procedure Outer_VxV_Pascal;
     procedure Outer_MxV_Pascal;
+
+    procedure TotalAtLvl_M_Pascal;
   end;
 
 implementation
@@ -76,6 +82,29 @@ begin
 
   SWStart;
   nda.Outer(a, b);
+  SWStop;
+end;
+
+procedure TMathTests.TotalAtLvl_M;
+var a, b: INDArray<Single>;
+const N = 200;
+begin
+  a := nda.Full<Single>([N, N], 0);
+
+  SWStart;
+  b := nda.TotalAtLvl(a, -1);
+  SWStop;
+end;
+
+procedure TMathTests.TotalAtLvl_M_Gaps;
+var a, b: INDArray<Single>;
+const N = 200;
+begin
+  a := nda.Full<Single>([2*N, 2*N], 0);
+  a := a[[NDIAll(2), NDIAll(2)]];
+
+  SWStart;
+  b := nda.TotalAtLvl(a, -1);
   SWStop;
 end;
 
@@ -156,6 +185,24 @@ begin
     for J := 0 to N - 1 do
       for K := 0 to N - 1 do
         c[I, J, K] := a[I, J] * b[K];
+
+  SWStop;
+end;
+
+procedure TMathPascalImplTests.TotalAtLvl_M_Pascal;
+var a: TArray<TArray<Single>>;
+    s: Single;
+    I, J: Integer;
+const N = 200;
+begin
+  SetLength(a, N, N);
+
+  SWStart;
+
+  s := 0;
+  for I := 0 to N - 1 do
+    for J := 0 to N - 1 do
+      s := s + a[I, J];
 
   SWStop;
 end;

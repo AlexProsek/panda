@@ -229,6 +229,14 @@ type
     function Data: PByte; override;
   end;
 
+  TNDArrayReinterpretWrapper<T> = class(TNDA<T>)
+  protected
+    fArray: INDArray;
+  public
+    constructor Create(const aArray: INDArray); overload;
+    function Data: PByte; override;
+  end;
+
   TDynArrWrapper<T> = class(TNDA<T>)
   protected
     fArray: TArray<T>;
@@ -396,7 +404,7 @@ type
 
   TNDAConstSliceIt = class(TNDASliceIt)
   protected
-    fPos: Integer;
+    fPos: NativeInt;
   public
     constructor Create(const aSlice: INDArray);
     function MoveNext: Boolean; override;
@@ -568,6 +576,7 @@ type
     class function AsType<T>(const aArr: INDArray; aForceCopy: Boolean = False): INDArray<T>; overload; static;
     class function AsType<T>(const aArrays: array of INDArray; aForceCopy: Boolean = False): TArray<INDArray<T>>; overload; static;
     class function AsContiguousArray<T>(const aArr: INDArray<T>): INDArray<T>; overload; static;
+    class function View<T>(const aArr: INDArray): INDArray<T>; overload; static;
   end;
 
   function SameQ(const aIdx1, aIdx2: array of NativeInt): Boolean; overload;
@@ -590,6 +599,8 @@ type
   function CheckCContLvl(const aArr: INDArray; aRequiredLvl: Integer): Boolean;
   function BroadcastLvl(A, B: INDArray): Integer;
   function BroadcastableQ(const A, B: INDArray; out aAxis: Integer): Boolean;
+  function RBroadcastableQ(const L, R: INDArray; out aAxis: Integer): Boolean;
+  function LBroadcastableQ(const L, R: INDArray; out aAxis: Integer): Boolean;
   function GetPartShape(const A: INDArray; const aIdx: INDIndexSeq): TNDAShape;
   function CompatibleQ(const aShapes: array of TNDAShape; out aResShape: TNDAShape): Boolean; overload;
   function CompatibleQ(const aArrays: array of INDArray; out aResShape: TNDAShape; out aType: PTypeInfo): Boolean; overload;
@@ -744,17 +755,17 @@ end;
 
 function ScalarQ(const aArr: INDArray): Boolean;
 begin
-  Result := (Length(aArr.Shape) = 0);
+  Result := (aArr.NDim = 0);
 end;
 
 function VectorQ(const aArr: INDArray): Boolean;
 begin
-  Result := (Length(aArr.Shape) = 1);
+  Result := (aArr.NDim = 1);
 end;
 
 function MatrixQ(const aArr: INDArray): Boolean;
 begin
-  Result := (Length(aArr.Shape) = 2);
+  Result := (aArr.NDim = 2);
 end;
 
 function GetItemSize(aType: PTypeInfo): Integer;
@@ -881,6 +892,46 @@ begin
   for I := High(SA) downto 0 do
     if sA[I] <> sB[I] then begin
       if (sA[I] = 1) or (sB[I] = 1) then begin
+        if aAxis >= 0 then exit(False);
+        aAxis := I;
+      end else
+        exit(False);
+    end;
+  Result := True;
+end;
+
+function RBroadcastableQ(const L, R: INDArray; out aAxis: Integer): Boolean;
+var sL, sR: TNDAShape;
+    I: Integer;
+begin
+  if L.NDim <> R.NDim then exit(False);
+
+  aAxis := -1;
+  sL := L.Shape;
+  sR := R.Shape;
+  for I := High(sL) downto 0 do
+    if sL[I] <> sR[I] then begin
+      if sR[I] = 1 then begin
+        if aAxis >= 0 then exit(False);
+        aAxis := I;
+      end else
+        exit(False);
+    end;
+  Result := True;
+end;
+
+function LBroadcastableQ(const L, R: INDArray; out aAxis: Integer): Boolean;
+var sL, sR: TNDAShape;
+    I: Integer;
+begin
+  if L.NDim <> R.NDim then exit(False);
+
+  aAxis := -1;
+  sL := L.Shape;
+  sR := R.Shape;
+  for I := High(sL) downto 0 do
+    if sL[I] <> sR[I] then begin
+      if sL[I] = 1 then begin
         if aAxis >= 0 then exit(False);
         aAxis := I;
       end else
@@ -2155,6 +2206,46 @@ end;
 
 {$endregion}
 
+{$region 'TNDArrayReinterpretWrapper<T>'}
+
+constructor TNDArrayReinterpretWrapper<T>.Create(const aArray: INDArray);
+var itSz, nDim: Integer;
+    bSz: NativeInt;
+begin
+  itSz := aArray.ItemSize;
+  if
+    ((itSz mod SizeOf(T)) <> 0) and ((SizeOf(T) mod itSz) <> 0)
+  then
+    raise ENDACastError.Create(csInvReinterpret);
+
+  nDim := aArray.NDim;
+  fArray := aArray;
+  if itSz > SizeOf(T) then begin
+    fShape := Copy(aArray.Shape);
+    fStrides := Copy(aArray.Strides);
+    fShape[nDim - 1] := fShape[nDim - 1] * (itSz div SizeOf(T));
+    fStrides[nDim - 1] :=  SizeOf(T);
+  end else
+  if itSz < SizeOf(T) then begin
+    GetCContLvl(fArray, bSz);
+    if bSz < SizeOf(T) then
+      raise ENDACastError.Create(csInvReinterpret);
+
+    fShape := Copy(aArray.Shape);
+    fStrides := Copy(aArray.Strides);
+    fShape[nDim - 1] := fShape[nDim - 1] div (SizeOf(T) div itSz);
+    fStrides[nDim - 1] := SizeOf(T);
+  end;
+  fFlags := fArray.Flags;
+end;
+
+function TNDArrayReinterpretWrapper<T>.Data: PByte;
+begin
+  Result := fArray.Data;
+end;
+
+{$endregion}
+
 {$region 'TDynArrWrapper<T>'}
 
 constructor TDynArrWrapper<T>.Create(const aArray: TArray<T>);
@@ -2945,6 +3036,8 @@ begin
   AddCvtFunc<Integer, Single>(cvt_I32F32);
   AddCvtFunc<Integer,  Int64>(cvt_I32I64);
 
+  AddCvtFunc<Int64,   Double>(cvt_I64F64);
+
   AddCvtFunc<Single,    Byte>(cvt_F32UI8);
   AddCvtFunc<Single,  Double>(cvt_F32F64);
 
@@ -3417,9 +3510,7 @@ class procedure TNDAUt.MapSS(const L, R: INDArray; aFnc: TIPProcVV);
 var cLvl: Integer;
     cSz: NativeInt;
 begin
-  if not SameShapeQ(L, R) then
-    raise ENDAMapError.CreateFmt(csBroadcastErr,
-      [ShapeToStr(L), ShapeToStr(R)]);
+  Assert(SameShapeQ(L, R));
 
   if (L.Flags and R.Flags and NDAF_C_CONTIGUOUS) <> 0 then begin
     aFnc(L.Size, L.Data, L.ItemSize, R.Data, R.ItemSize);
@@ -3479,7 +3570,7 @@ begin
 end;
 
 class procedure TNDAUt.MapR(const L, R: INDArray; aRFnc: TIPProcVV);
-var it: TNDAIt;
+var it: TNDASliceIt;
     dimL, dimR, lvl: Integer;
     sz: NativeInt;
     view: INDArray;
@@ -3496,19 +3587,44 @@ begin
     if not WriteableQ(L) then
       raise ENDAWriteError.Create(csNotWriteable);
 
-    MapSS(L, R, aRFnc);
+    if not RBroadcastableQ(L, R, lvl) then
+      raise ENDAMapError.CreateFmt(csBroadcastErr, [ShapeToStr(L), ShapeToStr(R)]);
+
+    if lvl = -1 then begin
+      MapSS(L, R, aRFnc);
+      exit;
+    end;
+
+    it := TNDASliceIt.Create(L, lvl, lvl);
+    try
+      view := it.CurrentSlice;
+      lvl := GetCommonCContLvl(view, R, sz);
+      while it.MoveNext do
+        MapSS(view, R, aRFnc, lvl, sz);
+    finally
+      it.Free;
+    end;
     exit;
   end;
 
   if dimL > dimR then begin
     lvl := BroadcastLvl(L, R);
-    if lvl < 0 then
-      raise ENDAMapError.CreateFmt(csBroadcastErr,
-        [ShapeToStr(L), ShapeToStr(R)]);
+
+    if lvl < 0 then begin
+      it := TNDASliceIt.Create(L, 0, dimL - dimR - 1);
+      try
+        view := it.CurrentSlice;
+        while it.MoveNext do
+          MapR(view, R, aRFnc);
+      finally
+        it.Free;
+      end;
+      exit;
+    end;
 
     it := TNDASliceIt.Create(L, 0, lvl - 1);
     try
-      view := TNDASliceIt(it).CurrentSlice;
+      view := it.CurrentSlice;
       lvl := GetCommonCContLvl(view, R, sz);
       while it.MoveNext do
         MapSS(view, R, aRFnc, lvl, sz);
@@ -3525,7 +3641,7 @@ begin
 end;
 
 class procedure TNDAUt.MapL(const L, R: INDArray; aLFnc: TIPProcVV);
-var it: TNDAIt;
+var it: TNDASliceIt;
     dimL, dimR, lvl: Integer;
     sz: NativeInt;
     view: INDArray;
@@ -3542,19 +3658,44 @@ begin
     if not WriteableQ(R) then
       raise ENDAWriteError.Create(csNotWriteable);
 
-    MapSS(L, R, aLFnc);
+    if not LBroadcastableQ(L, R, lvl) then
+      raise ENDAMapError.CreateFmt(csBroadcastErr, [ShapeToStr(L), ShapeToStr(R)]);
+
+    if lvl = -1 then begin
+      MapSS(L, R, aLFnc);
+      exit;
+    end;
+
+    it := TNDASliceIt.Create(R, lvl, lvl);
+    try
+      view := it.CurrentSlice;
+      lvl := GetCommonCContLvl(L, view, sz);
+      while it.MoveNext do
+        MapSS(L, view, aLFnc, lvl, sz);
+    finally
+      it.Free;
+    end;
     exit;
   end;
 
   if dimR > dimL then begin
     lvl := BroadcastLvl(R, L);
-    if lvl < 0 then
-      raise ENDAMapError.CreateFmt(csBroadcastErr,
-        [ShapeToStr(L), ShapeToStr(R)]);
+
+    if lvl < 0 then begin
+      it := TNDASliceIt.Create(R, 0, dimR - dimL - 1);
+      try
+        view := it.CurrentSlice;
+        while it.MoveNext do
+          MapL(L, view, aLFnc);
+      finally
+        it.Free;
+      end;
+      exit;
+    end;
 
     it := TNDASliceIt.Create(R, 0, lvl - 1);
     try
-      view := TNDASliceIt(it).CurrentSlice;
+      view := it.CurrentSlice;
       lvl := GetCommonCContLvl(L, view, sz);
       while it.MoveNext do
         MapSS(L, view, aLFnc, lvl, sz);
@@ -3979,6 +4120,19 @@ begin
     Result := aArr
   else
     Result := Copy<T>(aArr);
+end;
+
+class function TNDAUt.View<T>(const aArr: INDArray): INDArray<T>;
+begin
+  if
+    ((aArr.ItemSize mod SizeOf(T)) = 0) or
+    ((SizeOf(T) mod aArr.ItemSize) = 0)
+  then begin
+    Result := TNDArrayReinterpretWrapper<T>.Create(aArr);
+    exit;
+  end;
+
+  raise ENDACastError.Create(csInvReinterpret);
 end;
 
 class function TNDAUt.Permute<T>(const aData: TArray<T>; const aIndices: array of Integer): TArray<T>;

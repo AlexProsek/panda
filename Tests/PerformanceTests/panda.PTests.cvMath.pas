@@ -63,7 +63,6 @@ end;
 
 procedure TCVMathTests.Accum_Int32;
 var x, y: TArray<Integer>;
-    I: Integer;
 const N = 10000000;
 begin
   SetLength(x, N);
@@ -90,7 +89,6 @@ end;
 
 procedure TCVMathTests.Accum_Single;
 var x, y: TArray<Single>;
-    I: Integer;
 const N = 10000000;
 begin
   SetLength(x, N);

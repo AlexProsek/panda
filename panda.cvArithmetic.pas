@@ -1557,29 +1557,47 @@ end;
 {$elseif defined(ASMx64)}
 asm
   //RCX <- pA, RDX <- pB, R8 <- pRes, R9 <- aCount
-  mov rax, rcx
-  mov rcx, r9
-  shr rcx, 1
+  mov r10, r9
+  shr r9, 2
   jz @rest
-@Loop:
-  movupd xmm0, [rax]
+@L:
+{$ifdef AVX}
+  vmovupd ymm0, [rcx]
+  vmovupd ymm1, [rdx]
+  vmulpd ymm0, ymm0, ymm1
+  vmovupd [r8], ymm0
+{$else}
+  movupd xmm0, [rcx]
   movupd xmm1, [rdx]
+  movupd xmm2, [rcx + 16]
+  movupd xmm3, [rdx + 16]
   mulpd xmm0, xmm1
+  mulpd xmm2, xmm3
   movupd [r8], xmm0
-  add rax, 16
-  add rdx, 16
-  add r8, 16
-  dec rcx
-  jnz @Loop
+  movupd [r8 + 16], xmm2
+{$endif}
+  add rcx, 32
+  add rdx, 32
+  add r8, 32
+  dec r9
+  jnz @L
 
+{$ifdef AVX}
+  vzeroupper
+{$endif}
 @rest:
-  mov rcx, r9
-  and rcx, 1
+  and r10, 3
   jz @end
-  movq xmm0, [rax]
+@Lrest:
+  movq xmm0, [rcx]
   movq xmm1, [rdx]
   mulsd xmm0, xmm1
   movq [r8], xmm0
+  add rcx, 8
+  add rdx, 8
+  add r8, 8
+  dec r10
+  jnz @Lrest
 @end:
 end;
 {$else}

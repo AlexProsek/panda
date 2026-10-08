@@ -8,3 +8,4 @@ Demo07 - image filtering
 Demo08 - image thresholding + morphology
 Demo09 - 1D FFT
 Demo10 - 2D FFT convolution
+Demo11 - neural network OCR

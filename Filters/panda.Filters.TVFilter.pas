@@ -114,7 +114,7 @@ begin
       try
         f1d.Lambda := aLambda;
         f1d.IterationCount := aIterCount;
-        f1d.Init(aSrc.Shape[1]);
+        f1d.Init(aSrc.Shape[0]);
         f1d.Execute(aSrc, aDst);
       finally
         f1d.Free;
@@ -126,7 +126,7 @@ begin
       try
         f2d.Lambda := aLambda;
         f2d.IterationCount := aIterCount;
-        f2d.Init(aSrc.Shape[1], aSrc.Shape[1]);
+        f2d.Init(aSrc.Shape[1], aSrc.Shape[0]);
         f2d.Execute(aSrc, aDst);
       finally
         f2d.Free;

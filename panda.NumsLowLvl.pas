@@ -779,8 +779,22 @@ asm
 {$endif}
 end;
 {$else}
+var b, tmp: UInt64;
+    pEnd: PByte;
+    carry: Cardinal;
+    pair: array [0..1] of Cardinal absolute tmp;
 begin
-
+  b := PCardinal(pB)^;
+  pEnd := pA + nA * cI32Sz;
+  carry := 0;
+  while pA < pEnd do begin
+    tmp := PCardinal(pA)^ * b + carry;
+    PCardinal(pRes)^ := pair[0];
+    carry := pair[1];
+    Inc(pRes, cI32Sz);
+    Inc(pA, cI32Sz);
+  end;
+  PCardinal(pRes)^ := carry;
 end;
 {$endif}
 
@@ -1255,6 +1269,7 @@ begin
   pDst := pDst + (Nsrc - 1) * cI32Sz;
   pair[0] := PCardinal(pSrc)^;
   pair[1] := 0;
+  count := count mod W_BIT_COUNT;
   tmp := tmp shl count;
   Result := pair[1];
   D := pair[0];
@@ -1363,6 +1378,7 @@ begin
   pEnd := pSrc + Nsrc * cLimbSize;
   pair[1] := PCardinal(pSrc)^;
   pair[0] := 0;
+  count := count mod W_BIT_COUNT;
   tmp := tmp shr count;
   Result := pair[0];
   D := pair[1];

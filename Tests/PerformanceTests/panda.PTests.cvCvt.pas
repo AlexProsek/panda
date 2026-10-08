@@ -14,6 +14,8 @@ type
     procedure Cvt_UI8F32;
     procedure Cvt_F32UI8;
     procedure Cvt_I32F32;
+    procedure Cvt_I64F64;
+    procedure Cvt_I64F64_ShortArr;
     procedure Cvt_F32F64;
     procedure Cvt_F64F32;
   end;
@@ -56,6 +58,37 @@ begin
 
   SWStart;
   cvt(PInteger(x), PSingle(y), Length(x));
+  SWStop;
+end;
+
+procedure TCVCvtTests.Cvt_I64F64;
+var x: TArray<Int64>;
+    y: TArray<Double>;
+const N = 10000000;
+begin
+  SetLength(x, N);
+  SetLength(y, N);
+
+  SWStart;
+  cvt(PInt64(x), PDouble(y), Length(x));
+  SWStop;
+end;
+
+procedure TCVCvtTests.Cvt_I64F64_ShortArr;
+var x: TArray<Int64>;
+    y: TArray<Double>;
+    I: Integer;
+const N = 10000;
+      NLoop = 1000;
+begin
+  SetLength(x, N);
+  SetLength(y, N);
+
+  cvt(PInt64(x), PDouble(y), Length(x)); // warm-up
+
+  SWStart;
+  for I := 0 to NLoop - 1 do
+    cvt(PInt64(x), PDouble(y), Length(x));
   SWStop;
 end;
 

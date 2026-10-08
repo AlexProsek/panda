@@ -200,7 +200,7 @@ type
     /// <param name="Arr"> Original one-dimensional array </param>
     /// <param name="RowSize"> Number of elements in the row (it's equal to columns count)</param>
     /// <returns> two-dimensional array </returns>
-    /// <remarks> This function doesn't work with managed types (<c>Move</c> is used)</remarks>
+    /// <remarks> Managed types are copied using assignments.</remarks>
     class function Partition<T>(const Arr: TArray<T>; aRowSize: NativeInt; aOffset: NativeInt = 0): TArray<TArray<T>>; static;
     /// <summary>
     ///   Reverses the order of the elements in array.
@@ -225,6 +225,9 @@ type
     class function SubArray<T>(const data: TArray<TArray<T>>;
         const IndexFrom1, IndexFrom2, Length1, Length2: NativeInt): TArray<TArray<T>>; overload; static;
     class function SubArray<T>(const aData: TArray<T>; aFrom, aTo: NativeInt): TArray<T>; overload; static;
+    class function Permute<T>(const aData: TArray<T>; const aIndices: array of NativeInt): TArray<T>; overload; static;
+    class function Permute<T>(const aData: TArray<TArray<T>>; const aIndices: array of NativeInt): TArray<TArray<T>>; overload; static;
+    class function InversePermutation(const aPerm: array of NativeInt): TArray<NativeInt>; static;
     /// <summary>
     ///  Cycles the elements in array to the right.
     /// </summary>
@@ -414,6 +417,10 @@ type
     ///   Applies <c>aFnc</c> to size <c>aWin</c> windows in the specified <c>aData</c>.
     /// </summary>
     class function MovingMap<T, U>(const aData: TArray<T>; const aFnc: TFnc<TArray<T>, U>; aWin: NativeInt): TArray<U>; static;
+    /// <summary>
+    ///   Interleaves elements of <c>A</c> with elements of <c>B</c>.
+    ///   Elements of <c>B</c> repeat as needed between elements of <c>A</c>.
+    /// </summary>
     class function Riffle<T>(const A, B: TArray<T>): TArray<T>; static;
     class function ToArray<T>(const aData: array of T): TArray<T>; static;
     class function ConstantArray<T>(const aValue: T; aCount: NativeInt): TArray<T>; static;
@@ -1020,7 +1027,7 @@ end;
 
 class function TDynAUt.Partition<T>(const Arr: TArray<T>;
   aRowSize: NativeInt; aOffset: NativeInt): TArray<TArray<T>>;
-var I, cRowBytes, cSkipBytes, rowCount, restCount, len: NativeInt;
+var I, J, cRowBytes, cSkipBytes, rowCount, restCount, len: NativeInt;
     tmpLen, tmpRowSize: NativeInt;
     pSrc: PByte;
 begin
@@ -1038,7 +1045,17 @@ begin
     SetLength(Result, rowCount + 1);
 
   if IsManaged<T> then begin
-    raise ENotImplemented.Create('TArrayUtils.Partition is not implemented for managed types.');
+    for I := 0 to rowCount - 1 do begin
+      SetLength(Result[I], aRowSize);
+      for J := 0 to aRowSize - 1 do
+        Result[I][J] := Arr[I * tmpRowSize + J];
+    end;
+    if restCount > 0 then begin
+      I := High(Result);
+      SetLength(Result[I], restCount + aOffset);
+      for J := 0 to restCount + aOffset - 1 do
+        Result[I][J] := Arr[rowCount * tmpRowSize + J];
+    end;
   end else begin
     pSrc := PByte(Arr);
     cRowBytes := aRowSize * SizeOf(T);
@@ -1104,6 +1121,7 @@ class function TDynAUt.Table<T>(const aFunc: TFnc<Double, T>; aX0, aX1, aXStep: 
 var I, count: NativeInt;
 begin
   Assert(aXStep <> 0);
+  Result := nil;
   if aXStep > 0 then begin
     if aX1 < aX0 then exit;
   end else begin
@@ -1111,7 +1129,6 @@ begin
   end;
   count := Floor((aX1 - aX0 + aXStep) / aXStep);
 
-  Result := nil;
   SetLength(Result, count);
   for I := 0 to count - 1 do
     Result[I] := aFunc(aX0 + I * aXStep);
@@ -1122,6 +1139,7 @@ class function TDynAUt.Table<T>(const aFunc: TFnc<Double, Double, T>;
 var I, J, xCount, yCount: NativeInt;
 begin
   Assert((aXStep <> 0) and (aYStep <> 0));
+  Result := nil;
   if aXStep > 0 then begin
     if aX1 < aX0 then exit;
   end else begin
@@ -1135,7 +1153,6 @@ begin
   end;
   yCount := Floor((aY1 - aY0 + 3/2*aYStep) / aYStep);
 
-  Result := nil;
   SetLength(Result, xCount, yCount);
   for I := 0 to xCount - 1 do begin
     aX1 := aX0 + I * aXStep;
@@ -1186,8 +1203,37 @@ begin
     Move(aData[aFrom], Result[0], Length(Result) * SizeOf(T));
 end;
 
+class function TDynAUt.Permute<T>(const aData: TArray<T>; const aIndices: array of NativeInt): TArray<T>;
+var I, count: NativeInt;
+begin
+  count := Length(aData);
+  SetLength(Result, count);
+  for I := 0 to High(Result) do
+    Result[I] := aData[aIndices[I]];
+end;
+
+class function TDynAUt.Permute<T>(const aData: TArray<TArray<T>>; const aIndices: array of NativeInt): TArray<TArray<T>>;
+var I, count: NativeInt;
+begin
+  count := Length(aData);
+  SetLength(Result, count);
+  for I := 0 to High(Result) do
+    Result[I] := aData[aIndices[I]];
+end;
+
+class function TDynAUt.InversePermutation(const aPerm: array of NativeInt): TArray<NativeInt>;
+var I, count: NativeInt;
+begin
+  count := Length(aPerm);
+  SetLength(Result, count);
+  for I := 0 to count - 1 do begin
+    Assert((0 <= aPerm[I]) and (aPerm[I] < count));
+    Result[aPerm[I]] := I;
+  end;
+end;
+
 class function TDynAUt.RotateRight<T>(const aData: TArray<T>; RotateBy: NativeInt): TArray<T>;
-var iTmp: NativeInt;
+var iTmp, I: NativeInt;
 begin
   iTmp := Length(aData);
   if iTmp = 0 then exit(nil);
@@ -1195,7 +1241,8 @@ begin
   RotateBy := (iTmp + (RotateBy mod iTmp)) mod iTmp;
   iTmp := Length(aData) - RotateBy;
   if IsManaged<T> then begin
-    raise ENotImplemented.Create('TArrayUtils.RotateRigth<T> is not implemented for managed types.');
+    for I := 0 to High(aData) do
+      Result[(I + RotateBy) mod Length(aData)] := aData[I];
   end else begin
     Move(aData[0], Result[RotateBy], iTmp * SizeOf(T));
     if RotateBy = 0 then exit;
@@ -1204,7 +1251,7 @@ begin
 end;
 
 class function TDynAUt.RotateLeft<T>(const aData: TArray<T>; RotateBy: NativeInt): TArray<T>;
-var iTmp: NativeInt;
+var iTmp, I: NativeInt;
 begin
   iTmp := Length(aData);
   if iTmp = 0 then exit(nil);
@@ -1212,7 +1259,8 @@ begin
   RotateBy := (iTmp + (RotateBy mod iTmp)) mod iTmp;
   iTmp := Length(aData) - RotateBy;
   if IsManaged<T> then begin
-    raise ENotImplemented.Create('TArrayUtils.RotateLeft<T> is not implemented for managed types.');
+    for I := 0 to High(aData) do
+      Result[(I + Length(aData) - RotateBy) mod Length(aData)] := aData[I];
   end else begin
     Move(aData[RotateBy], Result[0], iTmp * SizeOf(T));
     if RotateBy = 0 then exit;
@@ -1914,7 +1962,7 @@ var I: Integer;
 begin
   Assert(Length(aData) > 0);
   aMin := aData[0];
-  aMax := aData[1];
+  aMax := aData[0];
   if not Assigned(aComparer) then aComparer := TComparer<T>.Default;
   for I := 1 to High(aData) do begin
     v := aData[I];
@@ -2015,7 +2063,7 @@ var values: TArray<TIndexedValue<U>>;
 type TIdxValuesHelper = TArrayHelper<TIndexedValue<U>>;
 {$endif}
 begin
-  if Length(aData) = 0 then exit;
+  if Length(aData) = 0 then exit(nil);
   if not Assigned(aComparer) then aComparer := TComparer<U>.Default;
   SetLength(values, Length(aData));
   for I := 0 to High(values) do begin
@@ -2247,7 +2295,7 @@ end;
 {$endif}
 
 class function TDynAUt.Riffle<T>(const A, B: TArray<T>): TArray<T>;
-var I, J, ca, cb: Integer;
+var I, J, ca, cb: NativeInt;
 begin
   ca := Length(A);
   cb := Length(B);
@@ -2264,8 +2312,22 @@ begin
       Inc(I);
       Inc(J);
     end;
-  end else
-    raise ENotImplemented.Create('TDynAUt.Riffle not implemented yet.');
+  end else begin
+    Result := nil;
+    if ca = 0 then exit;
+    if cb = 0 then begin
+      SetLength(Result, ca);
+      for I := 0 to ca - 1 do
+        Result[I] := A[I];
+      exit;
+    end;
+    SetLength(Result, 2 * ca - 1);
+    for I := 0 to ca - 1 do begin
+      Result[2 * I] := A[I];
+      if I < ca - 1 then
+        Result[2 * I + 1] := B[I mod cb];
+    end;
+  end;
 end;
 
 class function TDynAUt.ToArray<T>(const aData: array of T): TArray<T>;
@@ -2532,6 +2594,7 @@ begin
   Assert(MatrixQ<T>(A));
   rCnt := Length(A);
   cCnt := Length(A[0]);
+  Result := nil;
   SetLength(Result, rCnt, cCnt);
   for I := 0 to rCnt - 1 do begin
     rA := A[I];
@@ -2550,6 +2613,7 @@ begin
   Assert(MatrixQ<T>(A));
   rCnt := Length(A);
   cCnt := Length(A[0]);
+  Result := nil;
   SetLength(Result, rCnt, cCnt);
   for I := 0 to rCnt - 1 do begin
     rA := A[I];

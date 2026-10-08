@@ -103,9 +103,12 @@ type
   public
     procedure Init(const L0, L1, L2, L3: UInt64); overload; inline;
     procedure SetToZero; inline;
+    class function Compare(const A, B: TUInt256): Integer; static; inline;
     class operator Multiply(const A, B: TUInt256): TUInt256;
     class operator IntDivide(const A, B: TUInt256): TUInt256;
     class operator RightShift(const A: TUInt256; const B: Cardinal): TUInt256;
+    class operator LessThan(const A, B: TUInt256): Boolean; inline;
+    class operator GreaterThan(const A, B: TUInt256): Boolean; inline;
   end;
   PUInt256 = ^TUInt256;
 
@@ -130,7 +133,13 @@ type
     class function SubtractPositive(const A, B: TReal128): TReal128; static;
     /// aBuff is 256-bit buffer
     class function Round(const aBuff): Integer; static;
-    class procedure AdjustByReminder(const A, B: TReal128; var Q: TReal128); static;
+    // returns Abs(A - B*C), aSgn = Sgn(A - B*C)
+    class function AbsSubProd(const A, B, C: TReal128; out aSgn: Integer): TUInt256; static;
+    class function Next(const A: TReal128; aSgn: Integer): TReal128; static;
+    // chooses between Q*B and (Q + ulp)*B which is closer to A
+    class procedure AdjustReciprocal(const A, B: TReal128; var Q: TReal128); static;
+    // chooses between Q^2 and (Q + ulp)^2 which is closer to A
+    class procedure AdjustSqrt(const A: TReal128; var Q: TReal128); static;
     function InternalReciprocal: TReal128;
   {$region 'Getters/Setters'}
     function GetSignum: Integer; inline;
@@ -213,6 +222,7 @@ function _SubI128(pA, pB, pRes: PByte): Integer;
 procedure _NegI128(pA, pRes: PByte);
 
 function _IncUI128(pA: PByte; D: TLimb): TLimb;
+procedure _DecUI128(pA: PByte; D: TLimb);
 {$if defined(ASMx64)}
 procedure _MulUI128(pA, pB, pRes: PByte);
 {$endif}
@@ -454,6 +464,48 @@ begin
   pAc^ := pair[0];
   Result := pair[1];
 end;
+{$endif}
+
+procedure _DecUI128(pA: PByte; D: TLimb);
+{$ifdef OVERFLOWON}
+  {$Q-}
+{$endif}
+var tmp: UInt64;
+    pair: array [0..1] of Cardinal absolute tmp;
+    pAc: PCardinal;
+    carry: Cardinal;
+begin
+  carry := D;
+  pAc := PCardinal(pA);
+
+  tmp := pAc^;
+  pair[1] := 1;
+  Dec(tmp, carry);
+  pAc^ := pair[0];
+  carry := 1 xor pair[1];
+  Inc(pAc);
+
+  tmp := pAc^;
+  pair[1] := 1;
+  Dec(tmp, carry);
+  pAc^ := pair[0];
+  carry := 1 xor pair[1];
+  Inc(pAc);
+
+  tmp := pAc^;
+  pair[1] := 1;
+  Dec(tmp, carry);
+  pAc^ := pair[0];
+  carry := 1 xor pair[1];
+  Inc(pAc);
+
+  tmp := pAc^;
+  pair[1] := 1;
+  Dec(tmp, carry);
+  pAc^ := pair[0];
+end;
+{$ifdef OVERFLOWON}
+  {$Q+}
 {$endif}
 
 {$if defined(ASMx64)}
@@ -929,7 +981,7 @@ var nA, nB, pwr: Integer;
     Q: array [0..1] of UInt64;
 begin
   AData[0] := 0; AData[1] := 0;
-  BData[0] := 0; Bdata[1] := 0;
+  BData[0] := 0; BData[1] := 0;
   Q[0] := 0; Q[1] := 0;
   nA := _Length128(@A);
   nB := _Length128(@B);
@@ -968,6 +1020,13 @@ end;
 class operator TUInt128.IntDivide(const A, B: TUInt128): TUInt128;
 var r: TUInt128;
 begin
+  if B.ZeroQ then
+    raise EDivByZero.Create('Division by zero.');
+  if Compare(A, B) < 0 then begin
+    Result.Init(0, 0);
+    exit;
+  end;
+
   Result := A;
   r := B;
   if _Length128(@r) = 1 then
@@ -979,6 +1038,10 @@ end;
 class operator TUInt128.Modulus(const A, B: TUInt128): TUInt128;
 var q: TUInt128;
 begin
+  if B.ZeroQ then
+    raise EDivByZero.Create('Division by zero.');
+  if Compare(A, B) < 0 then exit(A);
+
   q := A;
   Result := B;
   if _Length128(@B) = 1 then
@@ -1101,6 +1164,19 @@ begin
   fLimbs[3] := 0;
 end;
 
+class function TUInt256.Compare(const A, B: TUInt256): Integer;
+begin
+  if A.fLimbs[3] > B.fLimbs[3] then exit(1);
+  if A.fLimbs[3] < B.fLimbs[3] then exit(-1);
+  if A.fLimbs[2] > B.fLimbs[2] then exit(1);
+  if A.fLimbs[2] < B.fLimbs[2] then exit(-1);
+  if A.fLimbs[1] > B.fLimbs[1] then exit(1);
+  if A.fLimbs[1] < B.fLimbs[1] then exit(-1);
+  if A.fLimbs[0] > B.fLimbs[0] then exit(1);
+  if A.fLimbs[0] < B.fLimbs[0] then exit(-1);
+  Result := 0;
+end;
+
 {$ifdef RANGEON}
    {$R-}
 {$endif}
@@ -1197,6 +1273,16 @@ begin
   r := B and cLimbRemMask;
   p := PByte(@A) + offset * cLimbSize;
   _shr(p, @Result, r, LCnt - offset);
+end;
+
+class operator TUInt256.LessThan(const A, B: TUInt256): Boolean;
+begin
+  Result := (Compare(A, B) < 0);
+end;
+
+class operator TUInt256.GreaterThan(const A, B: TUInt256): Boolean;
+begin
+  Result := (Compare(A, B) > 0);
 end;
 
 {$endregion}
@@ -1436,16 +1522,14 @@ begin
   Result := SchoolDiv(A, B);
 end;
 
-class procedure TReal128.AdjustByReminder(const A, B: TReal128; var Q: TReal128);
+class function TReal128.AbsSubProd(const A, B, C: TReal128; out aSgn: Integer): TUInt256;
 var buff: array [0..7] of UInt64;
-    ulp: TReal128;
     de: Integer;
-    bNeg: Boolean;
 begin
   buff[0] := B.fLimbs[0];
   buff[1] := B.fLimbs[1] and HI_FRAC_MASK or LEADING_ONE;
-  buff[2] := Q.fLimbs[0];
-  buff[3] := Q.fLimbs[1] and HI_FRAC_MASK or LEADING_ONE;
+  buff[2] := C.fLimbs[0];
+  buff[3] := C.fLimbs[1] and HI_FRAC_MASK or LEADING_ONE;
   buff[4] := 0;
   buff[5] := 0;
   buff[6] := 0;
@@ -1455,25 +1539,72 @@ begin
 {$else}
   _Mul(@buff[0], @buff[2], @buff[4], cLCnt, cLCnt);
 {$endif}
-  de := _CountLeadingZeros(@buff[4], 2 * cLCnt);
-  _ipLongShift(@buff[4], 2 * cLCnt, de - FRAC_OFFSET + 1);
+  de := B.Exponent + C.Exponent - A.Exponent;
+  _ipLongShift(@buff[4], 2 * cLCnt, FRAC_OFFSET + de);
   buff[0] := 0;
   buff[1] := 0;
   buff[2] := A.fLimbs[0];
   buff[3] := A.fLimbs[1] and HI_FRAC_MASK or LEADING_ONE;
-  _ipSub(@buff[0], @buff[4], 2 * cLCnt);  // buff[4..7] <- a - b * q
-
-  bNeg := (buff[7] and I64_HI_BIT) > 0;
-  if bNeg then
-    _NegMPI(@buff[4], @buff[4], 2 * cLCnt);
-
-  if (buff[5] and I64_HI_BIT) > 0 then begin
-    ulp.Init(0, 0);
-    ulp.Exponent := -FRAC_BIT_CNT + Q.Exponent;
-    if bNeg then ulp.Signum := -1;
-    Q := Q + ulp;
+  if PUInt256(@buff[0])^ < PUInt256(@buff[4])^ then begin
+    _ipSub(@buff[4], @buff[0], 2 * cLCnt);
+    Result := PUInt256(@buff[0])^;
+    aSgn := -1;
+  end else begin
+    _ipSub(@buff[0], @buff[4], 2 * cLCnt);
+    Result := PUInt256(@buff[4])^;
+    aSgn := 1;
   end;
 end;
+
+class function TReal128.Next(const A: TReal128; aSgn: Integer): TReal128;
+var buff: array [0..1] of UInt64;
+    e: Integer;
+begin
+  e := A.Exponent;
+  buff[0] := A.fLimbs[0];
+  buff[1] := A.fLimbs[1] and HI_FRAC_MASK or LEADING_ONE;
+  if aSgn > 0 then
+    _IncUI128(@buff, 1)
+  else
+    _DecUI128(@buff, 1);
+  if (buff[1] and (LEADING_ONE shl 1)) <> 0 then begin
+    _shr(@buff, @buff, 1, cLCnt);
+    Inc(e);
+  end;
+  Result.fLimbs[0] := buff[0];
+  Result.fLimbs[1] := buff[1] and HI_FRAC_MASK;
+  Result.Exponent := e;
+  Result.Signum := A.Signum;
+end;
+
+class procedure TReal128.AdjustReciprocal(const A, B: TReal128; var Q: TReal128);
+var Qc: TReal128;
+    d0, d1: TUInt256;
+    dsgn: Integer;
+const
+  HI_BITS_MASK  = $C000000000000000;
+begin
+  d0 := AbsSubProd(A, B, Q, dsgn);
+  if (d0.fLimbs[1] and HI_BITS_MASK) > 0 then begin
+    Qc := Next(Q, dsgn);
+    d1 := AbsSubProd(A, B, Qc, dsgn);
+    if d1 < d0 then
+      Q := Qc;
+  end;
+end;
+
+class procedure TReal128.AdjustSqrt(const A: TReal128; var Q: TReal128);
+var Qc: TReal128;
+    d0, d1: TUInt256;
+    dsgn: Integer;
+begin
+  d0 := AbsSubProd(A, Q, Q, dsgn);
+  Qc := Next(Q, dsgn);
+  d1 := AbsSubProd(A, Qc, Qc, dsgn);
+  if d1 < d0  then
+    Q := Qc;
+end;
+
 
 class function TReal128.SchoolDiv(const A, B: TReal128): TReal128;
 var fa, fb, fc: TUInt256;
@@ -1525,7 +1656,7 @@ end;
 function TReal128.Reciprocal: TReal128;
 begin
   Result := InternalReciprocal();
-  AdjustByReminder(cOneF128, Self, Result);
+  AdjustReciprocal(cOneF128, Self, Result);
 //  Result := SchoolDiv(cOneF128, Self);
 end;
 
@@ -1551,7 +1682,7 @@ begin
   y := cHalf * (y + m / y);
   Result := y;
   Result.Exponent := y.Exponent + (e div 2);
-//  AdjustByReminder(Self, Result, Result);
+  AdjustSqrt(Self, Result);
 end;
 
 function TReal128.AsDouble: Double;
@@ -1706,6 +1837,8 @@ end;
 
 procedure TReal128.SetExponent(aValue: Integer);
 begin
+  Assert((MIN_EXPONENT <= aValue) and (aValue <= MAX_EXPONENT));
+
   fLimbs[1] := (fLimbs[1] and (SGN_MASK or HI_FRAC_MASK)) or
     ((UInt64(aValue + EXP_BIAS) shl 48) and EXP_MASK);
 end;
