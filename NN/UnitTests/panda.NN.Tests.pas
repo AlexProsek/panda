@@ -82,6 +82,9 @@ type
     stol = 1e-6;
   published
     procedure ImportDenseSigmoid;
+    procedure ReadMetadataDense;
+    procedure ReadMetadataImageInput;
+    procedure ReadMetadataRejectsMissingParameter;
     procedure DecodeClassBatch;
     procedure ImportFlattenWithImageClassAdapters;
     procedure ImportMNISTStructure;
@@ -689,6 +692,84 @@ end;
 {$endregion}
 
 {$region 'TNNMAT4ImporterTests'}
+
+procedure TNNMAT4ImporterTests.ReadMetadataDense;
+var importer: TNNMAT4Importer;
+    metadata: TNNMAT4Metadata;
+begin
+  importer := TNNMAT4Importer.Create(NNTestDataFile('nn-linear.mat'));
+  try
+    metadata := importer.ReadMetadata;
+
+    CheckEquals('tensor', metadata.InputEncoder.LayerType);
+    CheckEquals([2], metadata.InputEncoder.InputShape);
+    CheckEquals([2], metadata.InputEncoder.OutputShape);
+    CheckEquals(1, Length(metadata.Layers));
+    CheckEquals('dense', metadata.Layers[0].LayerType);
+    CheckEquals([2], metadata.Layers[0].OutputShape);
+    CheckEquals('', metadata.OutputDecoder.LayerType);
+  finally
+    importer.Free;
+  end;
+end;
+
+procedure TNNMAT4ImporterTests.ReadMetadataImageInput;
+var importer: TNNMAT4Importer;
+    metadata: TNNMAT4Metadata;
+begin
+  importer := TNNMAT4Importer.Create(NNTestDataFile('nn-mnist.mat'));
+  try
+    metadata := importer.ReadMetadata;
+
+    CheckEquals('image', metadata.InputEncoder.LayerType);
+    CheckEquals([-1, -1, -1], metadata.InputEncoder.InputShape);
+    CheckEquals([1, 28, 28], metadata.InputEncoder.OutputShape);
+    CheckEquals(11, Length(metadata.Layers));
+    CheckEquals('class', metadata.OutputDecoder.LayerType);
+    CheckEquals([10], metadata.OutputDecoder.InputShape);
+    CheckEquals(0, Length(metadata.OutputDecoder.OutputShape));
+  finally
+    importer.Free;
+  end;
+end;
+
+procedure TNNMAT4ImporterTests.ReadMetadataRejectsMissingParameter;
+const Manifest = '{"format":"panda.nn.mat4","version":1,"input_shape":[2],' +
+  '"layers":[{"type":"dense","weights":{"kernel":"missing"}}]}';
+var stream: TMemoryStream;
+    exporter: TMAT4Exporter;
+    importer: TNNMAT4Importer;
+    manifestArray: INDArray<Byte>;
+    manifestBytes: TBytes;
+begin
+  stream := TMemoryStream.Create;
+  try
+    exporter := TMAT4Exporter.Create(stream);
+    try
+      manifestBytes := TEncoding.UTF8.GetBytes(Manifest);
+      manifestArray := TNDABuffer<Byte>.Create([Length(manifestBytes)]);
+      Move(manifestBytes[0], manifestArray.Data^, Length(manifestBytes));
+      exporter.WriteMatrix(manifestArray, '__panda_nn__');
+    finally
+      exporter.Free;
+    end;
+
+    stream.Position := 0;
+    importer := TNNMAT4Importer.Create(stream);
+    try
+      try
+        importer.ReadMetadata;
+        Fail('Expected ENNImportError for a missing parameter.');
+      except
+        on ENNImportError do ;
+      end;
+    finally
+      importer.Free;
+    end;
+  finally
+    stream.Free;
+  end;
+end;
 
 procedure TNNMAT4ImporterTests.ImportDenseSigmoid;
 const
