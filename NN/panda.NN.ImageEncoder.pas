@@ -30,6 +30,7 @@ type
       aColorSpace: TNetImageColorSpace = nicsRGB); reintroduce;
     /// <summary>Resizes an 8-bit grayscale or RGB24 image and returns pixel values in [0,1].</summary>
     function Encode(const aInput: IInterface): INDArray<Single>; override;
+    function Clone: TNetEncoder; override;
 
     /// <summary>Output image width in pixels. Must be positive.</summary>
     property Width: NativeInt read fWidth write SetWidth;
@@ -151,6 +152,15 @@ begin
         Result := TNDAMan.Transpose<Single>(Result, [0, 2, 1]);
     end;
   end;
+end;
+
+function TImageNetEncoder.Clone: TNetEncoder;
+var e: TImageNetEncoder;
+begin
+  e := TImageNetEncoder.Create(fWidth, fHeight, fColorSpace);
+  e.Interleaving := fInterleaving;
+  e.DataTransposed := fDataTransposed;
+  Result := e;
 end;
 
 {$endregion}

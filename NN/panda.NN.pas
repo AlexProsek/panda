@@ -24,6 +24,7 @@ type
   public
     procedure Execute(const aInput: INDArray<Single>); virtual; abstract;
     function Initialize(const aInputShape: TNDAShape): Boolean; virtual; abstract;
+    function Clone: TNNLayer; virtual; abstract;
 
     property Output: INDArray<Single> read fOutput;
     property Initialized: Boolean read fInitialized;
@@ -45,6 +46,7 @@ type
     procedure Execute(const aInput: INDArray<Single>); override;
     function Initialize(const aInputShape: TNDAShape): Boolean; overload; override;
     function Initialize(const aInShape, aOutShape: TNDAShape): Boolean; reintroduce; overload;
+    function Clone: TNNLayer; override;
 
     property Weights: INDArray<Single> read fWeights write SetWeights;
     property Biases: INDArray<Single> read fBiases write fBiases;
@@ -58,11 +60,13 @@ type
 
   TRampLayer = class(TElementwiseLayer)
   public
+    function Clone: TNNLayer; override;
     procedure Execute(const aInput: INDArray<Single>); override;
   end;
 
   TSigmoidLayer = class(TElementwiseLayer)
   public
+    function Clone: TNNLayer; override;
     procedure Execute(const aInput: INDArray<Single>); override;
   end;
 
@@ -77,6 +81,7 @@ type
     procedure AfterConstruction; override;
     procedure Execute(const aInput: INDArray<Single>); override;
     function Initialize(const aInputShape: TNDAShape): Boolean; override;
+    function Clone: TNNLayer; override;
 
     /// <summary>Axes to combine: positive values count from the first axis, negative from the last.</summary>
     property Level: Integer read fLevel write SetLevel;
@@ -84,6 +89,7 @@ type
 
   TNetEncoder = class abstract
   public
+    function Clone: TNetEncoder; virtual; abstract;
     /// <summary>Converts external image data to the network's Single tensor.</summary>
     function Encode(const aInput: IInterface): INDArray<Single>; virtual; abstract;
   end;
@@ -96,6 +102,7 @@ type
 
   TNetDecoder = class abstract
   public
+    function Clone: TNetDecoder; virtual; abstract;
     /// <summary>Converts the network output tensor to an external value.</summary>
     function Decode(const aInput: INDArray<Single>): IInterface; virtual; abstract;
   end;
@@ -103,6 +110,7 @@ type
   TClassNetDecoder = class(TNetDecoder)
   protected
   public
+    function Clone: TNetDecoder; override;
     /// <summary>Returns zero-based indices of the first maximum on the final axis.</summary>
     function Decode(const aInput: INDArray<Single>): IInterface; override;
   end;
@@ -117,6 +125,7 @@ type
     procedure AfterConstruction; override;
     procedure Execute(const aInput: INDArray<Single>); override;
     function Initialize(const aInputShape: TNDAShape): Boolean; override;
+    function Clone: TNNLayer; override;
 
     property Level: Integer read fLevel write SetLevel;
   end;
@@ -131,6 +140,7 @@ type
     destructor Destroy; override;
     procedure Execute(const aInput: INDArray<Single>); override;
     function Initialize(const aInputShape: TNDAShape): Boolean; override;
+    function Clone: TNNLayer; override;
   end;
 
   TPoolingLayer = class(TNNLayer)
@@ -148,6 +158,7 @@ type
     procedure AfterConstruction; override;
     procedure Execute(const aInput: INDArray<Single>); override;
     function Initialize(const aInputShape: TNDAShape): Boolean; override;
+    function Clone: TNNLayer; override;
 
     property Strides: TArray<NativeInt> read fStrides write SetStrides;
     property PoolSize: TArray<NativeInt> read fPoolSz write SetPoolSz;
@@ -172,6 +183,7 @@ type
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
     procedure AddLayer(aLayer: TNNLayer);
+    function Clone: TNNetChain;
     function Initialize(const aInputShape: TNDAShape): Boolean;
     /// <summary>
     ///   Executes on a tensor or configured encoder input and returns decoded or raw output.
@@ -275,6 +287,11 @@ begin
   Result := Initialize(aInShape);
 end;
 
+function TLinearLayer.Clone: TNNLayer;
+begin
+  Result := TLinearLayer.Create(fWeights, fBiases);
+end;
+
 {$region 'Getters/Setters'}
 
 procedure TLinearLayer.SetWeights(const aValue: INDArray<Single>);
@@ -322,6 +339,11 @@ end;
 
 {$region 'TRampLayer'}
 
+function TRampLayer.Clone: TNNLayer;
+begin
+  Result := TRampLayer.Create;
+end;
+
 procedure TRampLayer.Execute(const aInput: INDArray<Single>);
 begin
   if not fInitialized then
@@ -334,6 +356,11 @@ end;
 {$endregion}
 
 {$region 'TSigmoidLayer'}
+
+function TSigmoidLayer.Clone: TNNLayer;
+begin
+  Result := TSigmoidLayer.Create;
+end;
 
 procedure TSigmoidLayer.Execute(const aInput: INDArray<Single>);
 var pIn, pOut: PSingle;
@@ -422,6 +449,14 @@ begin
   Result := True;
 end;
 
+function TFlattenLayer.Clone: TNNLayer;
+var l: TFlattenLayer;
+begin
+  l := TFlattenLayer.Create;
+  l.Level := fLevel;
+  Result := l;
+end;
+
 procedure TFlattenLayer.Execute(const aInput: INDArray<Single>);
 var input: INDArray<Single>;
 begin
@@ -456,6 +491,11 @@ end;
 function TNetClassResult.GetIndices: TArray<Integer>;
 begin
   Result := Copy(fIndices);
+end;
+
+function TClassNetDecoder.Clone: TNetDecoder;
+begin
+  Result := TClassNetDecoder.Create;
 end;
 
 function TClassNetDecoder.Decode(const aInput: INDArray<Single>): IInterface;
@@ -525,6 +565,14 @@ begin
   Result := True;
 end;
 
+function TSoftmaxLayer.Clone: TNNLayer;
+var l: TSoftmaxLayer;
+begin
+  l := TSoftmaxLayer.Create;
+  l.Level := fLevel;
+  Result := l;
+end;
+
 {$region 'Getters/Setters'}
 
 procedure TSoftmaxLayer.SetLevel(aValue: Integer);
@@ -581,6 +629,11 @@ begin
   arr := fCorr.Output;
   fOutput := TNDArrayWrapper<Single>.Create(arr, TDynAUt.Drop<NativeInt>(arr.Shape, [1]));
   Result := True;
+end;
+
+function TConvLayer.Clone: TNNLayer;
+begin
+  Result := TConvLayer.Create(fWeights, fBiases);
 end;
 
 {$endregion}
@@ -658,6 +711,17 @@ begin
   Result := True;
 end;
 
+function TPoolingLayer.Clone: TNNLayer;
+var l: TPoolingLayer;
+begin
+  l := TPoolingLayer.Create;
+  l.PoolSize := Copy(fPoolSz);
+  l.Strides := Copy(fStrides);
+  l.Interleaving := fInterleaving;
+  Result := l;
+end;
+
+
 {$region 'Getters/Setters'}
 
 procedure TPoolingLayer.SetStrides(const aValue: TArray<NativeInt>);
@@ -706,6 +770,27 @@ end;
 procedure TNNetChain.AddLayer(aLayer: TNNLayer);
 begin
   fLayers.Add(aLayer);
+end;
+
+function TNNetChain.Clone: TNNetChain;
+var I: Integer;
+begin
+  Result := TNNetChain.Create;
+  try
+    for I := 0 to fLayers.Count - 1 do
+      Result.AddLayer(fLayers[I].Clone);
+
+    if Assigned(fInputEncoder) then
+      Result.InputEncoder := fInputEncoder.Clone;
+    if Assigned(fOutputDecoder) then
+      Result.OutputDecoder := fOutputDecoder.Clone;
+
+    if fInitialized and not Result.Initialize(fInputShape) then
+      raise ENNUninitNetError.Create('Cloned network initialization failed.');
+  except
+    Result.Free;
+    raise;
+  end;
 end;
 
 function TNNetChain.Initialize(const aInputShape: TNDAShape): Boolean;
