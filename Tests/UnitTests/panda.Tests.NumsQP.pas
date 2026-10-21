@@ -33,6 +33,7 @@ type
     procedure LongShift_SHR;
 
     procedure Dec_UI128;
+    procedure LongDivQuotientOffset;
   end;
 
   TInt128Tests = class(TNDATestCase)
@@ -68,6 +69,7 @@ type
     procedure Mul;
     procedure ShortDiv;
     procedure LongDiv;
+    procedure LongDivQuotientOffset;
     procedure Less;
     procedure Incr;
     procedure RightShift;
@@ -85,6 +87,13 @@ type
   published
     procedure FromDouble;
     procedure FromDoubleSubnormal;
+    procedure ComparePositive;
+    procedure CompareNegative;
+    procedure CompareDifferentSigns;
+    procedure CompareEqual;
+    procedure CompareSignedZeros;
+    procedure CompareZeroAndNonzero;
+    procedure CompareSubDblPrec;
     procedure RealToDbl_DblPrec;
     procedure RealToDbl_SubDblPrec;
     procedure RealToDbl_DblSubnormal;
@@ -102,6 +111,7 @@ type
     procedure Reciprocal_OffByOne;
     procedure Reciprocal_LargeExp;
     procedure DivideDbl;
+    procedure DivideSameSignificand;
     procedure Sqrt;
     procedure Sqrt_OffByOne;
   end;
@@ -120,6 +130,32 @@ type
 implementation
 
 {$region 'TLowLvlTests'}
+
+procedure TLowLvlTests.LongDivQuotientOffset;
+var a: array [0..3] of TLimb;
+    b: array [0..2] of TLimb;
+    q: array [0..1] of TLimb;
+    I: Integer;
+begin
+  // A = B * limb base, with a normalized two-limb divisor. Using TLimb
+  // exercises the quotient-offset check with both 32-bit and 64-bit limbs.
+  a[0] := 0;
+  a[1] := 1;
+  a[2] := TLimb(1) shl (W_BIT_COUNT - 1);
+  a[3] := 0;
+  b[0] := 1;
+  b[1] := a[2];
+  b[2] := 0;
+  q[0] := 0;
+  q[1] := 0;
+
+  _LongDivMod(@a, @b, @q, 3, 2);
+
+  CheckEquals(0, UInt64(q[0]));
+  CheckEquals(1, UInt64(q[1]));
+  for I := Low(a) to High(a) do
+    CheckEquals(0, UInt64(a[I]));
+end;
 
 procedure TLowLvlTests.TopBitPos;
 var A: TLimb;
@@ -910,6 +946,19 @@ begin
   CheckEquals(0, c.Hi);
 end;
 
+procedure TUInt128Tests.LongDivQuotientOffset;
+var a, b, c: TUInt128;
+begin
+  // A = B * 2^32. Quotient estimation must compare the current dividend limb.
+  a.Init($0000000100000000, $0000000080000000);
+  b.Init($8000000000000001, 0);
+
+  c := a div b;
+
+  CheckEquals($100000000, c.Lo);
+  CheckEquals(0, c.Hi);
+end;
+
 procedure TUInt128Tests.Less;
 var a, b: TUInt128;
 begin
@@ -1006,6 +1055,165 @@ end;
 {$endregion}
 
 {$region 'TReal128Tests'}
+
+procedure TReal128Tests.ComparePositive;
+var a, b: TReal128;
+    ab, ba: Integer;
+begin
+  a := 1;
+  b := 2;
+
+  ab := TReal128.Compare(a, b);
+  ba := TReal128.Compare(b, a);
+
+  CheckEquals(-1, ab);
+  CheckEquals(1, ba);
+  CheckTrue(a < b);
+  CheckTrue(a <= b);
+  CheckTrue(b > a);
+  CheckTrue(b >= a);
+  CheckFalse(a = b);
+  CheckTrue(a <> b);
+end;
+
+procedure TReal128Tests.CompareNegative;
+var a, b: TReal128;
+    ab, ba: Integer;
+begin
+  a := -2;
+  b := -1;
+
+  ab := TReal128.Compare(a, b);
+  ba := TReal128.Compare(b, a);
+
+  CheckEquals(-1, ab);
+  CheckEquals(1, ba);
+  CheckTrue(a < b);
+  CheckTrue(a <= b);
+  CheckTrue(b > a);
+  CheckTrue(b >= a);
+  CheckFalse(a = b);
+  CheckTrue(a <> b);
+end;
+
+procedure TReal128Tests.CompareDifferentSigns;
+var a, b: TReal128;
+    ab, ba: Integer;
+begin
+  a := -1;
+  b := 1;
+
+  ab := TReal128.Compare(a, b);
+  ba := TReal128.Compare(b, a);
+
+  CheckEquals(-1, ab);
+  CheckEquals(1, ba);
+end;
+
+procedure TReal128Tests.CompareEqual;
+var a, b: TReal128;
+    ab: Integer;
+begin
+  a := 2;
+  b := a;
+
+  ab := TReal128.Compare(a, b);
+
+  CheckEquals(0, ab);
+  CheckTrue(a = b);
+  CheckFalse(a <> b);
+
+  a := -2;
+  b := a;
+
+  ab := TReal128.Compare(a, b);
+
+  CheckEquals(0, ab);
+  CheckTrue(a = b);
+  CheckFalse(a <> b);
+end;
+
+procedure TReal128Tests.CompareSignedZeros;
+var a, b: TReal128;
+    ab, ba: Integer;
+begin
+  a := cZeroF128;
+  b := -cZeroF128;
+
+  ab := TReal128.Compare(a, b);
+  ba := TReal128.Compare(b, a);
+
+  CheckEquals(0, ab);
+  CheckEquals(0, ba);
+  CheckEquals(0, TReal128.Compare(a, a));
+  CheckEquals(0, TReal128.Compare(b, b));
+  CheckTrue(a = b);
+  CheckTrue(b = a);
+  CheckFalse(a <> b);
+  CheckFalse(b <> a);
+  CheckFalse(a < b);
+  CheckFalse(b < a);
+  CheckFalse(a > b);
+  CheckFalse(b > a);
+  CheckTrue(a <= b);
+  CheckTrue(b <= a);
+  CheckTrue(a >= b);
+  CheckTrue(b >= a);
+end;
+
+procedure TReal128Tests.CompareZeroAndNonzero;
+var zero, negZero, a: TReal128;
+    za, az, nza, anz: Integer;
+begin
+  zero := cZeroF128;
+  negZero := -cZeroF128;
+  a := cEpsF128;
+
+  za := TReal128.Compare(zero, a);
+  az := TReal128.Compare(a, zero);
+  nza := TReal128.Compare(negZero, a);
+  anz := TReal128.Compare(a, negZero);
+
+  CheckEquals(-1, za);
+  CheckEquals(1, az);
+  CheckEquals(-1, nza);
+  CheckEquals(1, anz);
+
+  a := -cEpsF128;
+
+  za := TReal128.Compare(zero, a);
+  az := TReal128.Compare(a, zero);
+  nza := TReal128.Compare(negZero, a);
+  anz := TReal128.Compare(a, negZero);
+
+  CheckEquals(1, za);
+  CheckEquals(-1, az);
+  CheckEquals(1, nza);
+  CheckEquals(-1, anz);
+end;
+
+procedure TReal128Tests.CompareSubDblPrec;
+var a, b: TReal128;
+    ab, ba: Integer;
+begin
+  a.Init(1, $3FFF000000000000); // 1 + 2^-112
+  b := cOneF128;
+
+  ab := TReal128.Compare(a, b);
+  ba := TReal128.Compare(b, a);
+
+  CheckEquals(1, ab);
+  CheckEquals(-1, ba);
+
+  a := -a;
+  b := -b;
+
+  ab := TReal128.Compare(a, b);
+  ba := TReal128.Compare(b, a);
+
+  CheckEquals(-1, ab);
+  CheckEquals(1, ba);
+end;
 
 procedure TReal128Tests.FromDouble;
 var r: TReal128;
@@ -1359,6 +1567,33 @@ begin
   c := a / b;
   d := b.AsDouble;
   CheckEquals(1/2, d);
+end;
+
+procedure TReal128Tests.DivideSameSignificand;
+var a, b, c: TReal128;
+begin
+  a := TReal128(1) / TReal128(3);
+  b := TReal128(2) / TReal128(3);
+
+  c := a / b;
+
+  CheckEquals(0, c.Lo);
+  CheckEquals($3FFE000000000000, c.Hi); // 1/2
+
+  c := b / a;
+
+  CheckEquals(0, c.Lo);
+  CheckEquals($4000000000000000, c.Hi); // 2
+
+  c := a / a;
+
+  CheckEquals(0, c.Lo);
+  CheckEquals($3FFF000000000000, c.Hi); // 1
+
+  c := -a / b;
+
+  CheckEquals(0, c.Lo);
+  CheckEquals($BFFE000000000000, c.Hi); // -1/2
 end;
 
 procedure TReal128Tests.Sqrt;

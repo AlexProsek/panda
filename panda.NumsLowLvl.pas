@@ -930,7 +930,8 @@ asm
   jb @D4
   ja @3D3
   mov ecx, nB
-  cmp eax, [esi + 4 * ecx - 8] //cmp(EAX, u_{j + n - 2}
+  add ecx, [esp + $4] //ECX <- j + n
+  cmp eax, [esi + 4 * ecx - 8] //cmp(EAX, u_{j + n - 2})
   ja @3D3
 @D4: //Multiplication and subtraction
   mov [esp + $18], 0 //set carry
@@ -1048,7 +1049,7 @@ asm
   jc @D4
   mov [rsp + $18], rdx //store r
   mov rax, [rsp + $10] //RAX <- q
-@2D3: //Test whether q*v_{n - 2} <= r*b + u _{j + n - 2}
+@2D3: //Test whether q*v_{n - 2} <= r*b + u_{j + n - 2}
   mov rcx, nB
   mov rbx, [rsp]
   mul qword ptr [rbx + 8 * rcx - 16] //(RDX:RAX) <- q * v_{n - 2}
@@ -1056,7 +1057,8 @@ asm
   jb @D4
   ja @3D3
   mov rcx, nB
-  cmp rax, [rsi + 8 * rcx - 16] //cmp(RAX, u_{j + n - 2}
+  add rcx, [rsp + 8]  // RCX <- n + j
+  cmp rax, [rsi + 8 * rcx - 16] //cmp(RAX, u_{j + n - 2})
   ja @3D3
 @D4: //Multiplication and subtraction
   mov r10, 0 //set carry

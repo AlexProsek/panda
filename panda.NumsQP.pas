@@ -158,6 +158,10 @@ type
     class operator Negative(const A: TReal128): TReal128; inline;
     class operator Multiply(const A, B: TReal128): TReal128;
     class operator Divide(const A, B: TReal128): TReal128; inline;
+    /// <summary>
+    ///   Returns -1, 0 or 1 when A is less than, equal to or greater than B.
+    ///   Positive and negative zero compare equal.
+    /// </summary>
     class function Compare(const A, B: TReal128): Integer; static; inline;
     class operator LessThan(const A, B: TReal128): Boolean; inline;
     class operator GreaterThan(const A, B: TReal128): Boolean; inline;
@@ -1621,7 +1625,8 @@ begin
 
   de := _CountLeadingZeros(@fc.fLimbs[0], 2 * cLCnt) - (FRAC_OFFSET - 1);
   _ipLongShift(@fc.fLimbs[0], 2 * cLCnt, de);
-  Round(fc.fLimbs);
+  // Rounding may renormalize the significand and increase its exponent.
+  Dec(de, Round(fc.fLimbs));
 
   Result.fLimbs[0] := fc.fLimbs[2];
   Result.fLimbs[1] := fc.fLimbs[3] and HI_FRAC_MASK;
@@ -1777,9 +1782,10 @@ end;
 
 class function TReal128.Compare(const A, B: TReal128): Integer;
 begin
+  if A.IsExactZero and B.IsExactZero then exit(0);
   if A.Signum < B.Signum then exit(-1);
   if A.Signum > B.Signum then exit(1);
-  Result := AbsCompare(A, B);
+  Result := A.Signum * AbsCompare(A, B);
 end;
 
 class operator TReal128.LessThan(const A, B: TReal128): Boolean;
