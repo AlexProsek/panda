@@ -19,6 +19,18 @@ type
   end;
   PRGB48 = ^TRGB48;
 
+  /// <summary>Four unsigned 16-bit channels in B, G, R, A memory order.</summary>
+  TRGBA64 = packed record
+    B, G, R, A: Word;
+  end;
+  PRGBA64 = ^TRGBA64;
+
+  /// <summary>Three Single channels in B, G, R memory order.</summary>
+  TRGBF32 = record
+    B, G, R: Single;
+  end;
+  PRGBF32 = ^TRGBF32;
+
   TRGB32 = packed record
     B, G, R, A: Byte;
     function IsGray: Boolean; inline;

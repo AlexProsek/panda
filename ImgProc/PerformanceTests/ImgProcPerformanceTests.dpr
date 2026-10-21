@@ -22,7 +22,8 @@ uses
   panda.ImgProc.PTests.CSCvt in 'panda.ImgProc.PTests.CSCvt.pas',
   panda.ImgProc.PTests.RLE in 'panda.ImgProc.PTests.RLE.pas',
   panda.ImgProc.CSCvt in '..\panda.ImgProc.CSCvt.pas',
-  panda.ImgProc.RLE in '..\panda.ImgProc.RLE.pas';
+  panda.ImgProc.RLE in '..\panda.ImgProc.RLE.pas',
+  panda.ImgProc.PTests.HDR in 'panda.ImgProc.PTests.HDR.pas';
 
 {$R *.RES}
 

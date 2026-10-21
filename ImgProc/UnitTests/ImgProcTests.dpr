@@ -26,7 +26,9 @@ uses
   panda.ImgProc.VCLImages in '..\panda.ImgProc.VCLImages.pas',
   panda.ImgProc.RLE in '..\panda.ImgProc.RLE.pas',
   panda.ImgProc.Tests.CSCvt in 'panda.ImgProc.Tests.CSCvt.pas',
-  panda.ImgProc.Tests.RLE in 'panda.ImgProc.Tests.RLE.pas';
+  panda.ImgProc.Tests.RLE in 'panda.ImgProc.Tests.RLE.pas',
+  panda.ImgProc.Tests.HDR in 'panda.ImgProc.Tests.HDR.pas',
+  panda.ImgProc.Tests.io in 'panda.ImgProc.Tests.io.pas';
 
 {$R *.RES}
 
