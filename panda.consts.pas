@@ -18,6 +18,7 @@ resourcestring
   csBroadcastErr    = 'Operands cannot be broadcast together with shapes %s, %s.';
   csBroadcastToErr  = 'Cannot broadcast input array from shape %s into shape %s.';
   csTooManyIndices  = 'Too many indices for array: array is %d-dimensional, but %d were indexed.';
+  csInvArrayDim     = 'An input array must have dimension %d.';
 
 implementation
 

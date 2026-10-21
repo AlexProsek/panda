@@ -206,15 +206,35 @@ type
     function Data: PByte; override;
   end;
 
+  /// <summary>
+  ///   Owns packed writable storage. Managed elements are initialized before
+  ///   assignment and finalized when the last array or view reference is
+  ///   released. Unmanaged storage is not initialized unless a fill value is
+  ///   supplied. Lifetime initialization does not construct mathematical zeros
+  ///   for types such as TRational; callers must assign valid values.
+  /// </summary>
   TNDABuffer<T> = class(TNDPackedArray<T>)
   protected
     fBuff: PByte;
     function InitBuffer(const aDims: array of NativeInt; aAlignment: Integer): PByte;
   public
+    /// <summary>Allocates storage for aDims; allocation errors propagate.</summary>
     constructor Create(const aDims: array of NativeInt); overload;
+    /// <summary>
+    ///   Allocates storage for aDims. A positive aAlignment must be a power of
+    ///   two and aligns Data; zero selects the allocator's default alignment.
+    ///   Managed elements are initialized, but have no assigned fill value.
+    ///   Allocation and element initialization errors propagate.
+    /// </summary>
     constructor Create(const aDims: array of NativeInt; aAlignment: Integer); overload;
+    /// <summary>
+    ///   Allocates storage as above and assigns aValue to every element.
+    ///   Managed values are retained until overwritten or the buffer is freed.
+    ///   Allocation, initialization and assignment errors propagate.
+    /// </summary>
     constructor Create(const aDims: array of NativeInt; const aValue: T;
       aAlignment: Integer); overload;
+    /// <summary>Finalizes initialized managed elements and frees owned storage.</summary>
     destructor Destroy; override;
     procedure AfterConstruction; override;
   end;
@@ -594,6 +614,7 @@ type
   function ScalarQ(const aArr: INDArray): Boolean; inline;
   function VectorQ(const aArr: INDArray): Boolean; inline;
   function MatrixQ(const aArr: INDArray): Boolean; inline;
+  function SquareMatrixQ(const aArr: INDArray): Boolean; inline;
   function GetCContLvl(const aArr: INDArray; out aBlockSz: NativeInt): Integer;
   function GetCommonCContLvl(const A, B: INDArray; out aSz: NativeInt): Integer;
   function CheckCContLvl(const aArr: INDArray; aRequiredLvl: Integer): Boolean;
@@ -766,6 +787,13 @@ end;
 function MatrixQ(const aArr: INDArray): Boolean;
 begin
   Result := (aArr.NDim = 2);
+end;
+
+function SquareMatrixQ(const aArr: INDArray): Boolean;
+var sh: TNDAShape;
+begin
+  sh := aArr.Shape;
+  Result := ((Length(sh) = 2) and (sh[0] = sh[1]));
 end;
 
 function GetItemSize(aType: PTypeInfo): Integer;
@@ -2125,23 +2153,21 @@ begin
 end;
 
 constructor TNDABuffer<T>.Create(const aDims: array of NativeInt; aAlignment: Integer);
-var data: PByte;
 begin
-  data := InitBuffer(aDims, aAlignment);
-  Create(data, aDims);
+  inherited Create(nil, aDims);
+  // Publish storage only after all managed elements are initialized.
+  fData := InitBuffer(aDims, aAlignment);
 end;
 
 constructor TNDABuffer<T>.Create(const aDims: array of NativeInt; const aValue: T;
   aAlignment: Integer);
-var data: PByte;
 begin
-  data := InitBuffer(aDims, aAlignment);
-  Create(data, aDims);
+  Create(aDims, aAlignment);
   TNDAUt.TFuncUt<T>.FillR(Size, fData, SizeOf(T), @aValue, 0);
 end;
 
 function TNDABuffer<T>.InitBuffer(const aDims: array of NativeInt; aAlignment: Integer): PByte;
-var sz: NativeInt;
+var sz, I: NativeInt;
     mask: NativeUInt;
 begin
   sz := GetSize(aDims);
@@ -2153,11 +2179,23 @@ begin
     GetMem(fBuff, sz * SizeOf(T));
     Result := fBuff;
   end;
+  
+  if IsManagedType(T) then begin
+    for I := 0 to sz - 1 do
+      System.Initialize(TNDA<T>.PT(Result + I * SizeOf(T))^);
+  end;
 end;
 
 destructor TNDABuffer<T>.Destroy;
+var I: NativeInt;
 begin
+  if IsManagedType(T) then begin
+    for I := 0 to GetSize(fShape) - 1 do
+      System.Finalize(TNDA<T>.PT(fData + I * SizeOf(T))^);
+  end;
+
   FreeMem(fBuff);
+  inherited;
 end;
 
 procedure TNDABuffer<T>.AfterConstruction;

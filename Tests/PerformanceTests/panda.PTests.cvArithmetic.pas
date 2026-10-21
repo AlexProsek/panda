@@ -141,7 +141,7 @@ begin
   SetLength(res, N);
 
   SWStart;
-  VecMul(PDouble(@x[0]), @x[0], @res[0], N);
+  DoTestLoop(procedure begin VecMul(PDouble(@x[0]), @x[0], @res[0], N) end, 100);
   SWStop;
 end;
 
@@ -564,7 +564,7 @@ begin
   SetLength(x, N);
 
   SWStart;
-  dot(PDouble(x), PDouble(x), N, res);
+  DoTestLoop(procedure begin dot(PDouble(x), PDouble(x), N, res); end, 100);
   SWStop;
 end;
 

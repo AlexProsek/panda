@@ -16,6 +16,8 @@ type
   protected const
     stol = 1e-6;
     dtol = 1e-12;
+  protected
+    procedure CheckDot2x2(aCount: NativeInt);
   published
     procedure MovDupI8;
     procedure AddVec1_Double;
@@ -116,6 +118,16 @@ type
     procedure TestDot6_Single;
     procedure TestDot8_Single;
     procedure TestDot2_Cmplx;
+    procedure TestDot2x2_0;
+    procedure TestDot2x2_1;
+    procedure TestDot2x2_2;
+    procedure TestDot2x2_3;
+    procedure TestDot2x2_4;
+    procedure TestDot2x2_5;
+    procedure TestDot2x2_6;
+    procedure TestDot2x2_7;
+    procedure TestDot2x2_19;
+    procedure TestDot2x2_NegativeCount;
     procedure TestSCopy_4;
     procedure TestSCopy_5;
     procedure TestSCopyConst;
@@ -1515,6 +1527,168 @@ begin
   dot(PCmplx128(x), PCmplx128(y), 2, res);
   CheckEquals(-18, res.Re, dtol);
   CheckEquals( 68, res.Im, dtol);
+end;
+
+procedure TTestVectorMath.CheckDot2x2(aCount: NativeInt);
+var r00, r01, r10, r11: TArray<Double>;
+    i, i00, i01, i10, i11: NativeInt;
+    d00, d01, d10, d11, e00, e01, e10, e11: Double;
+
+  function UnalignedOffset(const aData: TArray<Double>): NativeInt;
+  begin
+    if (NativeUInt(Pointer(aData)) and 31) = 0 then
+      Result := 1
+    else
+      Result := 0;
+  end;
+
+begin
+  SetLength(r00, aCount + 1);
+  SetLength(r01, aCount + 1);
+  SetLength(r10, aCount + 1);
+  SetLength(r11, aCount + 1);
+  i00 := UnalignedOffset(r00);
+  i01 := UnalignedOffset(r01);
+  i10 := UnalignedOffset(r10);
+  i11 := UnalignedOffset(r11);
+  for i := 0 to aCount - 1 do begin
+    r00[i00 + i] := (i mod 5 - 2) * 0.5;
+    r01[i01 + i] := (i mod 7 - 3) * 0.25;
+    r10[i10 + i] := (i mod 3 - 1) * 2;
+    r11[i11 + i] := (i mod 11 - 5) * 0.5;
+  end;
+  e00 := 0;
+  e01 := 0;
+  e10 := 0;
+  e11 := 0;
+  for i := 0 to aCount - 1 do begin
+    e00 := e00 + r00[i00 + i] * r10[i10 + i];
+    e01 := e01 + r00[i00 + i] * r11[i11 + i];
+    e10 := e10 + r01[i01 + i] * r10[i10 + i];
+    e11 := e11 + r01[i01 + i] * r11[i11 + i];
+  end;
+
+  dot2x2(@r00[i00], @r01[i01], @r10[i10], @r11[i11], aCount, d00, d01, d10, d11);
+
+  CheckEquals(e00, d00, dtol);
+  CheckEquals(e01, d01, dtol);
+  CheckEquals(e10, d10, dtol);
+  CheckEquals(e11, d11, dtol);
+end;
+
+procedure TTestVectorMath.TestDot2x2_0;
+var d00, d01, d10, d11: Double;
+begin
+  d00 := 1;
+  d01 := 2;
+  d10 := 3;
+  d11 := 4;
+
+  dot2x2(nil, nil, nil, nil, 0, d00, d01, d10, d11);
+
+  CheckEquals(0, d00, dtol);
+  CheckEquals(0, d01, dtol);
+  CheckEquals(0, d10, dtol);
+  CheckEquals(0, d11, dtol);
+end;
+
+procedure TTestVectorMath.TestDot2x2_1;
+begin
+  CheckDot2x2(1);
+end;
+
+procedure TTestVectorMath.TestDot2x2_2;
+var r00, r01, r10, r11: TArray<Double>;
+    d00, d01, d10, d11, d: Double;
+const N = 2;
+begin
+  r00 := TArray<Double>.Create(1, 2);
+  r01 := TArray<Double>.Create(3, 4);
+  r10 := TArray<Double>.Create(5, 6);
+  r11 := TArray<Double>.Create(7, 8);
+
+  dot2x2(PDouble(r00), PDouble(r01), PDouble(r10), PDouble(r11), N, d00, d01, d10, d11);
+
+  dot(PDouble(r00), PDouble(r10), N, d);
+  CheckEquals(d, d00, dtol);
+  dot(PDouble(r00), PDouble(r11), N, d);
+  CheckEquals(d, d01, dtol);
+  dot(PDouble(r01), PDouble(r10), N, d);
+  CheckEquals(d, d10, dtol);
+  dot(PDouble(r01), PDouble(r11), N, d);
+  CheckEquals(d, d11, dtol);
+end;
+
+procedure TTestVectorMath.TestDot2x2_3;
+var r00, r01, r10, r11: TArray<Double>;
+    d00, d01, d10, d11, d: Double;
+const N = 3;
+begin
+  r00 := TArray<Double>.Create( 1,  2,  3);
+  r01 := TArray<Double>.Create( 4,  5,  6);
+  r10 := TArray<Double>.Create( 7,  8,  9);
+  r11 := TArray<Double>.Create(10, 11, 12);
+
+  dot2x2(PDouble(r00), PDouble(r01), PDouble(r10), PDouble(r11), N, d00, d01, d10, d11);
+
+  dot(PDouble(r00), PDouble(r10), N, d);
+  CheckEquals(d, d00, dtol);
+  dot(PDouble(r00), PDouble(r11), N, d);
+  CheckEquals(d, d01, dtol);
+  dot(PDouble(r01), PDouble(r10), N, d);
+  CheckEquals(d, d10, dtol);
+  dot(PDouble(r01), PDouble(r11), N, d);
+  CheckEquals(d, d11, dtol);
+end;
+
+procedure TTestVectorMath.TestDot2x2_4;
+begin
+  CheckDot2x2(4);
+end;
+
+procedure TTestVectorMath.TestDot2x2_5;
+var r00, r01, r10, r11: TArray<Double>;
+    d00, d01, d10, d11, d: Double;
+const N = 5;
+begin
+  r00 := TArray<Double>.Create( 1,  2,  3,  4,  5);
+  r01 := TArray<Double>.Create( 6,  7,  8,  9, 10);
+  r10 := TArray<Double>.Create(11, 12, 13, 14, 15);
+  r11 := TArray<Double>.Create(16, 17, 18, 19, 20);
+
+  dot2x2(PDouble(r00), PDouble(r01), PDouble(r10), PDouble(r11), N, d00, d01, d10, d11);
+
+  dot(PDouble(r00), PDouble(r10), N, d);
+  CheckEquals(d, d00, dtol);
+  dot(PDouble(r00), PDouble(r11), N, d);
+  CheckEquals(d, d01, dtol);
+  dot(PDouble(r01), PDouble(r10), N, d);
+  CheckEquals(d, d10, dtol);
+  dot(PDouble(r01), PDouble(r11), N, d);
+  CheckEquals(d, d11, dtol);
+end;
+
+procedure TTestVectorMath.TestDot2x2_6;
+begin
+  CheckDot2x2(6);
+end;
+
+procedure TTestVectorMath.TestDot2x2_7;
+begin
+  CheckDot2x2(7);
+end;
+
+procedure TTestVectorMath.TestDot2x2_19;
+begin
+  CheckDot2x2(19);
+end;
+
+procedure TTestVectorMath.TestDot2x2_NegativeCount;
+var d00, d01, d10, d11: Double;
+begin
+  ExpectedException := EArgumentOutOfRangeException;
+
+  dot2x2(nil, nil, nil, nil, -1, d00, d01, d10, d11);
 end;
 
 procedure TTestVectorMath.TestSCopy_4;

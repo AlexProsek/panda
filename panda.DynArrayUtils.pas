@@ -155,7 +155,7 @@ type
   {$ifndef FPC}
     class function Concat<T>(const aArrays: array of TArray<T>): TArray<T>; overload; static;
   {$endif}
-    class function Clone<T>(const A: TArray<T>): TArray<T>; overload; static;
+    class function Clone<T>(const A: TArray<T>): TArray<T>; overload; static; inline;
   {$ifndef FPC}
     class function Clone<T>(const A: TArray<TArray<T>>): TArray<TArray<T>>; overload; static;
     class function Clone<T>(const A: TArray<TArray<TArray<T>>>): TArray<TArray<TArray<T>>>; overload; static;
@@ -858,9 +858,7 @@ end;
 
 class function TDynAUt.Clone<T>(const A: TArray<T>): TArray<T>;
 begin
-  Result := nil;
-  SetLength(Result, Length(A));
-  Copy<T>(A, Result, 0, 0, Length(A));
+  Result := System.Copy(A);
 end;
 
 {$ifndef FPC}
@@ -871,7 +869,7 @@ begin
   len := Length(A);
   SetLength(Result, len);
   for I := 0 to len - 1 do
-    Result[I] := Clone<T>(A[I]);
+    Result[I] := System.Copy(A[I]);
 end;
 
 class function TDynAUt.Clone<T>(const A: TArray<TArray<TArray<T>>>): TArray<TArray<TArray<T>>>;

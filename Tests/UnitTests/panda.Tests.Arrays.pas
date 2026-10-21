@@ -22,6 +22,22 @@ uses
   ;
 
 type
+  TManagedBufferTests = class(TTestCase)
+  protected
+    fDestroyed: Integer;
+    procedure CheckLifetime(aAlignment: Integer; aFill: Boolean);
+    procedure CheckConstructorFailure(aAlignment: Integer);
+  published
+    procedure UnalignedLifetime;
+    procedure AlignedLifetime;
+    procedure FilledUnalignedLifetime;
+    procedure FilledAlignedLifetime;
+    procedure ViewRetainsValues;
+    procedure OverwriteReleasesValue;
+    procedure UnalignedConstructorFailure;
+    procedure AlignedConstructorFailure;
+  end;
+
   TArrayTests = class(TNDATestCase)
   published
     procedure ArrayConstr1D;
@@ -282,6 +298,144 @@ type
   end;
 
 implementation
+
+type
+  TBufferTrackedValue = class(TInterfacedObject)
+  private
+    fDestroyed: PInteger;
+  public
+    constructor Create(var aDestroyed: Integer);
+    destructor Destroy; override;
+  end;
+
+  TFailingManagedBuffer = class(TNDABuffer<IInterface>)
+  public
+    constructor Create(const aValue: IInterface; aAlignment: Integer);
+  end;
+
+constructor TBufferTrackedValue.Create(var aDestroyed: Integer);
+begin
+  inherited Create;
+  fDestroyed := @aDestroyed;
+end;
+
+destructor TBufferTrackedValue.Destroy;
+begin
+  Inc(fDestroyed^);
+  inherited;
+end;
+
+constructor TFailingManagedBuffer.Create(const aValue: IInterface; aAlignment: Integer);
+begin
+  inherited Create([3], aValue, aAlignment);
+  raise EAbort.Create('Test constructor failure after managed values are assigned');
+end;
+
+procedure TManagedBufferTests.CheckLifetime(aAlignment: Integer; aFill: Boolean);
+var M: INDArray<IInterface>;
+    V: IInterface;
+    I: Integer;
+begin
+  fDestroyed := 0;
+  V := TBufferTrackedValue.Create(fDestroyed);
+  if aFill then
+    M := TNDABuffer<IInterface>.Create([3], V, aAlignment)
+  else begin
+    M := TNDABuffer<IInterface>.Create([3], aAlignment);
+    for I := 0 to 2 do begin
+      CheckTrue(TNDA<IInterface>.PT(M.Data + I * SizeOf(IInterface))^ = nil);
+      TNDA<IInterface>.PT(M.Data + I * SizeOf(IInterface))^ := V;
+    end;
+  end;
+  if aAlignment > 0 then
+    CheckTrue(NativeUInt(M.Data) mod NativeUInt(aAlignment) = 0);
+
+  V := nil;
+
+  CheckEquals(0, fDestroyed);
+
+  M := nil;
+
+  CheckEquals(1, fDestroyed);
+end;
+
+procedure TManagedBufferTests.CheckConstructorFailure(aAlignment: Integer);
+var V: IInterface;
+begin
+  fDestroyed := 0;
+  V := TBufferTrackedValue.Create(fDestroyed);
+
+  try
+    TFailingManagedBuffer.Create(V, aAlignment);
+    Fail('Expected constructor failure');
+  except
+    on E: EAbort do;
+  end;
+  V := nil;
+
+  CheckEquals(1, fDestroyed);
+end;
+
+procedure TManagedBufferTests.UnalignedLifetime;
+begin
+  CheckLifetime(0, False);
+end;
+
+procedure TManagedBufferTests.AlignedLifetime;
+begin
+  CheckLifetime(64, False);
+end;
+
+procedure TManagedBufferTests.FilledUnalignedLifetime;
+begin
+  CheckLifetime(0, True);
+end;
+
+procedure TManagedBufferTests.FilledAlignedLifetime;
+begin
+  CheckLifetime(64, True);
+end;
+
+procedure TManagedBufferTests.ViewRetainsValues;
+var M, V: INDArray<IInterface>;
+    Item: IInterface;
+begin
+  fDestroyed := 0;
+  Item := TBufferTrackedValue.Create(fDestroyed);
+  M := TNDABuffer<IInterface>.Create([3], Item, 0);
+  Item := nil;
+  V := M[[NDISpan(0, 1)]];
+
+  M := nil;
+
+  CheckEquals(0, fDestroyed);
+
+  V := nil;
+
+  CheckEquals(1, fDestroyed);
+end;
+
+procedure TManagedBufferTests.OverwriteReleasesValue;
+var M: INDArray<IInterface>;
+begin
+  fDestroyed := 0;
+  M := TNDABuffer<IInterface>.Create([1], 0);
+  TNDA<IInterface>.PT(M.Data)^ := TBufferTrackedValue.Create(fDestroyed);
+
+  TNDA<IInterface>.PT(M.Data)^ := nil;
+
+  CheckEquals(1, fDestroyed);
+end;
+
+procedure TManagedBufferTests.UnalignedConstructorFailure;
+begin
+  CheckConstructorFailure(0);
+end;
+
+procedure TManagedBufferTests.AlignedConstructorFailure;
+begin
+  CheckConstructorFailure(64);
+end;
 
 {$region 'TTensorTests'}
 
@@ -3626,6 +3780,7 @@ end;
 
 initialization
 
+  RegisterTest(TManagedBufferTests.Suite);
   RegisterTest(TArrayTests.Suite);
   RegisterTest(TIndicesTests.Suite);
   RegisterTest(TNDAItTests.Suite);

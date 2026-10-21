@@ -465,7 +465,7 @@ end;
 procedure TCorrF64.AfterConstruction;
 begin
   inherited;
-  fCorrProc := corr1df64;
+  fCorrProc := corr1dF64;
 end;
 
 {$endregion}

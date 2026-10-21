@@ -20,6 +20,8 @@ type
 
     procedure TotalAtLvl_M;
     procedure TotalAtLvl_M_Gaps;
+
+    procedure GramMat;
   end;
 
   TMathPascalImplTests = class(TNDAPerformanceTestCase)
@@ -32,6 +34,10 @@ type
   end;
 
 implementation
+
+uses
+    panda.Math
+  ;
 
 {$EXCESSPRECISION OFF} // to prevent Single -> Double conversion by x64 compiler
 
@@ -105,6 +111,18 @@ begin
 
   SWStart;
   b := nda.TotalAtLvl(a, -1);
+  SWStop;
+end;
+
+procedure TMathTests.GramMat;
+var a, b: INDArray<Double>;
+const N = 512;
+begin
+  a := nda.Full<Double>([4*N, N], 0);
+  b := nda.Full<Double>([N, N], 0);
+
+  SWStart;
+  DoTestLoop(procedure begin ndaGram(a, b) end, 30);
   SWStop;
 end;
 

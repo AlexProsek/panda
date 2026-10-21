@@ -30,6 +30,8 @@ procedure cvAccum(aData, aRes: PInteger; aCount: NativeInt); overload;
 procedure cvAccum(aData, aRes: PSingle; aCount: NativeInt); overload;
 procedure cvAccum(aData, aRes: PDouble; aCount: NativeInt); overload;
 
+procedure svAccum(aData: PSingle; aDataStep: NativeInt; aRes: PSingle; aResStep: NativeInt; aCount: NativeInt); overload;
+
 procedure cvMinMax(pData: PSingle; aCount: NativeInt; var aMin, aMax: Single); overload;
 procedure cvMinMax(pData: PDouble; aCount: NativeInt; var aMin, aMax: Double); overload;
 
@@ -533,6 +535,21 @@ begin
     aRes^ := s;
     Inc(aData);
     Inc(aRes);
+  end;
+end;
+
+procedure svAccum(aData: PSingle; aDataStep: NativeInt;
+  aRes: PSingle; aResStep: NativeInt; aCount: NativeInt);
+var pEnd: PByte;
+    s: Double;
+begin
+  pEnd := PByte(aData) + aCount * aDataStep;
+  s := 0;
+  while PByte(aData) < pEnd do begin
+    s := s + aData^;
+    aRes^ := s;
+    Inc(PByte(aData), aDataStep);
+    Inc(PByte(aRes), aResStep);
   end;
 end;
 

@@ -14,6 +14,8 @@ uses
 {$endif}
   ;
 
+{$I AsmDefs.inc}
+
 type
   TNDAMath = class(TNDAUt)
   public type
@@ -78,13 +80,116 @@ function ndaDot(const aA, aB: INDArray<Double>): INDArray<Double>; overload;
 function ndaOuter(const aA, aB: INDArray<Single>): INDArray<Single>; overload;
 function ndaOuter(const aA, aB: INDArray<Double>): INDArray<Double>; overload;
 
+/// <summary> Returns the full symmetric Gram matrix A^T*A. </summary>
+function ndaGram(const aA: INDArray<Double>): INDArray<Double>; overload;
+/// <summary> Computes A^T*A, reusing aRes when it is assigned. </summary>
+procedure ndaGram(const aA: INDArray<Double>; var aRes: INDArray<Double>); overload;
+/// <summary> Computes A^T*A using <c>aAt</c> as a transpose workspace. </summary>
+/// <remarks>
+///   Allocates unassigned buffers. Assigned aRes and aAt must have shapes W x W
+///   and W x H respectively, with contiguous rows, for an H x W input.
+///   Uses BLAS dsyrk for compatible buffers when BLAS is defined.
+///   The workspace receives the transpose of aA in both native and BLAS paths.
+/// </remarks>
+procedure ndaGram(const aA: INDArray<Double>; var aRes, aAt: INDArray<Double>); overload;
+
+/// <summary> Returns the full symmetric A^T*A using native parallel evaluation. </summary>
+/// <remarks>
+///   Returns a newly allocated matrix and uses a temporary transpose workspace.
+///   Input and worker-limit rules match the overload with an explicit aAt.
+/// </remarks>
+function ndaGramParallel(const aA: INDArray<Double>; aMaxWorkers: Integer = 0): INDArray<Double>; overload;
+/// <summary> Computes A^T*A in parallel, allocating aRes when nil and otherwise reusing it. </summary>
+/// <remarks>
+///   Uses a temporary transpose workspace. Buffer and worker-limit rules match
+///   the overload with an explicit aAt workspace.
+/// </remarks>
+procedure ndaGramParallel(const aA: INDArray<Double>; var aRes: INDArray<Double>;
+  aMaxWorkers: Integer = 0); overload;
+/// <summary> Computes the full symmetric A^T*A using balanced upper-triangular tile jobs. </summary>
+/// <remarks>
+///   For an H x W input, allocates unassigned aRes (W x W) and aAt (W x H).
+///   Assigned shapes and contiguous rows are checked with assertions. Result rows
+///   must occupy disjoint storage; padding and reversed row order are allowed.
+///   Result and workspace storage must not overlap the input or each other.
+///   Transposes aA into aAt once before starting jobs. Input and buffers must not
+///   be changed by the caller until this call returns; all jobs complete first.
+///   Always uses native kernels, even when BLAS is defined. Zero aMaxWorkers uses
+///   TThread.ProcessorCount; one executes serially. Jobs are also limited by the
+///   number of upper-triangular tiles. Small matrices may be slower in parallel.
+///   Raises EArgumentOutOfRangeException for a negative worker limit and
+///   ENDAShapeError for a nil or nonmatrix input.
+/// </remarks>
+procedure ndaGramParallel(const aA: INDArray<Double>; var aRes, aAt: INDArray<Double>;
+  aMaxWorkers: Integer = 0); overload;
+
+/// <summary> Returns A*B for matrices A (M x K) and B (K x N). </summary>
+/// <remarks>
+///   Returns a newly allocated M x N matrix. Uses a temporary transpose of B
+///   and copies A temporarily when its rows are not contiguous.
+///   Raises ENDAShapeError for nil/nonmatrix inputs or incompatible dimensions.
+/// </remarks>
+function ndaMatMul(const aA, aB: INDArray<Double>): INDArray<Double>; overload;
+/// <summary> Computes A*B, allocating aRes when nil and otherwise reusing it. </summary>
+/// <remarks>
+///   Uses a temporary transpose workspace. Input, result and layout requirements
+///   are the same as for the overload with an explicit aBt workspace.
+/// </remarks>
+procedure ndaMatMul(const aA, aB: INDArray<Double>; var aRes: INDArray<Double>); overload;
+/// <summary> Computes A*B using <c>aBt</c> as a transpose workspace. </summary>
+/// <remarks>
+///   For A (M x K) and B (K x N), allocates unassigned aRes (M x N) and aBt (N x K).
+///   Assigned buffers are reused without resizing; their shapes and contiguous
+///   rows are checked with assertions. Padded and reversed row order are allowed.
+///   Result and workspace storage must not overlap either input or each other.
+///   Refreshes aBt with the transpose of B on every call. Copies A temporarily
+///   only when its rows are not contiguous. Uses BLAS dgemm for compatible
+///   buffers when BLAS is defined, otherwise uses native dot kernels.
+///   Raises ENDAShapeError for nil/nonmatrix inputs or incompatible dimensions.
+/// </remarks>
+procedure ndaMatMul(const aA, aB: INDArray<Double>; var aRes, aBt: INDArray<Double>); overload;
+
+/// <summary> Returns A*B using native kernels and at most aMaxWorkers parallel jobs. </summary>
+/// <remarks>
+///   Returns a newly allocated matrix. Uses the same input and temporary buffer
+///   rules as ndaMatMulParallel with an explicit transpose workspace.
+/// </remarks>
+function ndaMatMulParallel(const aA, aB: INDArray<Double>; aMaxWorkers: Integer = 0): INDArray<Double>; overload;
+/// <summary> Computes A*B in parallel, allocating aRes when nil and otherwise reusing it. </summary>
+/// <remarks>
+///   Uses a temporary transpose workspace. Input, result and worker-limit rules
+///   are the same as for the overload with an explicit aBt workspace.
+/// </remarks>
+procedure ndaMatMulParallel(const aA, aB: INDArray<Double>; var aRes: INDArray<Double>;
+  aMaxWorkers: Integer = 0); overload;
+/// <summary> Computes A*B with native kernels using disjoint groups of output rows. </summary>
+/// <remarks>
+///   For A (M x K) and B (K x N), allocates unassigned aRes (M x N) and aBt (N x K).
+///   Assigned shapes and contiguous rows are checked with assertions. Output rows
+///   must occupy disjoint storage; padding and reversed row order are allowed.
+///   Result and workspace storage must not overlap either input or each other.
+///   Packs A when needed and transposes B into aBt once before starting jobs.
+///   Inputs and buffers must not be changed by the caller until this call returns.
+///   Waits for all jobs to complete. Uses native kernels even when BLAS is defined.
+///   Zero aMaxWorkers selects TThread.ProcessorCount; one executes serially.
+///   The number of jobs is also limited by the number of output row pairs,
+///   including a final odd row. Small products may be slower with parallel jobs.
+///   Raises EArgumentOutOfRangeException for a negative worker limit and
+///   ENDAShapeError for nil/nonmatrix inputs or incompatible dimensions.
+/// </remarks>
+procedure ndaMatMulParallel(const aA, aB: INDArray<Double>; var aRes, aBt: INDArray<Double>;
+  aMaxWorkers: Integer = 0); overload;
+
 implementation
 
 uses
     panda.cvMath
   , panda.cvArithmetic
   , panda.Arithmetic
+  , panda.ArrManip
   , panda.DynArrayUtils
+  , System.Classes
+  , System.Threading
   ;
 
 {$EXCESSPRECISION OFF} // to prevent Single -> Double conversion by x64 compiler
@@ -641,6 +746,452 @@ function ndaOuter(const aA, aB: INDArray<Double>): INDArray<Double>;
 begin
   Result := TNDAUt.Full<Double>(TDynAUt.Concat<NativeInt>(aA.Shape, aB.Shape), aB);
   TNDAMath.DoOuterProd(aA, Result, souter_vloop);
+end;
+
+{$endregion}
+
+{$region 'ndaGram'}
+
+function ndaGram(const aA: INDArray<Double>): INDArray<Double>;
+var At: INDArray<Double>;
+begin
+  ndaGram(aA, Result, At);
+end;
+
+procedure ndaGram(const aA: INDArray<Double>; var aRes: INDArray<Double>);
+var At: INDArray<Double>;
+begin
+  ndaGram(aA, aRes, At);
+end;
+
+procedure PrepareGram(const aA: INDArray<Double>; var aRes, aAt: INDArray<Double>;
+  aParallel: Boolean = False);
+var sh: TNDAShape;
+    w, h: NativeInt;
+begin
+  if not (Assigned(aA) and MatrixQ(aA)) then
+    raise ENDAShapeError.CreateFmt(csInvArrayDim, [2]);
+
+  sh := aA.Shape;
+  w := sh[1];
+  h := sh[0];
+
+  if not Assigned(aRes) then
+    aRes := TNDAUt.Empty<Double>([w, w]);
+  if not Assigned(aAt) then
+    aAt := TNDAUt.Empty<Double>([w, h]);
+
+  Assert(
+    MatrixQ(aRes) and (aRes.Shape[0] = w) and (aRes.Shape[1] = w) and
+    MatrixQ(aAt) and (aAt.Shape[0] = w) and (aAt.Shape[1] = h) and
+    (aAt.Strides[1] = cF64Sz)
+  );
+
+  // The blocked transpose assumes forward source rows when columns are contiguous.
+  if aParallel and (aA.Strides[0] < 0) and (aA.Strides[1] = cF64Sz) then
+    TNDAUt.Fill<Double>(aAt, TNDAMan.TransposedView<Double>(aA))
+  else
+    TNDAMan.Transpose<Double>(aA, aAt, [1, 0]);
+end;
+
+function GramTileRows(aWidth: NativeInt): NativeInt;
+begin
+{$if defined(ASMx64)}
+  Result := aWidth div 2 + (aWidth and 1);
+{$else}
+  Result := aWidth;
+{$endif}
+end;
+
+function GramTriangleCount(aRows: Int64): Int64;
+begin
+  if (aRows and 1) = 0 then
+    Result := (aRows div 2)*(aRows + 1)
+  else
+    Result := aRows*(aRows div 2 + 1);
+end;
+
+function GramTilePrefix(aRows, aRow: NativeInt): Int64;
+begin
+  Result := GramTriangleCount(aRows) - GramTriangleCount(aRows - aRow);
+end;
+
+procedure GramNative(const aAt, aRes: INDArray<Double>; aFirst, aCount: Int64);
+var w, h, b, lo, hi, mid, blockRow, blockCol, I, J: NativeInt;
+    srcWStep, dstWStep: NativeInt;
+    pSrc, pDst: PByte;
+    d00: Double;
+{$if defined(ASMx64)}
+    d01, d10, d11: Double;
+{$endif}
+begin
+  w := aAt.Shape[0];
+  h := aAt.Shape[1];
+  b := GramTileRows(w);
+  srcWStep := aAt.Strides[0];
+  dstWStep := aRes.Strides[0];
+  pSrc := aAt.Data;
+  pDst := aRes.Data;
+
+  // Find the first tile once, then walk the triangular range sequentially.
+  lo := 0;
+  hi := b - 1;
+  while lo < hi do begin
+    mid := lo + (hi - lo + 1) div 2;
+    if GramTilePrefix(b, mid) <= aFirst then
+      lo := mid
+    else
+      hi := mid - 1;
+  end;
+  blockRow := lo;
+  blockCol := blockRow + NativeInt(aFirst - GramTilePrefix(b, blockRow));
+  while aCount > 0 do begin
+{$if defined(ASMx64)}
+    I := blockRow*2;
+    J := blockCol*2;
+    if (I + 1 < w) and (J + 1 < w) then begin
+      dot2x2(
+        PDouble(pSrc + I*srcWStep), PDouble(pSrc + (I+1)*srcWStep),
+        PDouble(pSrc + J*srcWStep), PDouble(pSrc + (J+1)*srcWStep),
+        h, d00, d01, d10, d11
+      );
+      PDouble(pDst +     I*dstWStep +     J*cF64Sz)^ := d00;
+      PDouble(pDst +     I*dstWStep + (J+1)*cF64Sz)^ := d01;
+      PDouble(pDst + (I+1)*dstWStep +     J*cF64Sz)^ := d10;
+      PDouble(pDst + (I+1)*dstWStep + (J+1)*cF64Sz)^ := d11;
+
+      PDouble(pDst +     J*dstWStep +     I*cF64Sz)^ := d00;
+      PDouble(pDst +     J*dstWStep + (I+1)*cF64Sz)^ := d10;
+      PDouble(pDst + (J+1)*dstWStep +     I*cF64Sz)^ := d01;
+      PDouble(pDst + (J+1)*dstWStep + (I+1)*cF64Sz)^ := d11;
+    end else begin
+      dot(PDouble(pSrc + I*srcWStep), PDouble(pSrc + J*srcWStep), h, d00);
+      PDouble(pDst + I*dstWStep + J*cF64Sz)^ := d00;
+      PDouble(pDst + J*dstWStep + I*cF64Sz)^ := d00;
+      if I + 1 < w then begin
+        dot(PDouble(pSrc + (I+1)*srcWStep), PDouble(pSrc + J*srcWStep), h, d01);
+        PDouble(pDst + (I+1)*dstWStep + J*cF64Sz)^ := d01;
+        PDouble(pDst + J*dstWStep + (I+1)*cF64Sz)^ := d01;
+      end;
+    end;
+{$else}
+    I := blockRow;
+    J := blockCol;
+    dot(PDouble(pSrc + I*srcWStep), PDouble(pSrc + J*srcWStep), h, d00);
+    PDouble(pDst + I*dstWStep + J*cF64Sz)^ := d00;
+    PDouble(pDst + J*dstWStep + I*cF64Sz)^ := d00;
+{$endif}
+    Dec(aCount);
+    Inc(blockCol);
+    if blockCol = b then begin
+      Inc(blockRow);
+      blockCol := blockRow;
+    end;
+  end;
+end;
+
+procedure ndaGram(const aA: INDArray<Double>; var aRes, aAt: INDArray<Double>);
+{$ifdef BLAS}
+var w, h, I, J: NativeInt;
+    srcWStep, dstWStep: NativeInt;
+    pSrc, pDst: PByte;
+{$endif}
+begin
+  PrepareGram(aA, aRes, aAt);
+{$ifdef BLAS}
+  w := aAt.Shape[0];
+  h := aAt.Shape[1];
+  srcWStep := aAt.Strides[0];
+  dstWStep := aRes.Strides[0];
+  pSrc := aAt.Data;
+  pDst := aRes.Data;
+  // BLAS leading dimensions are positive element counts represented by LongInt.
+  if 
+    (srcWStep >= h*cF64Sz) and (dstWStep >= w*cF64Sz) and
+{$if SizeOf(NativeInt) > SizeOf(LongInt)}
+    (w <= High(LongInt)) and (h <= High(LongInt)) and
+    (srcWStep div cF64Sz <= High(LongInt)) and
+    (dstWStep div cF64Sz <= High(LongInt)) and
+{$endif}
+    (srcWStep mod cF64Sz = 0) and (dstWStep mod cF64Sz = 0) 
+  then begin
+    cblas.dsyrk(cblasRowMajor, cblasUpper, cblasNoTrans,
+      w, h, 1, PDouble(pSrc), srcWStep div cF64Sz,
+      0, PDouble(pDst), dstWStep div cF64Sz
+    );
+    for I := 0 to w - 1 do
+      for J := I + 1 to w - 1 do
+        PDouble(pDst + J*dstWStep + I*cF64Sz)^ := PDouble(pDst + I*dstWStep + J*cF64Sz)^;
+    
+    exit;
+  end;
+{$endif}
+  GramNative(aAt, aRes, 0, GramTriangleCount(GramTileRows(aAt.Shape[0])));
+end;
+
+function ndaGramParallel(const aA: INDArray<Double>; aMaxWorkers: Integer): INDArray<Double>;
+var At: INDArray<Double>;
+begin
+  ndaGramParallel(aA, Result, At, aMaxWorkers);
+end;
+
+procedure ndaGramParallel(const aA: INDArray<Double>; var aRes: INDArray<Double>;
+  aMaxWorkers: Integer);
+var At: INDArray<Double>;
+begin
+  ndaGramParallel(aA, aRes, At, aMaxWorkers);
+end;
+
+procedure ndaGramParallel(const aA: INDArray<Double>; var aRes, aAt: INDArray<Double>;
+  aMaxWorkers: Integer);
+type TJob = record
+    First, Count: Int64;
+  end;
+var At, G: INDArray<Double>;
+    jobs: TArray<TJob>;
+    tileCount, first, count: Int64;
+    w: NativeInt;
+    jobCount, I: Integer;
+begin
+  if aMaxWorkers < 0 then
+    raise EArgumentOutOfRangeException.Create(csArgumentOutOfRange);
+
+  PrepareGram(aA, aRes, aAt, True);
+  w := aAt.Shape[0];
+  Assert((aRes.Strides[1] = cF64Sz) and
+    ((w = 1) or (Abs(aRes.Strides[0]) >= w*cF64Sz)));
+
+  if aMaxWorkers = 0 then
+    aMaxWorkers := TThread.ProcessorCount;
+  tileCount := GramTriangleCount(GramTileRows(w));
+  jobCount := Max(aMaxWorkers, 1);
+  if tileCount < jobCount then
+    jobCount := Integer(tileCount);
+  if jobCount = 1 then begin
+    GramNative(aAt, aRes, 0, tileCount);
+    exit;
+  end;
+
+  At := aAt;
+  G := aRes;
+  SetLength(jobs, jobCount);
+  first := 0;
+  for I := 0 to jobCount - 1 do begin
+    count := tileCount div jobCount;
+    if I < tileCount mod jobCount then
+      Inc(count);
+    jobs[I].First := first;
+    jobs[I].Count := count;
+    Inc(first, count);
+  end;
+  TParallel.For(0, jobCount - 1,
+    procedure (aJob: Integer)
+    begin
+      GramNative(At, G, jobs[aJob].First, jobs[aJob].Count);
+    end
+  );
+end;
+
+{$endregion}
+
+{$region 'ndaMatMul'}
+
+function ndaMatMul(const aA, aB: INDArray<Double>): INDArray<Double>;
+var Bt: INDArray<Double>;
+begin
+  ndaMatMul(aA, aB, Result, Bt);
+end;
+
+procedure ndaMatMul(const aA, aB: INDArray<Double>; var aRes: INDArray<Double>);
+var Bt: INDArray<Double>;
+begin
+  ndaMatMul(aA, aB, aRes, Bt);
+end;
+
+function PrepareMatMul(const aA, aB: INDArray<Double>; var aRes, aBt: INDArray<Double>): INDArray<Double>;
+var shA, shB: TNDAShape;
+    m, n, k: NativeInt;
+begin
+  if not (Assigned(aA) and Assigned(aB)) then
+    raise ENDAShapeError.CreateFmt(csInvArrayDim, [2]);
+  if not (MatrixQ(aA) and MatrixQ(aB)) then
+    raise ENDAShapeError.CreateFmt(csInvArrayDim, [2]);
+
+  shA := aA.Shape;
+  shB := aB.Shape;
+  m := shA[0];
+  k := shA[1];
+  n := shB[1];
+  if k <> shB[0] then
+    raise ENDAShapeError.Create('Matrix multiplication error: inner dimensions don''t match.');
+
+  if not Assigned(aRes) then
+    aRes := TNDAUt.Empty<Double>([m, n]);
+  if not Assigned(aBt) then
+    aBt := TNDAUt.Empty<Double>([n, k]);
+
+  Assert(
+    MatrixQ(aRes) and (aRes.Shape[0] = m) and (aRes.Shape[1] = n) and
+    MatrixQ(aBt) and (aBt.Shape[0] = n) and (aBt.Shape[1] = k) and
+    (aRes.Strides[1] = cF64Sz) and (aBt.Strides[1] = cF64Sz)
+  );
+
+  Result := aA;
+  if Result.Strides[1] <> cF64Sz then
+    Result := TNDAUt.Copy<Double>(Result);
+  TNDAMan.Transpose<Double>(aB, aBt, [1, 0]);
+end;
+
+procedure MatMulNative(const aA, aBt, aRes: INDArray<Double>);
+var m, n, k, I, J: NativeInt;
+    aStep, btStep, dstStep: NativeInt;
+    pA, pBt, pDst: PByte;
+{$if defined(ASMx64)}
+    m2, n2: NativeInt;
+    d00, d01, d10, d11: Double;
+{$endif}
+begin
+  m := aA.Shape[0];
+  k := aA.Shape[1];
+  n := aBt.Shape[0];
+  aStep := aA.Strides[0];
+  btStep := aBt.Strides[0];
+  dstStep := aRes.Strides[0];
+  pA := aA.Data;
+  pBt := aBt.Data;
+  pDst := aRes.Data;
+
+{$if defined(ASMx64)}
+  m2 := (m and not(NativeUInt(1)));
+  n2 := (n and not(NativeUInt(1)));
+  I := 0;
+  while I < m2 do begin
+    J := 0;
+    while J < n2 do begin
+      dot2x2(
+        PDouble(pA + I*aStep), PDouble(pA + (I+1)*aStep),
+        PDouble(pBt + J*btStep), PDouble(pBt + (J+1)*btStep),
+        k, d00, d01, d10, d11
+      );
+      PDouble(pDst +     I*dstStep +     J*cF64Sz)^ := d00;
+      PDouble(pDst +     I*dstStep + (J+1)*cF64Sz)^ := d01;
+      PDouble(pDst + (I+1)*dstStep +     J*cF64Sz)^ := d10;
+      PDouble(pDst + (I+1)*dstStep + (J+1)*cF64Sz)^ := d11;
+      Inc(J, 2);
+    end;
+    if (n and 1) <> 0 then begin
+      dot(PDouble(pA + I*aStep), PDouble(pBt + n2*btStep), k, d00);
+      PDouble(pDst + I*dstStep + n2*cF64Sz)^ := d00;
+      dot(PDouble(pA + (I+1)*aStep), PDouble(pBt + n2*btStep), k, d10);
+      PDouble(pDst + (I+1)*dstStep + n2*cF64Sz)^ := d10;
+    end;
+    Inc(I, 2);
+  end;
+  if (m and 1) <> 0 then
+    for J := 0 to n - 1 do
+      dot(PDouble(pA + m2*aStep), PDouble(pBt + J*btStep), k,
+        PDouble(pDst + m2*dstStep + J*cF64Sz)^);
+{$else}
+  for I := 0 to m - 1 do
+    for J := 0 to n - 1 do
+      dot(PDouble(pA + I*aStep), PDouble(pBt + J*btStep), k,
+        PDouble(pDst + I*dstStep + J*cF64Sz)^);
+{$endif}
+end;
+
+procedure ndaMatMul(const aA, aB: INDArray<Double>; var aRes, aBt: INDArray<Double>);
+var A: INDArray<Double>;
+{$ifdef BLAS}
+    m, n, k, aStep, btStep, dstStep: NativeInt;
+{$endif}
+begin
+  A := PrepareMatMul(aA, aB, aRes, aBt);
+{$ifdef BLAS}
+  m := A.Shape[0];
+  k := A.Shape[1];
+  n := aBt.Shape[0];
+  aStep := A.Strides[0];
+  btStep := aBt.Strides[0];
+  dstStep := aRes.Strides[0];
+  // BLAS leading dimensions are positive element counts represented by LongInt.
+  if
+    (aStep >= k*cF64Sz) and (btStep >= k*cF64Sz) and (dstStep >= n*cF64Sz) and
+{$if SizeOf(NativeInt) > SizeOf(LongInt)}
+    (m <= High(LongInt)) and (n <= High(LongInt)) and (k <= High(LongInt)) and
+    (aStep div cF64Sz <= High(LongInt)) and
+    (btStep div cF64Sz <= High(LongInt)) and
+    (dstStep div cF64Sz <= High(LongInt)) and
+{$endif}
+    (aStep mod cF64Sz = 0) and (btStep mod cF64Sz = 0) and (dstStep mod cF64Sz = 0)
+  then begin
+    cblas.dgemm(cblasRowMajor, cblasNoTrans, cblasTrans,
+      m, n, k, 1, PDouble(A.Data), aStep div cF64Sz,
+      PDouble(aBt.Data), btStep div cF64Sz, 0, PDouble(aRes.Data), dstStep div cF64Sz
+    );
+    exit;
+  end;
+{$endif}
+  MatMulNative(A, aBt, aRes);
+end;
+
+function ndaMatMulParallel(const aA, aB: INDArray<Double>; aMaxWorkers: Integer): INDArray<Double>;
+var Bt: INDArray<Double>;
+begin
+  ndaMatMulParallel(aA, aB, Result, Bt, aMaxWorkers);
+end;
+
+procedure ndaMatMulParallel(const aA, aB: INDArray<Double>; var aRes: INDArray<Double>;
+  aMaxWorkers: Integer);
+var Bt: INDArray<Double>;
+begin
+  ndaMatMulParallel(aA, aB, aRes, Bt, aMaxWorkers);
+end;
+
+procedure ndaMatMulParallel(const aA, aB: INDArray<Double>; var aRes, aBt: INDArray<Double>;
+  aMaxWorkers: Integer);
+var A, Bt: INDArray<Double>;
+    rowsA, rowsC: TArray<INDArray<Double>>;
+    m, k, n, pairs, jobs, firstPair, count, rowStart, rowCount, I: NativeInt;
+begin
+  if aMaxWorkers < 0 then
+    raise EArgumentOutOfRangeException.Create(csArgumentOutOfRange);
+
+  A := PrepareMatMul(aA, aB, aRes, aBt);
+  m := A.Shape[0];
+  k := A.Shape[1];
+  n := aBt.Shape[0];
+  Assert((m = 1) or (Abs(aRes.Strides[0]) >= n*cF64Sz));
+
+  if aMaxWorkers = 0 then
+    aMaxWorkers := TThread.ProcessorCount;
+  pairs := m div 2 + (m and 1);
+  jobs := Min(Max(aMaxWorkers, 1), pairs);
+  if jobs = 1 then begin
+    MatMulNative(A, aBt, aRes);
+    exit;
+  end;
+
+  Bt := aBt;
+  SetLength(rowsA, jobs);
+  SetLength(rowsC, jobs);
+  firstPair := 0;
+  for I := 0 to jobs - 1 do begin
+    count := pairs div jobs;
+    if I < pairs mod jobs then
+      Inc(count);
+    rowStart := firstPair*2;
+    rowCount := Min(count*2, m - rowStart);
+    rowsA[I] := A[NDIBlockSeq([rowStart, 0], [rowCount, k])];
+    rowsC[I] := aRes[NDIBlockSeq([rowStart, 0], [rowCount, n])];
+    Inc(firstPair, count);
+  end;
+
+  TParallel.For(0, Integer(jobs) - 1,
+    procedure (aJob: Integer)
+    begin
+      MatMulNative(rowsA[aJob], Bt, rowsC[aJob]);
+    end
+  );
 end;
 
 {$endregion}

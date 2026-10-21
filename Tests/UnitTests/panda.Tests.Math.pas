@@ -16,6 +16,10 @@ type
   TMathTests = class(TNDATestCase)
   protected const
     tol = 1e-5;
+  protected
+    procedure CheckMatMul(aM, aK, aN: Integer);
+    procedure CheckMatMulParallel(aM, aK, aN, aMaxWorkers: Integer);
+    procedure CheckGramParallel(aH, aW, aMaxWorkers: Integer);
   published
     procedure Range1DInt;
     procedure Range1DSingle;
@@ -46,9 +50,123 @@ type
     procedure Outer_VmxVn;
     procedure Outer_MxV;
     procedure Outer_MxM;
+
+    procedure Gram_5x4;
+    procedure Gram_5x5;
+    procedure Gram_1x1;
+    procedure Gram_StridedInput;
+    procedure Gram_PaddedBuffers;
+    procedure Gram_ReversedWorkspace;
+    procedure Gram_ReversedResult;
+    procedure Gram_ReusedBuffers;
+
+    procedure GramParallel_Workers1;
+    procedure GramParallel_Workers2;
+    procedure GramParallel_Workers4;
+    procedure GramParallel_AutomaticWorkers;
+    procedure GramParallel_1x1;
+    procedure GramParallel_SingleColumn;
+    procedure GramParallel_SingleTile;
+    procedure GramParallel_OddWidth;
+    procedure GramParallel_EvenWidth;
+    procedure GramParallel_UnevenTiles;
+    procedure GramParallel_BoundaryInsideRow;
+    procedure GramParallel_ExcessWorkers;
+    procedure GramParallel_SingleInputRow;
+    procedure GramParallel_LargerProduct;
+    procedure GramParallel_FixedValues;
+    procedure GramParallel_AllocatedResult;
+    procedure GramParallel_ReusedResult;
+    procedure GramParallel_ReusedBuffers;
+    procedure GramParallel_StridedInput;
+    procedure GramParallel_TransposedInput;
+    procedure GramParallel_ReversedInput;
+    procedure GramParallel_ReversedRows;
+    procedure GramParallel_PaddedBuffers;
+    procedure GramParallel_ReversedBuffers;
+    procedure GramParallel_NegativeWorkers;
+    procedure GramParallel_NilInput;
+    procedure GramParallel_VectorInput;
+    procedure GramParallel_TensorInput;
+{$ifopt C+}
+    procedure GramParallel_InvalidResultShape;
+    procedure GramParallel_InvalidWorkspaceShape;
+    procedure GramParallel_StridedResult;
+    procedure GramParallel_StridedWorkspace;
+    procedure GramParallel_OverlappingRows;
+{$endif}
+
+    procedure MatMul_EvenRowsEvenCols;
+    procedure MatMul_EvenRowsOddCols;
+    procedure MatMul_OddRowsEvenCols;
+    procedure MatMul_OddRowsOddCols;
+    procedure MatMul_1x1;
+    procedure MatMul_SingleRow;
+    procedure MatMul_SingleColumn;
+    procedure MatMul_InnerDimension1;
+    procedure MatMul_FixedValues;
+    procedure MatMul_AllocatedResult;
+    procedure MatMul_ReusedResult;
+    procedure MatMul_ReusedBuffers;
+    procedure MatMul_StridedInputs;
+    procedure MatMul_TransposedInputs;
+    procedure MatMul_ReversedInputs;
+    procedure MatMul_ReversedRows;
+    procedure MatMul_PaddedBuffers;
+    procedure MatMul_ReversedWorkspace;
+    procedure MatMul_ReversedResult;
+    procedure MatMul_NilA;
+    procedure MatMul_NilB;
+    procedure MatMul_VectorA;
+    procedure MatMul_VectorB;
+    procedure MatMul_TensorA;
+    procedure MatMul_TensorB;
+    procedure MatMul_IncompatibleDimensions;
+{$ifopt C+}
+    procedure MatMul_InvalidResultShape;
+    procedure MatMul_InvalidWorkspaceShape;
+    procedure MatMul_StridedResult;
+    procedure MatMul_StridedWorkspace;
+{$endif}
+
+    procedure MatMulParallel_Workers1;
+    procedure MatMulParallel_Workers2;
+    procedure MatMulParallel_Workers4;
+    procedure MatMulParallel_AutomaticWorkers;
+    procedure MatMulParallel_EvenRows;
+    procedure MatMulParallel_LargerProduct;
+    procedure MatMulParallel_ExcessWorkers;
+    procedure MatMulParallel_SingleRow;
+    procedure MatMulParallel_SingleColumn;
+    procedure MatMulParallel_InnerDimension1;
+    procedure MatMulParallel_ReusedResult;
+    procedure MatMulParallel_ReusedBuffers;
+    procedure MatMulParallel_StridedInputs;
+    procedure MatMulParallel_TransposedInputs;
+    procedure MatMulParallel_ReversedInputs;
+    procedure MatMulParallel_PaddedBuffers;
+    procedure MatMulParallel_ReversedBuffers;
+    procedure MatMulParallel_NegativeWorkers;
+    procedure MatMulParallel_NilA;
+    procedure MatMulParallel_NilB;
+    procedure MatMulParallel_NonmatrixA;
+    procedure MatMulParallel_NonmatrixB;
+    procedure MatMulParallel_IncompatibleDimensions;
+{$ifopt C+}
+    procedure MatMulParallel_InvalidResultShape;
+    procedure MatMulParallel_InvalidWorkspaceShape;
+    procedure MatMulParallel_StridedResult;
+    procedure MatMulParallel_StridedWorkspace;
+    procedure MatMulParallel_OverlappingRows;
+{$endif}
   end;
 
 implementation
+
+uses
+    panda.ArrManip
+  , System.SysUtils
+  ;
 
 {$region 'TMathTests'}
 
@@ -89,7 +207,7 @@ end;
 procedure TMathTests.Total2D;
 var x: TNDAItems<Single>;
 begin
-  x := nda.AsArray<Single>([1, 2, 3, 4, 5, 6], [2, 3]);
+  x := nda.AsArray<Single>([[1, 2, 3], [4, 5, 6]]);
   x := ndaTotal(x);
 
   CheckEquals(1, x.NDim);
@@ -102,7 +220,7 @@ end;
 procedure TMathTests.Total2DLvl1;
 var x: TNDAItems<Single>;
 begin
-  x := nda.AsArray<Single>([1, 2, 3, 4, 5, 6], [2, 3]);
+  x := nda.AsArray<Single>([[1, 2, 3], [4, 5, 6]]);
   x := ndaTotalAtLvl(x, 1);
 
   CheckEquals(1, x.NDim);
@@ -507,6 +625,1249 @@ begin
 
   CheckTrue(ndaAllClose(expected, m, tol));
 end;
+
+procedure TMathTests.Gram_5x4;
+var x, g: INDArray<Double>;
+    m, expected: TArray<TArray<Double>>;
+    I: Integer;
+begin
+  x := nda.AsArray<Double>([
+    [ 1,  2,  3,  4],
+    [ 5,  6,  7,  8],
+    [ 9, 10, 11, 12],
+    [13, 14, 15, 16],
+    [17, 18, 19, 20]
+  ]);
+  TNDAUt.TryAsDynArray2D<Double>(ndaDot(TNDAMan.Transpose<Double>(x),x), expected);
+
+  g := ndaGram(x);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Double>(g, m));
+  CheckEquals(Length(expected), Length(m));
+  for I := 0 to High(expected) do
+    CheckEquals(expected[I], m[I], tol);
+end;
+
+procedure TMathTests.Gram_5x5;
+var x, g: INDArray<Double>;
+    m, expected: TArray<TArray<Double>>;
+    I: Integer;
+begin
+  x := nda.AsArray<Double>([
+    [ 1,  2,  3,  4,  5],
+    [ 6,  7,  8,  9, 10],
+    [11, 12, 13, 14, 15],
+    [16, 17, 18, 19, 20],
+    [21, 22, 23, 24, 25]
+  ]);
+  TNDAUt.TryAsDynArray2D<Double>(ndaDot(TNDAMan.Transpose<Double>(x),x), expected);
+
+  g := ndaGram(x);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Double>(g, m));
+  CheckEquals(Length(expected), Length(m));
+  for I := 0 to High(expected) do
+    CheckEquals(expected[I], m[I], tol);
+end;
+
+procedure TMathTests.Gram_1x1;
+var x, g: INDArray<Double>;
+    m: TNDAItems<Double>;
+begin
+  x := nda.AsArray<Double>([[-3]]);
+
+  g := ndaGram(x);
+
+  m := g;
+  CheckEquals([1, 1], g.Shape);
+  CheckEquals(9, m[[0, 0]], tol);
+end;
+
+procedure TMathTests.Gram_StridedInput;
+var x, g, expected: INDArray<Double>;
+begin
+  x := nda.AsArray<Double>([[1, 99, -2, 99, 3, 99], [4, 99, 5, 99, -6, 99]]);
+  x := x[[NDIAll, NDIAll(2)]];
+  expected := nda.AsArray<Double>([[17, 18, -21], [18, 29, -36], [-21, -36, 45]]);
+
+  ndaGram(x, g);
+
+  CheckTrue(ndaAllClose(expected, g, tol));
+end;
+
+procedure TMathTests.Gram_PaddedBuffers;
+var x, g, at, gStorage, atStorage, expected: INDArray<Double>;
+    values, workspace: TNDAItems<Double>;
+    I: Integer;
+begin
+  x := nda.AsArray<Double>([[1, -2, 3], [4, 5, -6]]);
+  gStorage := nda.Full<Double>([3, 5], -99);
+  atStorage := nda.Full<Double>([3, 4], -99);
+  g := gStorage[[NDIAll, NDIAllTo(2)]];
+  at := atStorage[[NDIAll, NDIAllTo(1)]];
+  expected := nda.AsArray<Double>([[17, 18, -21], [18, 29, -36], [-21, -36, 45]]);
+
+  ndaGram(x, g, at);
+
+  CheckTrue(ndaAllClose(expected, g, tol));
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[1, 4], [-2, 5], [3, -6]]), at, tol));
+  values := gStorage;
+  workspace := atStorage;
+  for I := 0 to 2 do begin
+    CheckEquals(-99, values[[I, 3]], tol);
+    CheckEquals(-99, values[[I, 4]], tol);
+    CheckEquals(-99, workspace[[I, 2]], tol);
+    CheckEquals(-99, workspace[[I, 3]], tol);
+  end;
+end;
+
+procedure TMathTests.Gram_ReversedWorkspace;
+var x, g, at, expected: INDArray<Double>;
+begin
+  x := nda.AsArray<Double>([[1, -2, 3], [4, 5, -6]]);
+  at := nda.Empty<Double>([3, 2]);
+  at := at[[NDIAll(-1), NDIAll]];
+  expected := nda.AsArray<Double>([[17, 18, -21], [18, 29, -36], [-21, -36, 45]]);
+
+  ndaGram(x, g, at);
+
+  CheckTrue(ndaAllClose(expected, g, tol));
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[1, 4], [-2, 5], [3, -6]]), at, tol));
+end;
+
+procedure TMathTests.Gram_ReversedResult;
+var x, g, at, expected: INDArray<Double>;
+begin
+  x := nda.AsArray<Double>([[1, -2, 3], [4, 5, -6]]);
+  g := nda.Empty<Double>([3, 3]);
+  g := g[[NDIAll(-1), NDIAll]];
+  expected := nda.AsArray<Double>([[17, 18, -21], [18, 29, -36], [-21, -36, 45]]);
+
+  ndaGram(x, g, at);
+
+  CheckTrue(ndaAllClose(expected, g, tol));
+end;
+
+procedure TMathTests.Gram_ReusedBuffers;
+var x, g, at: INDArray<Double>;
+    pG, pAt: PByte;
+begin
+  x := nda.AsArray<Double>([[1, 2], [3, 4]]);
+  ndaGram(x, g, at);
+  pG := g.Data;
+  pAt := at.Data;
+  x.SetItem([0, 0], 2);
+
+  ndaGram(x, g, at);
+
+  CheckTrue(g.Data = pG);
+  CheckTrue(at.Data = pAt);
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[13, 16], [16, 20]]), g, tol));
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[2, 3], [2, 4]]), at, tol));
+end;
+
+{$endregion}
+
+{$region 'ndaMatMul'}
+
+procedure TMathTests.CheckMatMul(aM, aK, aN: Integer);
+var a, b, c, expected: INDArray<Double>;
+    I, J: Integer;
+begin
+  a := nda.Empty<Double>([aM, aK]);
+  b := nda.Empty<Double>([aK, aN]);
+  for I := 0 to aM - 1 do
+    for J := 0 to aK - 1 do
+      a.SetItem([I, J], ((I*7 + J*3) mod 13 - 6) / 4);
+  for I := 0 to aK - 1 do
+    for J := 0 to aN - 1 do
+      b.SetItem([I, J], ((I*5 + J*11) mod 17 - 8) / 8);
+  expected := ndaDot(a, b);
+
+  c := ndaMatMul(a, b);
+
+  CheckEquals([aM, aN], c.Shape);
+  CheckTrue(ndaAllClose(expected, c, tol));
+end;
+
+procedure TMathTests.MatMul_EvenRowsEvenCols;
+begin
+  CheckMatMul(4, 8, 6);
+end;
+
+procedure TMathTests.MatMul_EvenRowsOddCols;
+begin
+  CheckMatMul(4, 7, 3);
+end;
+
+procedure TMathTests.MatMul_OddRowsEvenCols;
+begin
+  CheckMatMul(3, 4, 6);
+end;
+
+procedure TMathTests.MatMul_OddRowsOddCols;
+begin
+  CheckMatMul(3, 5, 5);
+end;
+
+procedure TMathTests.MatMul_1x1;
+var a, b, c: INDArray<Double>;
+begin
+  a := nda.AsArray<Double>([[-3]]);
+  b := nda.AsArray<Double>([[2]]);
+
+  c := ndaMatMul(a, b);
+
+  CheckEquals([1, 1], c.Shape);
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[-6]]), c, tol));
+end;
+
+procedure TMathTests.MatMul_SingleRow;
+begin
+  CheckMatMul(1, 3, 5);
+end;
+
+procedure TMathTests.MatMul_SingleColumn;
+begin
+  CheckMatMul(5, 3, 1);
+end;
+
+procedure TMathTests.MatMul_InnerDimension1;
+begin
+  CheckMatMul(3, 1, 5);
+end;
+
+procedure TMathTests.MatMul_FixedValues;
+var a, b, c, expected: INDArray<Double>;
+begin
+  a := nda.AsArray<Double>([[1, -2, 3], [4, 5, -6]]);
+  b := nda.AsArray<Double>([[2, -1], [1, 4], [-3, 2]]);
+  expected := nda.AsArray<Double>([[-9, -3], [31, 4]]);
+
+  c := ndaMatMul(a, b);
+
+  CheckEquals([2, 2], c.Shape);
+  CheckTrue(ndaAllClose(expected, c, tol));
+end;
+
+procedure TMathTests.MatMul_AllocatedResult;
+var a, b, c: INDArray<Double>;
+begin
+  a := nda.AsArray<Double>([[1, -2, 3], [4, 5, -6]]);
+  b := nda.AsArray<Double>([[2, -1], [1, 4], [-3, 2]]);
+
+  ndaMatMul(a, b, c);
+
+  CheckEquals([2, 2], c.Shape);
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[-9, -3], [31, 4]]), c, tol));
+end;
+
+procedure TMathTests.MatMul_ReusedResult;
+var a, b, c: INDArray<Double>;
+    pC: PByte;
+begin
+  a := nda.AsArray<Double>([[1, -2, 3], [4, 5, -6]]);
+  b := nda.AsArray<Double>([[2, -1], [1, 4], [-3, 2]]);
+  c := nda.Full<Double>([2, 2], -99);
+  pC := c.Data;
+
+  ndaMatMul(a, b, c);
+
+  CheckTrue(c.Data = pC);
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[-9, -3], [31, 4]]), c, tol));
+end;
+
+procedure TMathTests.MatMul_ReusedBuffers;
+var a, b, c, bt: INDArray<Double>;
+    pC, pBt: PByte;
+begin
+  a := nda.AsArray<Double>([[1, -2, 3], [4, 5, -6]]);
+  b := nda.AsArray<Double>([[2, -1], [1, 4], [-3, 2]]);
+  ndaMatMul(a, b, c, bt);
+
+  CheckEquals([2, 2], c.Shape);
+  CheckEquals([2, 3], bt.Shape);
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[-9, -3], [31, 4]]), c, tol));
+  CheckTrue(ndaAllClose(TNDAMan.Transpose<Double>(b), bt, tol));
+
+  pC := c.Data;
+  pBt := bt.Data;
+  a.SetItem([0, 0], 2);
+  b.SetItem([0, 1], 3);
+
+  ndaMatMul(a, b, c, bt);
+
+  CheckTrue(c.Data = pC);
+  CheckTrue(bt.Data = pBt);
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[-7, 4], [31, 20]]), c, tol));
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[2, 1, -3], [3, 4, 2]]), bt, tol));
+end;
+
+procedure TMathTests.MatMul_StridedInputs;
+var a, b, c, bt: INDArray<Double>;
+begin
+  a := nda.AsArray<Double>([[1, 99, -2, 99, 3, 99], [4, 99, 5, 99, -6, 99]]);
+  b := nda.AsArray<Double>([
+    [2, 99, -1, 99], [99, 99, 99, 99],
+    [1, 99, 4, 99], [99, 99, 99, 99],
+    [-3, 99, 2, 99], [99, 99, 99, 99]
+  ]);
+  a := a[[NDIAll, NDIAll(2)]];
+  b := b[[NDIAll(2), NDIAll(2)]];
+
+  ndaMatMul(a, b, c, bt);
+
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[-9, -3], [31, 4]]), c, tol));
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[2, 1, -3], [-1, 4, 2]]), bt, tol));
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[1, -2, 3], [4, 5, -6]]), a, tol));
+end;
+
+procedure TMathTests.MatMul_TransposedInputs;
+var a, b, c: INDArray<Double>;
+begin
+  a := nda.AsArray<Double>([[1, 4], [-2, 5], [3, -6]]);
+  b := nda.AsArray<Double>([[2, 1, -3], [-1, 4, 2]]);
+  a := TNDAMan.TransposedView<Double>(a);
+  b := TNDAMan.TransposedView<Double>(b);
+
+  c := ndaMatMul(a, b);
+
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[-9, -3], [31, 4]]), c, tol));
+end;
+
+procedure TMathTests.MatMul_ReversedInputs;
+var a, b, c: INDArray<Double>;
+begin
+  a := nda.AsArray<Double>([[1, -2, 3], [4, 5, -6]]);
+  b := nda.AsArray<Double>([[2, -1], [1, 4], [-3, 2]]);
+  a := a[[NDIAll(-1), NDIAll(-1)]];
+  b := b[[NDIAll(-1), NDIAll(-1)]];
+
+  c := ndaMatMul(a, b);
+
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[4, 31], [-3, -9]]), c, tol));
+end;
+
+procedure TMathTests.MatMul_ReversedRows;
+var a, b, c: INDArray<Double>;
+begin
+  a := nda.AsArray<Double>([[1, -2, 3], [4, 5, -6]]);
+  b := nda.AsArray<Double>([[2, -1], [1, 4], [-3, 2]]);
+  a := a[[NDIAll(-1), NDIAll]];
+
+  c := ndaMatMul(a, b);
+
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[31, 4], [-9, -3]]), c, tol));
+end;
+
+procedure TMathTests.MatMul_PaddedBuffers;
+var a, b, c, bt, cStorage, btStorage: INDArray<Double>;
+    values, workspace: TNDAItems<Double>;
+    pC, pBt: PByte;
+    I: Integer;
+begin
+  a := nda.AsArray<Double>([[1, -2, 99], [4, 5, 99], [-3, 6, 99]]);
+  a := a[[NDIAll, NDIAllTo(1)]];
+  b := nda.AsArray<Double>([[2, -1, 3], [1, 4, -2]]);
+  cStorage := nda.Full<Double>([3, 5], -99);
+  btStorage := nda.Full<Double>([3, 4], -99);
+  c := cStorage[[NDIAll, NDIAllTo(2)]];
+  bt := btStorage[[NDIAll, NDIAllTo(1)]];
+  pC := c.Data;
+  pBt := bt.Data;
+
+  ndaMatMul(a, b, c, bt);
+
+  CheckTrue(c.Data = pC);
+  CheckTrue(bt.Data = pBt);
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[0, -9, 7], [13, 16, 2], [0, 27, -21]]), c, tol));
+  CheckTrue(ndaAllClose(TNDAMan.Transpose<Double>(b), bt, tol));
+  values := cStorage;
+  workspace := btStorage;
+  for I := 0 to 2 do begin
+    CheckEquals(-99, values[[I, 3]], tol);
+    CheckEquals(-99, values[[I, 4]], tol);
+    CheckEquals(-99, workspace[[I, 2]], tol);
+    CheckEquals(-99, workspace[[I, 3]], tol);
+  end;
+end;
+
+procedure TMathTests.MatMul_ReversedWorkspace;
+var a, b, c, bt: INDArray<Double>;
+    pBt: PByte;
+begin
+  a := nda.AsArray<Double>([[1, -2], [4, 5], [-3, 6]]);
+  b := nda.AsArray<Double>([[2, -1, 3], [1, 4, -2]]);
+  bt := nda.Empty<Double>([3, 2]);
+  bt := bt[[NDIAll(-1), NDIAll]];
+  pBt := bt.Data;
+
+  ndaMatMul(a, b, c, bt);
+
+  CheckTrue(bt.Data = pBt);
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[0, -9, 7], [13, 16, 2], [0, 27, -21]]), c, tol));
+  CheckTrue(ndaAllClose(TNDAMan.Transpose<Double>(b), bt, tol));
+end;
+
+procedure TMathTests.MatMul_ReversedResult;
+var a, b, c, bt: INDArray<Double>;
+    pC: PByte;
+begin
+  a := nda.AsArray<Double>([[1, -2], [4, 5], [-3, 6]]);
+  b := nda.AsArray<Double>([[2, -1, 3], [1, 4, -2]]);
+  c := nda.Empty<Double>([3, 3]);
+  c := c[[NDIAll(-1), NDIAll]];
+  pC := c.Data;
+
+  ndaMatMul(a, b, c, bt);
+
+  CheckTrue(c.Data = pC);
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[0, -9, 7], [13, 16, 2], [0, 27, -21]]), c, tol));
+end;
+
+procedure TMathTests.MatMul_NilA;
+var a, b, c, bt: INDArray<Double>;
+begin
+  b := nda.Empty<Double>([2, 3]);
+
+  try
+    ndaMatMul(a, b, c, bt);
+    Fail('Expected ENDAShapeError.');
+  except
+    on E: ENDAShapeError do begin
+      CheckFalse(Assigned(c));
+      CheckFalse(Assigned(bt));
+    end;
+  end;
+end;
+
+procedure TMathTests.MatMul_NilB;
+var a, b, c, bt: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([2, 3]);
+
+  try
+    ndaMatMul(a, b, c, bt);
+    Fail('Expected ENDAShapeError.');
+  except
+    on E: ENDAShapeError do begin
+      CheckFalse(Assigned(c));
+      CheckFalse(Assigned(bt));
+    end;
+  end;
+end;
+
+procedure TMathTests.MatMul_VectorA;
+var a, b, c: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([2]);
+  b := nda.Empty<Double>([2, 3]);
+  ExpectedException := ENDAShapeError;
+
+  c := ndaMatMul(a, b);
+end;
+
+procedure TMathTests.MatMul_VectorB;
+var a, b, c: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([3, 2]);
+  b := nda.Empty<Double>([2]);
+  ExpectedException := ENDAShapeError;
+
+  c := ndaMatMul(a, b);
+end;
+
+procedure TMathTests.MatMul_TensorA;
+var a, b, c: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([2, 3, 4]);
+  b := nda.Empty<Double>([4, 2]);
+  ExpectedException := ENDAShapeError;
+
+  c := ndaMatMul(a, b);
+end;
+
+procedure TMathTests.MatMul_TensorB;
+var a, b, c: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([2, 3]);
+  b := nda.Empty<Double>([3, 4, 2]);
+  ExpectedException := ENDAShapeError;
+
+  c := ndaMatMul(a, b);
+end;
+
+procedure TMathTests.MatMul_IncompatibleDimensions;
+var a, b, c, bt: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([2, 3]);
+  b := nda.Empty<Double>([4, 2]);
+
+  try
+    ndaMatMul(a, b, c, bt);
+    Fail('Expected ENDAShapeError.');
+  except
+    on E: ENDAShapeError do begin
+      CheckFalse(Assigned(c));
+      CheckFalse(Assigned(bt));
+    end;
+  end;
+end;
+
+{$ifopt C+}
+procedure TMathTests.MatMul_InvalidResultShape;
+var a, b, c, bt: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([2, 3]);
+  b := nda.Empty<Double>([3, 4]);
+  c := nda.Empty<Double>([4, 2]);
+  ExpectedException := EAssertionFailed;
+
+  ndaMatMul(a, b, c, bt);
+end;
+
+procedure TMathTests.MatMul_InvalidWorkspaceShape;
+var a, b, c, bt: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([2, 3]);
+  b := nda.Empty<Double>([3, 4]);
+  bt := nda.Empty<Double>([3, 4]);
+  ExpectedException := EAssertionFailed;
+
+  ndaMatMul(a, b, c, bt);
+end;
+
+procedure TMathTests.MatMul_StridedResult;
+var a, b, c, bt: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([2, 3]);
+  b := nda.Empty<Double>([3, 4]);
+  c := nda.Empty<Double>([2, 8]);
+  c := c[[NDIAll, NDIAll(2)]];
+  ExpectedException := EAssertionFailed;
+
+  ndaMatMul(a, b, c, bt);
+end;
+
+procedure TMathTests.MatMul_StridedWorkspace;
+var a, b, c, bt: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([2, 3]);
+  b := nda.Empty<Double>([3, 4]);
+  bt := nda.Empty<Double>([4, 6]);
+  bt := bt[[NDIAll, NDIAll(2)]];
+  ExpectedException := EAssertionFailed;
+
+  ndaMatMul(a, b, c, bt);
+end;
+{$endif}
+
+{$endregion}
+
+{$region 'ndaMatMulParallel'}
+
+procedure TMathTests.CheckMatMulParallel(aM, aK, aN, aMaxWorkers: Integer);
+var a, b, c, serial, expected: INDArray<Double>;
+    I, J: Integer;
+begin
+  a := nda.Empty<Double>([aM, aK]);
+  b := nda.Empty<Double>([aK, aN]);
+  for I := 0 to aM - 1 do
+    for J := 0 to aK - 1 do
+      a.SetItem([I, J], ((I*7 + J*3) mod 13 - 6) / 4);
+  for I := 0 to aK - 1 do
+    for J := 0 to aN - 1 do
+      b.SetItem([I, J], ((I*5 + J*11) mod 17 - 8) / 8);
+  expected := ndaDot(a, b);
+  serial := ndaMatMulParallel(a, b, 1);
+
+  c := ndaMatMulParallel(a, b, aMaxWorkers);
+
+  CheckEquals([aM, aN], c.Shape);
+  CheckTrue(ndaAllClose(expected, c, tol));
+  CheckTrue(ndaAllClose(serial, c, tol));
+end;
+
+procedure TMathTests.MatMulParallel_Workers1;
+begin
+  CheckMatMulParallel(11, 7, 5, 1);
+end;
+
+procedure TMathTests.MatMulParallel_Workers2;
+begin
+  CheckMatMulParallel(11, 7, 5, 2);
+end;
+
+procedure TMathTests.MatMulParallel_Workers4;
+begin
+  CheckMatMulParallel(11, 7, 5, 4);
+end;
+
+procedure TMathTests.MatMulParallel_AutomaticWorkers;
+begin
+  CheckMatMulParallel(11, 7, 5, 0);
+end;
+
+procedure TMathTests.MatMulParallel_EvenRows;
+begin
+  CheckMatMulParallel(14, 8, 6, 4);
+end;
+
+procedure TMathTests.MatMulParallel_LargerProduct;
+begin
+  CheckMatMulParallel(257, 129, 65, 4);
+end;
+
+procedure TMathTests.MatMulParallel_ExcessWorkers;
+begin
+  CheckMatMulParallel(3, 3, 4, 100);
+end;
+
+procedure TMathTests.MatMulParallel_SingleRow;
+begin
+  CheckMatMulParallel(1, 3, 5, 4);
+end;
+
+procedure TMathTests.MatMulParallel_SingleColumn;
+begin
+  CheckMatMulParallel(9, 3, 1, 4);
+end;
+
+procedure TMathTests.MatMulParallel_InnerDimension1;
+begin
+  CheckMatMulParallel(9, 1, 7, 4);
+end;
+
+procedure TMathTests.MatMulParallel_ReusedResult;
+var a, b, c: INDArray<Double>;
+    pC: PByte;
+begin
+  a := nda.AsArray<Double>([[1, -2], [4, 5], [-3, 6]]);
+  b := nda.AsArray<Double>([[2, -1, 3], [1, 4, -2]]);
+  c := nda.Full<Double>([3, 3], -99);
+  pC := c.Data;
+
+  ndaMatMulParallel(a, b, c, 2);
+
+  CheckTrue(c.Data = pC);
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[0, -9, 7], [13, 16, 2], [0, 27, -21]]), c, tol));
+end;
+
+procedure TMathTests.MatMulParallel_ReusedBuffers;
+var a, b, c, bt, expected: INDArray<Double>;
+    pC, pBt: PByte;
+    I: Integer;
+begin
+  a := nda.AsArray<Double>([[1, -2], [4, 5], [-3, 6]]);
+  b := nda.AsArray<Double>([[2, -1, 3], [1, 4, -2]]);
+  ndaMatMulParallel(a, b, c, bt);
+  pC := c.Data;
+  pBt := bt.Data;
+
+  CheckEquals([3, 3], c.Shape);
+  CheckEquals([3, 2], bt.Shape);
+  CheckTrue(ndaAllClose(ndaDot(a, b), c, tol));
+  CheckTrue(ndaAllClose(TNDAMan.Transpose<Double>(b), bt, tol));
+
+  for I := 1 to 10 do begin
+    a.SetItem([0, 0], I);
+    b.SetItem([0, 1], -I);
+    expected := ndaDot(a, b);
+
+    ndaMatMulParallel(a, b, c, bt, 4);
+
+    CheckTrue(c.Data = pC);
+    CheckTrue(bt.Data = pBt);
+    CheckTrue(ndaAllClose(expected, c, tol));
+    CheckTrue(ndaAllClose(TNDAMan.Transpose<Double>(b), bt, tol));
+  end;
+end;
+
+procedure TMathTests.MatMulParallel_StridedInputs;
+var a, b, c, bt, expected, originalA, originalB: INDArray<Double>;
+begin
+  a := nda.AsArray<Double>([[1, 99, -2, 99], [4, 99, 5, 99], [-3, 99, 6, 99]]);
+  b := nda.AsArray<Double>([[2, 99, -1, 99, 3, 99], [1, 99, 4, 99, -2, 99]]);
+  a := a[[NDIAll, NDIAll(2)]];
+  b := b[[NDIAll, NDIAll(2)]];
+  originalA := TNDAUt.Copy<Double>(a);
+  originalB := TNDAUt.Copy<Double>(b);
+  expected := ndaDot(originalA, originalB);
+
+  ndaMatMulParallel(a, b, c, bt, 2);
+
+  CheckTrue(ndaAllClose(expected, c, tol));
+  CheckTrue(ndaAllClose(TNDAMan.Transpose<Double>(originalB), bt, tol));
+  CheckTrue(ndaAllClose(originalA, a, tol));
+  CheckTrue(ndaAllClose(originalB, b, tol));
+end;
+
+procedure TMathTests.MatMulParallel_TransposedInputs;
+var a, b, c: INDArray<Double>;
+begin
+  a := nda.AsArray<Double>([[1, 4, -3], [-2, 5, 6]]);
+  b := nda.AsArray<Double>([[2, 1], [-1, 4], [3, -2]]);
+  a := TNDAMan.TransposedView<Double>(a);
+  b := TNDAMan.TransposedView<Double>(b);
+
+  c := ndaMatMulParallel(a, b, 2);
+
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[0, -9, 7], [13, 16, 2], [0, 27, -21]]), c, tol));
+end;
+
+procedure TMathTests.MatMulParallel_ReversedInputs;
+var a, b, c, expected: INDArray<Double>;
+begin
+  a := nda.AsArray<Double>([[1, -2], [4, 5], [-3, 6]]);
+  b := nda.AsArray<Double>([[2, -1, 3], [1, 4, -2]]);
+  a := a[[NDIAll(-1), NDIAll(-1)]];
+  b := b[[NDIAll(-1), NDIAll(-1)]];
+  expected := nda.AsArray<Double>([[-21, 27, 0], [2, 16, 13], [7, -9, 0]]);
+
+  c := ndaMatMulParallel(a, b, 2);
+
+  CheckTrue(ndaAllClose(expected, c, tol));
+end;
+
+procedure TMathTests.MatMulParallel_PaddedBuffers;
+var a, b, c, bt, cStorage, btStorage: INDArray<Double>;
+    values, workspace: TNDAItems<Double>;
+    I: Integer;
+begin
+  a := nda.AsArray<Double>([[1, -2, 99], [4, 5, 99], [-3, 6, 99]]);
+  a := a[[NDIAll, NDIAllTo(1)]];
+  b := nda.AsArray<Double>([[2, -1, 3], [1, 4, -2]]);
+  cStorage := nda.Full<Double>([3, 5], -99);
+  btStorage := nda.Full<Double>([3, 4], -99);
+  c := cStorage[[NDIAll, NDIAllTo(2)]];
+  bt := btStorage[[NDIAll, NDIAllTo(1)]];
+
+  ndaMatMulParallel(a, b, c, bt, 2);
+
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[0, -9, 7], [13, 16, 2], [0, 27, -21]]), c, tol));
+  CheckTrue(ndaAllClose(TNDAMan.Transpose<Double>(b), bt, tol));
+  values := cStorage;
+  workspace := btStorage;
+  for I := 0 to 2 do begin
+    CheckEquals(-99, values[[I, 3]], tol);
+    CheckEquals(-99, values[[I, 4]], tol);
+    CheckEquals(-99, workspace[[I, 2]], tol);
+    CheckEquals(-99, workspace[[I, 3]], tol);
+  end;
+end;
+
+procedure TMathTests.MatMulParallel_ReversedBuffers;
+var a, b, c, bt: INDArray<Double>;
+    pC, pBt: PByte;
+begin
+  a := nda.AsArray<Double>([[1, -2], [4, 5], [-3, 6]]);
+  a := a[[NDIAll(-1), NDIAll]];
+  b := nda.AsArray<Double>([[2, -1, 3], [1, 4, -2]]);
+  c := nda.Empty<Double>([3, 3]);
+  c := c[[NDIAll(-1), NDIAll]];
+  bt := nda.Empty<Double>([3, 2]);
+  bt := bt[[NDIAll(-1), NDIAll]];
+  pC := c.Data;
+  pBt := bt.Data;
+
+  ndaMatMulParallel(a, b, c, bt, 2);
+
+  CheckTrue(c.Data = pC);
+  CheckTrue(bt.Data = pBt);
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[0, 27, -21], [13, 16, 2], [0, -9, 7]]), c, tol));
+  CheckTrue(ndaAllClose(TNDAMan.Transpose<Double>(b), bt, tol));
+end;
+
+procedure TMathTests.MatMulParallel_NegativeWorkers;
+var a, b, c, bt: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([3, 2]);
+  b := nda.Empty<Double>([2, 3]);
+
+  try
+    ndaMatMulParallel(a, b, c, bt, -1);
+    Fail('Expected EArgumentOutOfRangeException.');
+  except
+    on E: EArgumentOutOfRangeException do begin
+      CheckFalse(Assigned(c));
+      CheckFalse(Assigned(bt));
+    end;
+  end;
+end;
+
+procedure TMathTests.MatMulParallel_NilA;
+var a, b, c: INDArray<Double>;
+begin
+  b := nda.Empty<Double>([2, 3]);
+  ExpectedException := ENDAShapeError;
+
+  c := ndaMatMulParallel(a, b);
+end;
+
+procedure TMathTests.MatMulParallel_NilB;
+var a, b, c: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([3, 2]);
+  ExpectedException := ENDAShapeError;
+
+  c := ndaMatMulParallel(a, b);
+end;
+
+procedure TMathTests.MatMulParallel_NonmatrixA;
+var a, b, c: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([2]);
+  b := nda.Empty<Double>([2, 3]);
+  ExpectedException := ENDAShapeError;
+
+  c := ndaMatMulParallel(a, b);
+end;
+
+procedure TMathTests.MatMulParallel_NonmatrixB;
+var a, b, c: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([3, 2]);
+  b := nda.Empty<Double>([2, 3, 4]);
+  ExpectedException := ENDAShapeError;
+
+  c := ndaMatMulParallel(a, b);
+end;
+
+procedure TMathTests.MatMulParallel_IncompatibleDimensions;
+var a, b, c, bt: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([3, 2]);
+  b := nda.Empty<Double>([3, 4]);
+
+  try
+    ndaMatMulParallel(a, b, c, bt, 2);
+    Fail('Expected ENDAShapeError.');
+  except
+    on E: ENDAShapeError do begin
+      CheckFalse(Assigned(c));
+      CheckFalse(Assigned(bt));
+    end;
+  end;
+end;
+
+{$ifopt C+}
+procedure TMathTests.MatMulParallel_InvalidResultShape;
+var a, b, c, bt: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([3, 2]);
+  b := nda.Empty<Double>([2, 4]);
+  c := nda.Empty<Double>([4, 3]);
+  ExpectedException := EAssertionFailed;
+
+  ndaMatMulParallel(a, b, c, bt, 2);
+end;
+
+procedure TMathTests.MatMulParallel_InvalidWorkspaceShape;
+var a, b, c, bt: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([3, 2]);
+  b := nda.Empty<Double>([2, 4]);
+  bt := nda.Empty<Double>([2, 4]);
+  ExpectedException := EAssertionFailed;
+
+  ndaMatMulParallel(a, b, c, bt, 2);
+end;
+
+procedure TMathTests.MatMulParallel_StridedResult;
+var a, b, c, bt: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([3, 2]);
+  b := nda.Empty<Double>([2, 4]);
+  c := nda.Empty<Double>([3, 8]);
+  c := c[[NDIAll, NDIAll(2)]];
+  ExpectedException := EAssertionFailed;
+
+  ndaMatMulParallel(a, b, c, bt, 2);
+end;
+
+procedure TMathTests.MatMulParallel_StridedWorkspace;
+var a, b, c, bt: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([3, 2]);
+  b := nda.Empty<Double>([2, 4]);
+  bt := nda.Empty<Double>([4, 4]);
+  bt := bt[[NDIAll, NDIAll(2)]];
+  ExpectedException := EAssertionFailed;
+
+  ndaMatMulParallel(a, b, c, bt, 2);
+end;
+
+procedure TMathTests.MatMulParallel_OverlappingRows;
+var a, b, c, bt, storage: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([3, 2]);
+  b := nda.Empty<Double>([2, 3]);
+  storage := nda.Empty<Double>([5]);
+  c := TNDArray<Double>.Create(storage.Data,
+    TArray<NativeInt>.Create(3, 3), TArray<NativeInt>.Create(8, 8));
+  ExpectedException := EAssertionFailed;
+
+  ndaMatMulParallel(a, b, c, bt, 2);
+end;
+{$endif}
+
+{$endregion}
+
+{$region 'ndaGramParallel'}
+
+procedure TMathTests.CheckGramParallel(aH, aW, aMaxWorkers: Integer);
+var a, g, expected, serial, legacy: INDArray<Double>;
+    values: TNDAItems<Double>;
+    I, J: Integer;
+begin
+  a := nda.Empty<Double>([aH, aW]);
+  for I := 0 to aH - 1 do
+    for J := 0 to aW - 1 do
+      a.SetItem([I, J], ((I*7 + J*3) mod 13 - 6) / 4);
+  expected := ndaDot(TNDAMan.Transpose<Double>(a), a);
+  serial := ndaGramParallel(a, 1);
+  legacy := ndaGram(a);
+
+  g := ndaGramParallel(a, aMaxWorkers);
+
+  CheckEquals([aW, aW], g.Shape);
+  CheckTrue(ndaAllClose(expected, g, tol));
+  CheckTrue(ndaAllClose(serial, g, tol));
+  CheckTrue(ndaAllClose(legacy, g, tol));
+  values := g;
+  for I := 0 to aW - 1 do
+    for J := I + 1 to aW - 1 do
+      CheckEquals(values[[I, J]], values[[J, I]], 0);
+end;
+
+procedure TMathTests.GramParallel_Workers1;
+begin
+  CheckGramParallel(7, 9, 1);
+end;
+
+procedure TMathTests.GramParallel_Workers2;
+begin
+  CheckGramParallel(7, 9, 2);
+end;
+
+procedure TMathTests.GramParallel_Workers4;
+begin
+  CheckGramParallel(7, 9, 4);
+end;
+
+procedure TMathTests.GramParallel_AutomaticWorkers;
+begin
+  CheckGramParallel(7, 9, 0);
+end;
+
+procedure TMathTests.GramParallel_1x1;
+begin
+  CheckGramParallel(1, 1, 4);
+end;
+
+procedure TMathTests.GramParallel_SingleColumn;
+begin
+  CheckGramParallel(5, 1, 4);
+end;
+
+procedure TMathTests.GramParallel_SingleTile;
+begin
+  CheckGramParallel(3, 2, 4);
+end;
+
+procedure TMathTests.GramParallel_OddWidth;
+begin
+  CheckGramParallel(4, 3, 2);
+end;
+
+procedure TMathTests.GramParallel_EvenWidth;
+begin
+  CheckGramParallel(5, 4, 2);
+end;
+
+procedure TMathTests.GramParallel_UnevenTiles;
+begin
+  CheckGramParallel(8, 5, 4);
+end;
+
+procedure TMathTests.GramParallel_BoundaryInsideRow;
+begin
+  CheckGramParallel(9, 17, 4);
+end;
+
+procedure TMathTests.GramParallel_ExcessWorkers;
+begin
+  CheckGramParallel(3, 3, 100);
+end;
+
+procedure TMathTests.GramParallel_SingleInputRow;
+begin
+  CheckGramParallel(1, 7, 4);
+end;
+
+procedure TMathTests.GramParallel_LargerProduct;
+begin
+  CheckGramParallel(129, 65, 4);
+end;
+
+procedure TMathTests.GramParallel_FixedValues;
+var a, g: INDArray<Double>;
+begin
+  a := nda.AsArray<Double>([[1, -2, 3], [4, 5, -6]]);
+
+  g := ndaGramParallel(a, 2);
+
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[17, 18, -21], [18, 29, -36], [-21, -36, 45]]), g, tol));
+end;
+
+procedure TMathTests.GramParallel_AllocatedResult;
+var a, g: INDArray<Double>;
+begin
+  a := nda.AsArray<Double>([[1, -2, 3], [4, 5, -6]]);
+
+  ndaGramParallel(a, g, 2);
+
+  CheckEquals([3, 3], g.Shape);
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[17, 18, -21], [18, 29, -36], [-21, -36, 45]]), g, tol));
+end;
+
+procedure TMathTests.GramParallel_ReusedResult;
+var a, g: INDArray<Double>;
+    pG: PByte;
+begin
+  a := nda.AsArray<Double>([[1, -2, 3], [4, 5, -6]]);
+  g := nda.Full<Double>([3, 3], -99);
+  pG := g.Data;
+
+  ndaGramParallel(a, g, 2);
+
+  CheckTrue(g.Data = pG);
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[17, 18, -21], [18, 29, -36], [-21, -36, 45]]), g, tol));
+end;
+
+procedure TMathTests.GramParallel_ReusedBuffers;
+var a, g, at, expected: INDArray<Double>;
+    pG, pAt: PByte;
+    I: Integer;
+begin
+  a := nda.AsArray<Double>([[1, -2, 3], [4, 5, -6]]);
+  ndaGramParallel(a, g, at);
+  pG := g.Data;
+  pAt := at.Data;
+
+  CheckEquals([3, 3], g.Shape);
+  CheckEquals([3, 2], at.Shape);
+  CheckTrue(ndaAllClose(ndaDot(TNDAMan.Transpose<Double>(a), a), g, tol));
+  CheckTrue(ndaAllClose(TNDAMan.Transpose<Double>(a), at, tol));
+
+  for I := 1 to 10 do begin
+    a.SetItem([0, 0], I);
+    expected := ndaDot(TNDAMan.Transpose<Double>(a), a);
+
+    ndaGramParallel(a, g, at, 4);
+
+    CheckTrue(g.Data = pG);
+    CheckTrue(at.Data = pAt);
+    CheckTrue(ndaAllClose(expected, g, tol));
+    CheckTrue(ndaAllClose(TNDAMan.Transpose<Double>(a), at, tol));
+  end;
+end;
+
+procedure TMathTests.GramParallel_StridedInput;
+var a, g, at, original, expected: INDArray<Double>;
+begin
+  a := nda.AsArray<Double>([[1, 99, -2, 99, 3, 99], [4, 99, 5, 99, -6, 99]]);
+  a := a[[NDIAll, NDIAll(2)]];
+  original := TNDAUt.Copy<Double>(a);
+  expected := ndaDot(TNDAMan.Transpose<Double>(original), original);
+
+  ndaGramParallel(a, g, at, 2);
+
+  CheckTrue(ndaAllClose(expected, g, tol));
+  CheckTrue(ndaAllClose(TNDAMan.Transpose<Double>(original), at, tol));
+  CheckTrue(ndaAllClose(original, a, tol));
+end;
+
+procedure TMathTests.GramParallel_TransposedInput;
+var a, g: INDArray<Double>;
+begin
+  a := nda.AsArray<Double>([[1, 4], [-2, 5], [3, -6]]);
+  a := TNDAMan.TransposedView<Double>(a);
+
+  g := ndaGramParallel(a, 2);
+
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[17, 18, -21], [18, 29, -36], [-21, -36, 45]]), g, tol));
+end;
+
+procedure TMathTests.GramParallel_ReversedInput;
+var a, g: INDArray<Double>;
+begin
+  a := nda.AsArray<Double>([[1, -2, 3], [4, 5, -6]]);
+  a := a[[NDIAll(-1), NDIAll(-1)]];
+
+  g := ndaGramParallel(a, 2);
+
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[45, -36, -21], [-36, 29, 18], [-21, 18, 17]]), g, tol));
+end;
+
+procedure TMathTests.GramParallel_PaddedBuffers;
+var a, g, at, gStorage, atStorage: INDArray<Double>;
+    values, workspace: TNDAItems<Double>;
+    I: Integer;
+begin
+  a := nda.AsArray<Double>([[1, -2, 3], [4, 5, -6]]);
+  gStorage := nda.Full<Double>([3, 5], -99);
+  atStorage := nda.Full<Double>([3, 4], -99);
+  g := gStorage[[NDIAll, NDIAllTo(2)]];
+  at := atStorage[[NDIAll, NDIAllTo(1)]];
+
+  ndaGramParallel(a, g, at, 2);
+
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[17, 18, -21], [18, 29, -36], [-21, -36, 45]]), g, tol));
+  CheckTrue(ndaAllClose(TNDAMan.Transpose<Double>(a), at, tol));
+  values := gStorage;
+  workspace := atStorage;
+  for I := 0 to 2 do begin
+    CheckEquals(-99, values[[I, 3]], tol);
+    CheckEquals(-99, values[[I, 4]], tol);
+    CheckEquals(-99, workspace[[I, 2]], tol);
+    CheckEquals(-99, workspace[[I, 3]], tol);
+  end;
+end;
+
+procedure TMathTests.GramParallel_ReversedRows;
+var a, original, expected, g, at: INDArray<Double>;
+begin
+  a := nda.AsArray<Double>([[1, -2, 3], [4, 5, -6], [7, 8, -9], [-10, 11, 12], [13, -14, 15]]);
+  a := a[[NDIAll(-1), NDIAll]];
+  original := TNDAUt.Copy<Double>(a);
+  expected := ndaDot(TNDAMan.Transpose<Double>(original), original);
+
+  ndaGramParallel(a, g, at, 2);
+
+  CheckTrue(ndaAllClose(expected, g, tol));
+  CheckTrue(ndaAllClose(TNDAMan.Transpose<Double>(original), at, tol));
+  CheckTrue(ndaAllClose(original, a, tol));
+end;
+
+procedure TMathTests.GramParallel_ReversedBuffers;
+var a, g, at: INDArray<Double>;
+    pG, pAt: PByte;
+begin
+  a := nda.AsArray<Double>([[1, -2, 3], [4, 5, -6]]);
+  a := a[[NDIAll(-1), NDIAll]];
+  g := nda.Empty<Double>([3, 3]);
+  at := nda.Empty<Double>([3, 2]);
+  g := g[[NDIAll(-1), NDIAll]];
+  at := at[[NDIAll(-1), NDIAll]];
+  pG := g.Data;
+  pAt := at.Data;
+
+  ndaGramParallel(a, g, at, 2);
+
+  CheckTrue(g.Data = pG);
+  CheckTrue(at.Data = pAt);
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[4, 1], [5, -2], [-6, 3]]), at, tol), 'Transpose workspace');
+  CheckTrue(ndaAllClose(nda.AsArray<Double>([[17, 18, -21], [18, 29, -36], [-21, -36, 45]]), g, tol), 'Gram values');
+end;
+
+procedure TMathTests.GramParallel_NegativeWorkers;
+var a, g, at: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([2, 3]);
+
+  try
+    ndaGramParallel(a, g, at, -1);
+    Fail('Expected EArgumentOutOfRangeException.');
+  except
+    on E: EArgumentOutOfRangeException do begin
+      CheckFalse(Assigned(g));
+      CheckFalse(Assigned(at));
+    end;
+  end;
+end;
+
+procedure TMathTests.GramParallel_NilInput;
+var a, g: INDArray<Double>;
+begin
+  ExpectedException := ENDAShapeError;
+
+  g := ndaGramParallel(a);
+end;
+
+procedure TMathTests.GramParallel_VectorInput;
+var a, g: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([3]);
+  ExpectedException := ENDAShapeError;
+
+  g := ndaGramParallel(a);
+end;
+
+procedure TMathTests.GramParallel_TensorInput;
+var a, g: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([2, 3, 4]);
+  ExpectedException := ENDAShapeError;
+
+  g := ndaGramParallel(a);
+end;
+
+{$ifopt C+}
+procedure TMathTests.GramParallel_InvalidResultShape;
+var a, g, at: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([2, 3]);
+  g := nda.Empty<Double>([3, 2]);
+  ExpectedException := EAssertionFailed;
+
+  ndaGramParallel(a, g, at, 2);
+end;
+
+procedure TMathTests.GramParallel_InvalidWorkspaceShape;
+var a, g, at: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([2, 3]);
+  at := nda.Empty<Double>([2, 3]);
+  ExpectedException := EAssertionFailed;
+
+  ndaGramParallel(a, g, at, 2);
+end;
+
+procedure TMathTests.GramParallel_StridedResult;
+var a, g, at: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([2, 3]);
+  g := nda.Empty<Double>([3, 6]);
+  g := g[[NDIAll, NDIAll(2)]];
+  ExpectedException := EAssertionFailed;
+
+  ndaGramParallel(a, g, at, 2);
+end;
+
+procedure TMathTests.GramParallel_StridedWorkspace;
+var a, g, at: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([2, 3]);
+  at := nda.Empty<Double>([3, 4]);
+  at := at[[NDIAll, NDIAll(2)]];
+  ExpectedException := EAssertionFailed;
+
+  ndaGramParallel(a, g, at, 2);
+end;
+
+procedure TMathTests.GramParallel_OverlappingRows;
+var a, g, at, storage: INDArray<Double>;
+begin
+  a := nda.Empty<Double>([2, 3]);
+  storage := nda.Empty<Double>([5]);
+  g := TNDArray<Double>.Create(storage.Data,
+    TArray<NativeInt>.Create(3, 3), TArray<NativeInt>.Create(8, 8));
+  ExpectedException := EAssertionFailed;
+
+  ndaGramParallel(a, g, at, 2);
+end;
+{$endif}
 
 {$endregion}
 

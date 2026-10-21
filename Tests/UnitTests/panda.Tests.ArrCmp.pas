@@ -9,6 +9,7 @@ uses
   , panda.ArrCmp
   , panda.Arithmetic
   , panda.Tests.NDATestCase
+  , System.SysUtils
   ;
 
 type
@@ -38,6 +39,13 @@ type
   published
     procedure Masking1D_I32;
     procedure Masking2D_I32;
+  end;
+
+  TIsFiniteTests = class(TNDATestCase)
+  published
+    procedure IsFinite_F64_S;
+    procedure IsFinite_F64_V;
+    procedure IsFinite_F64_M;
   end;
 
 implementation
@@ -223,10 +231,55 @@ end;
 
 {$endregion}
 
+{$region 'TIsFiniteTests'}
+
+procedure TIsFiniteTests.IsFinite_F64_S;
+var s: INDArray<Double>;
+begin
+  s := TNDAUt.Scalar<Double>(3);
+  CheckTrue(ndaAllIsFinite(s));
+
+  s := TNDAUt.Scalar<Double>(Double.NaN);
+  CheckFalse(ndaAllIsFinite(s));
+
+  s := TNDAUt.Scalar<Double>(Double.PositiveInfinity);
+  CheckFalse(ndaAllIsFinite(s));
+end;
+
+procedure TIsFiniteTests.IsFinite_F64_V;
+var v: INDArray<Double>;
+begin
+  v := TNDAUt.AsArray<Double>([1, Double.NaN, 3, 4, 5, 6]);
+
+  CheckFalse(ndaAllIsFinite(v));
+  CheckTrue(ndaAllIsFinite(v[[NDIAll(2)]]));
+end;
+
+procedure TIsFiniteTests.IsFinite_F64_M;
+var m: INDArray<Double>;
+begin
+  m := TNDAUt.AsArray<Double>([
+    [1, 2, 3],
+    [4, 5, 6],
+    [7, Double.NaN, 9],
+    [10, 11, 12],
+    [Double.PositiveInfinity, 14, 15]
+  ]);
+
+  CheckFalse(ndaAllIsFinite(m));
+  CheckTrue(ndaAllIsFinite(m[[NDISpan(0, 1)]]));
+  CheckFalse(ndaAllIsFinite(m[[NDISpan(0, 2)]]));
+  CheckFalse(ndaAllIsFinite(m[[NDISpan(-2, -1)]]));
+  CheckTrue(ndaAllIsFinite(m[[NDISpan(1, 3, 2), NDIAll(2)]]));
+end;
+
+{$endregion}
+
 initialization
 
   RegisterTest(TArrCmpTests.Suite);
   RegisterTest(TTensorCmpTests.Suite);
   RegisterTest(TTensorMaskingTests.Suite);
+  RegisterTest(TIsFiniteTests.Suite);
 
 end.

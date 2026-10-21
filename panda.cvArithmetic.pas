@@ -118,6 +118,16 @@ procedure dot(pX, pY: PCmplx128; aCount: NativeInt; out aRes: TCmplx128); overlo
 function sdot(aN: NativeInt; pX: PByte; aXInc: NativeInt; pY: PByte; aYInc: NativeInt): Single;
 function ddot(aN: NativeInt; pX: PByte; aXInc: NativeInt; pY: PByte; aYInc: NativeInt): Double;
 
+/// <summary> Computes four dot products, sharing the input vector loads. </summary>
+/// <remarks>
+/// D00 = dot(pR00, pR10), D01 = dot(pR00, pR11),
+/// D10 = dot(pR01, pR10), D11 = dot(pR01, pR11), each over aCount doubles.
+/// A zero count returns four zeros without reading the input vectors.
+/// </remarks>
+/// <exception cref="EArgumentOutOfRangeException"> aCount is negative. </exception>
+procedure dot2x2(pR00, pR01, pR10, pR11: PDouble; aCount: NativeInt;
+  out D00, D01, D10, D11: Double); overload;
+
 procedure Differences(pX, pRes: PDouble; aCount: NativeInt); overload;
 procedure Differences(pX, pRes: PSingle; aCount: NativeInt); overload;
 procedure Differences(pX, pRes: PDouble; aXStep, aResStep, aCount: NativeInt); overload;
@@ -4198,26 +4208,57 @@ asm
   mov rax, rcx
   mov rcx, r8
   xorpd xmm0, xmm0
-  shr rcx, 1
+  shr rcx, 2
   jz @rest
+
+{$ifdef AVX}
+  vxorpd ymm0, ymm0, ymm0
 @L:
-  movupd xmm1, [rax]
-  movupd xmm2, [rdx]
-  mulpd xmm1, xmm2 // xmm0 <- X * Y
-  addpd xmm0, xmm1
-  add rax, 16
-  add rdx, 16
+  vmovupd ymm1, [rax]
+  vmovupd ymm2, [rdx]
+  vmulpd ymm1, ymm1, ymm2 // ymm1 <- X * Y
+  vaddpd ymm0, ymm0, ymm1
+  add rax, 32
+  add rdx, 32
   dec rcx
   jnz @L
 
-@rest:
-  and r8, 1
-  jz @end
+  vextractf128 xmm1, ymm0, 1
+  vaddpd xmm0, xmm0, xmm1
 
+  vzeroupper
+{$else}
+  xorps xmm3, xmm3
+@L:
+  movupd xmm1, [rax]
+  movupd xmm2, [rdx]
+  mulpd xmm1, xmm2
+  addpd xmm0, xmm1
+
+  movupd xmm4, [rax + 16]
+  movupd xmm5, [rdx + 16]
+  mulpd xmm4, xmm5
+  addpd xmm3, xmm4
+
+  add rax, 32
+  add rdx, 32
+  dec rcx
+  jnz @L
+
+  addpd xmm0, xmm3
+{$endif}
+@rest:
+  and r8, 3
+  jz @end
+@Lrest:
   movsd xmm1, [rax]
   movsd xmm2, [rdx]
   mulsd xmm1, xmm2
   addsd xmm0, xmm1
+  add rax, 8
+  add rdx, 8
+  dec r8
+  jnz @Lrest
 
 @end:
   movhlps xmm1, xmm0
@@ -4361,6 +4402,183 @@ begin
   end else
     dot(PDouble(pX), PDouble(pY), aN, Result);
 end;
+
+procedure dot2x2(pR00, pR01, pR10, pR11: PDouble; aCount: NativeInt;
+  out D00, D01, D10, D11: Double);
+{$if defined(ASMx64)}
+// RCX <- pR00, RDX <- pR01, R8 <- pR10, R9 <- pR11, [RBP + $30] <- aCount,
+// [RBP + $38] <- @D00, [RBP + $40] <- @D01, [RBP + $48] <- @D10, [RBP + $50] <- @D11
+asm
+  mov rax, [rbp + $30]
+  test rax, rax
+  jns @begin
+  sub rsp, 32 // shadow space; the RBP stack frame already aligns RSP
+  call RaiseNegativeLength
+@begin:
+  sub rsp, 64 // 64 for xmm6..xmm9 backup
+  movdqa [rsp], xmm6
+  movdqa [rsp + 16], xmm7
+  movdqa [rsp + 32], xmm8
+  movdqa [rsp + 48], xmm9
+
+{$ifdef AVX}
+  vxorpd ymm4, ymm4, ymm4
+  vxorpd ymm5, ymm5, ymm5
+  vxorpd ymm6, ymm6, ymm6
+  vxorpd ymm7, ymm7, ymm7
+  shr rax, 2
+  jz @reduce
+@L:
+  vmovupd ymm0, [rcx]    // ymm0 <- pR00[i:i+3]
+  vmovupd ymm1, [rdx]    // ymm1 <- pR01[i:i+3]
+  vmovupd ymm2, [r8]     // ymm2 <- pR10[i:i+3]
+  vmovupd ymm3, [r9]     // ymm3 <- pR11[i:i+3]
+
+  vmulpd ymm8, ymm0, ymm2
+  vmulpd ymm9, ymm0, ymm3
+  vmulpd ymm0, ymm1, ymm2
+  vmulpd ymm1, ymm1, ymm3
+
+  vaddpd ymm4, ymm4, ymm8
+  vaddpd ymm5, ymm5, ymm9
+  vaddpd ymm6, ymm6, ymm0
+  vaddpd ymm7, ymm7, ymm1
+
+  add rcx, 32
+  add rdx, 32
+  add r8, 32
+  add r9, 32
+  dec rax
+  jnz @L
+
+@reduce:
+  vextractf128 xmm0, ymm4, 1
+  vextractf128 xmm1, ymm5, 1
+  vextractf128 xmm2, ymm6, 1
+  vextractf128 xmm3, ymm7, 1
+  vaddpd xmm4, xmm4, xmm0
+  vaddpd xmm5, xmm5, xmm1
+  vaddpd xmm6, xmm6, xmm2
+  vaddpd xmm7, xmm7, xmm3
+
+  vzeroupper
+{$else}
+  xorpd xmm4, xmm4
+  xorpd xmm5, xmm5
+  xorpd xmm6, xmm6
+  xorpd xmm7, xmm7
+  shr rax, 1
+  jz @rest
+@L:
+  movupd xmm0, [rcx]      // xmm0 <- pR00[i:i+1]
+  movupd xmm1, [rdx]      // xmm1 <- pR01[i:i+1]
+  movupd xmm2, [r8]       // xmm2 <- pR10[i:i+1]
+  movupd xmm3, [r9]       // xmm3 <- pR11[i:i+1]
+
+  movapd xmm8, xmm0
+  movapd xmm9, xmm1
+
+  mulpd xmm0, xmm2
+  mulpd xmm8, xmm3
+  mulpd xmm1, xmm2
+  mulpd xmm9, xmm3
+
+  addpd xmm4, xmm0
+  addpd xmm5, xmm8
+  addpd xmm6, xmm1
+  addpd xmm7, xmm9
+
+  add rcx, 16
+  add rdx, 16
+  add r8, 16
+  add r9, 16
+  dec rax
+  jnz @L
+{$endif}
+
+@rest:
+  mov rax, [rbp + $30]
+{$ifdef AVX}
+  and rax, 3
+{$else}
+  and rax, 1
+{$endif}
+  jz @end
+
+@Lrest:
+  movsd xmm0, [rcx]      // xmm0 <- pR00[i]
+  movsd xmm1, [rdx]      // xmm1 <- pR01[i]
+  movsd xmm2, [r8]       // xmm2 <- pR10[i]
+  movsd xmm3, [r9]       // xmm3 <- pR11[i]
+
+  movsd xmm8, xmm0
+  movsd xmm9, xmm1
+
+  mulsd xmm0, xmm2
+  mulsd xmm8, xmm3
+  mulsd xmm1, xmm2
+  mulsd xmm9, xmm3
+
+  addsd xmm4, xmm0
+  addsd xmm5, xmm8
+  addsd xmm6, xmm1
+  addsd xmm7, xmm9
+
+  add rcx, 8
+  add rdx, 8
+  add r8, 8
+  add r9, 8
+  dec rax
+  jnz @Lrest
+
+@end:
+  movhlps xmm0, xmm4
+  movhlps xmm1, xmm5
+  movhlps xmm2, xmm6
+  movhlps xmm3, xmm7
+  addsd xmm0, xmm4
+  addsd xmm1, xmm5
+  addsd xmm2, xmm6
+  addsd xmm3, xmm7
+
+  mov rcx, [rbp + $38]
+  movsd [rcx], xmm0
+  mov rdx, [rbp + $40]
+  movsd [rdx], xmm1
+  mov r8, [rbp + $48]
+  movsd [r8], xmm2
+  mov r9, [rbp + $50]
+  movsd [r9], xmm3
+
+  movdqa xmm6, [rsp]
+  movdqa xmm7, [rsp + 16]
+  movdqa xmm8, [rsp + 32]
+  movdqa xmm9, [rsp + 48]
+  add rsp, 64
+end;
+{$else}
+var pEnd: PByte;
+begin
+  if aCount < 0 then
+    RaiseNegativeLength;
+
+  D00 := 0;
+  D01 := 0;
+  D10 := 0;
+  D11 := 0;
+  pEnd := PByte(pR00) + aCount * SizeOf(Double);
+  while PByte(pR00) < pEnd do begin
+    D00 := D00 + pR00^ * pR10^;
+    D01 := D01 + pR00^ * pR11^;
+    D10 := D10 + pR01^ * pR10^;
+    D11 := D11 + pR01^ * pR11^;
+    Inc(pR00);
+    Inc(pR01);
+    Inc(pR10);
+    Inc(pR11);
+  end;
+end;
+{$endif}
 
 procedure Differences(pX, pRes: PDouble; aCount: NativeInt);
 var x0, x1: Double;

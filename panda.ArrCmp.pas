@@ -16,6 +16,21 @@ procedure ndaMax(const aA, aB: INDArray<Single>; var aRes: INDArray<Single>); ov
 
 procedure ndaThreshold(const aA: INDArray<Byte>; aT: Byte; var aRes: INDArray<Byte>); overload;
 
+function ndaAllIsFinite(const aA: INDArray<Single>): Boolean; inline; overload;
+function ndaAllIsFinite(const aA: INDArray<Double>): Boolean; inline; overload;
+
+{$region 'low-level functions'}
+
+type
+  TFinitePredicate = function (pValues: PByte; aCount, aStep: NativeInt): Boolean;
+
+function _IsFinite_F32(pValues: PByte; aCount, aStep: NativeInt): Boolean;
+function _IsFinite_F64(pValues: PByte; aCount, aStep: NativeInt): Boolean;
+
+function _AllIsFinite(const aA: INDArray; aPred: TFinitePredicate): Boolean;
+
+{$endregion}
+
 implementation
 
 {$EXCESSPRECISION OFF} // to prevent Single -> Double conversion by x64 compiler
@@ -121,6 +136,77 @@ end;
 {$endregion}
 
 {$region 'Masking'}
+
+{$endregion}
+
+{$region 'Predicates'}
+
+function IsFinite(const aValue: Single): Boolean; inline; overload;
+begin
+  Result := not (IsNan(aValue) or IsInfinite(aValue));
+end;
+
+function IsFinite(const aValue: Double): Boolean; inline; overload;
+begin
+  Result := not (IsNan(aValue) or IsInfinite(aValue));
+end;
+
+function _IsFinite_F32(pValues: PByte; aCount, aStep: NativeInt): Boolean;
+var pEnd: PByte;
+begin
+  pEnd := pValues + aCount * aStep;
+  while pValues <> pEnd do begin
+    if not IsFinite(PSingle(pValues)^) then exit(False);
+    Inc(pValues, aStep);
+  end;
+  Result := True;
+end;
+
+function _IsFinite_F64(pValues: PByte; aCount, aStep: NativeInt): Boolean;
+var pEnd: PByte;
+begin
+  pEnd := pValues + aCount * aStep;
+  while pValues <> pEnd do begin
+    if not IsFinite(PDouble(pValues)^) then exit(False);
+    Inc(pValues, aStep);
+  end;
+  Result := True;
+end;
+
+function _AllIsFinite(const aA: INDArray; aPred: TFinitePredicate): Boolean;
+var it: TNDASliceIt;
+    cnt, s: NativeInt;
+    nDim: Integer;
+begin
+  nDim := aA.NDim;
+
+  if nDim = 0 then
+    exit(aPred(aA.Data, 1, aA.ItemSize));
+
+  if nDim = 1 then
+    exit(aPred(aA.Data, aA.Shape[0], aA.Strides[0]));
+
+  it := TNDASliceIt.Create(aA, 0, nDim - 2);
+  try
+    cnt := aA.Shape[nDim - 1];
+    s := aA.Strides[nDim - 1];
+    while it.MoveNext do
+      if not aPred(it.CurrentSlice.Data, cnt, s) then exit(False);
+    Result := True;
+  finally
+    it.Free;
+  end;
+end;
+
+function ndaAllIsFinite(const aA: INDArray<Single>): Boolean;
+begin
+  Result := _AllIsFinite(aA, _IsFinite_F32);
+end;
+
+function ndaAllIsFinite(const aA: INDArray<Double>): Boolean;
+begin
+  Result := _AllIsFinite(aA, _IsFinite_F64);
+end;
 
 {$endregion}
 
