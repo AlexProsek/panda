@@ -223,7 +223,7 @@ var I: NativeInt;
     pEnd: PByte;
 begin
   pEnd := pSrc + R * aSrcStep;
-  while pSrc < pEnd do begin
+  while pSrc <> pEnd do begin
     for I := 0 to C - 1 do
       PCmplx128(pDst + I*aDstStep)^ := PCmplx128(pSrc + I*cC128Sz)^;
     Inc(pSrc, aSrcStep);
@@ -241,7 +241,7 @@ begin
   CRest := aSrcCCnt and (cBlockSz - 1);
   RRest := aSrcRcnt and (cBlockSz - 1);
   pEnd := pSrc + ((aSrcRCnt shr 2) shl 2) * aSrcRStep;
-  while pSrc < pEnd do begin
+  while pSrc <> pEnd do begin
     pRowEnd := pSrc + srcRWb;
     pSrcBlock := pSrc;
     pDstBlock := pDst;
@@ -399,7 +399,7 @@ var I: NativeInt;
     pEnd: PByte;
 begin
   pEnd := pSrc + R * aSrcStep;
-  while pSrc < pEnd do begin
+  while pSrc <> pEnd do begin
     for I := 0 to C - 1 do
       PDouble(pDst + I*aDstStep)^ := PDouble(pSrc + I*cF64Sz)^;
     Inc(pSrc, aSrcStep);
@@ -416,7 +416,7 @@ begin
   CRest := aSrcCCnt and (cBlockSz - 1);
   RRest := aSrcRcnt and (cBlockSz - 1);
   pEnd := pSrc + ((aSrcRCnt shr 2) shl 2) * aSrcRStep;
-  while pSrc < pEnd do begin
+  while pSrc <> pEnd do begin
     pRowEnd := pSrc + srcRWb;
     pSrcBlock := pSrc;
     pDstBlock := pDst;
@@ -527,7 +527,7 @@ var I: NativeInt;
     pEnd: PByte;
 begin
   pEnd := pSrc + R * aSrcStep;
-  while pSrc < pEnd do begin
+  while pSrc <> pEnd do begin
     for I := 0 to C - 1 do
       PSingle(pDst + I*aDstStep)^ := PSingle(pSrc + I*cF32Sz)^;
     Inc(pSrc, aSrcStep);
@@ -544,7 +544,7 @@ begin
   CRest := aSrcCCnt and (cBlockSz - 1);
   RRest := aSrcRcnt and (cBlockSz - 1);
   pEnd := pSrc + ((aSrcRCnt shr 2) shl 2) * aSrcRStep;
-  while pSrc < pEnd do begin
+  while pSrc <> pEnd do begin
     pRowEnd := pSrc + srcRWb;
     pSrcBlock := pSrc;
     pDstBlock := pDst;
@@ -722,7 +722,7 @@ var I: NativeInt;
     pEnd: PByte;
 begin
   pEnd := pSrc + R * aSrcStep;
-  while pSrc < pEnd do begin
+  while pSrc <> pEnd do begin
     for I := 0 to C - 1 do
       PWord(pDst + I*aDstStep)^ := PWord(pSrc + 2*I)^;
     Inc(pSrc, aSrcStep);
@@ -739,7 +739,7 @@ begin
   CRest := aSrcCCnt and (cBlockSz - 1);
   RRest := aSrcRcnt and (cBlockSz - 1);
   pEnd := pSrc + ((aSrcRCnt shr 3) shl 3) * aSrcRStep;
-  while pSrc < pEnd do begin
+  while pSrc <> pEnd do begin
     pRowEnd := pSrc + srcRWb;
     pSrcBlock := pSrc;
     pDstBlock := pDst;
@@ -866,7 +866,7 @@ var I: NativeInt;
     pEnd: PByte;
 begin
   pEnd := pSrc + R * aSrcStep;
-  while pSrc < pEnd do begin
+  while pSrc <> pEnd do begin
     for I := 0 to C - 1 do
       (pDst + I*aDstStep)^ := (pSrc + I)^;
     Inc(pSrc, aSrcStep);
@@ -883,7 +883,7 @@ begin
   CRest := aSrcCCnt and (cBlockSz - 1);
   RRest := aSrcRcnt and (cBlockSz - 1);
   pEnd := pSrc + ((aSrcRCnt shr 3) shl 3) * aSrcRStep;
-  while pSrc < pEnd do begin
+  while pSrc <> pEnd do begin
     pRowEnd := pSrc + srcRWb;
     pSrcBlock := pSrc;
     pDstBlock := pDst;

@@ -32,6 +32,12 @@ type
 
     procedure BlockTr8x8_2B;
     procedure BlockTr20x20_2B;
+
+    procedure BlockTrReversedRows_16B;
+    procedure BlockTrReversedRows_8B;
+    procedure BlockTrReversedRows_4B;
+    procedure BlockTrReversedRows_2B;
+    procedure BlockTrReversedRows_1B;
   end;
 
   TArrManipTests = class(TNDATestCase)
@@ -44,6 +50,7 @@ type
     procedure Flatten2DStrides;
 
     procedure Transpose2D;
+    procedure Transpose2D_ReversedRowsAndDestination;
     procedure Transpose3D_210;
     procedure Transpose3D_201;
     procedure Transpose3D_102;
@@ -333,6 +340,96 @@ begin
       CheckEquals(a[I, J], b[J, I]);
 end;
 
+procedure TArrManipLowLvlTests.BlockTrReversedRows_16B;
+var a: array [0..9, 0..10] of TCmplx128;
+    b: array [0..10, 0..9] of TCmplx128;
+    I, J: Integer;
+begin
+  for I := 0 to 9 do
+    for J := 0 to 10 do begin
+      a[I, J] := 11*I + J + 1;
+      b[J, I] := 0;
+    end;
+
+  CTr_16B(@a[9, 0], @b, 10, 11, -11*SizeOf(TCmplx128), 10*SizeOf(TCmplx128));
+
+  for I := 0 to 9 do
+    for J := 0 to 10 do
+      CheckEquals(a[9 - I, J], b[J, I]);
+end;
+
+procedure TArrManipLowLvlTests.BlockTrReversedRows_8B;
+var a: array [0..9, 0..10] of Double;
+    b: array [0..10, 0..9] of Double;
+    I, J: Integer;
+begin
+  for I := 0 to 9 do
+    for J := 0 to 10 do begin
+      a[I, J] := 11*I + J + 1;
+      b[J, I] := 0;
+    end;
+
+  CTr_8B(@a[9, 0], @b, 10, 11, -11*SizeOf(Double), 10*SizeOf(Double));
+
+  for I := 0 to 9 do
+    for J := 0 to 10 do
+      CheckEquals(a[9 - I, J], b[J, I]);
+end;
+
+procedure TArrManipLowLvlTests.BlockTrReversedRows_4B;
+var a: array [0..9, 0..10] of Single;
+    b: array [0..10, 0..9] of Single;
+    I, J: Integer;
+begin
+  for I := 0 to 9 do
+    for J := 0 to 10 do begin
+      a[I, J] := 11*I + J + 1;
+      b[J, I] := 0;
+    end;
+
+  CTr_4B(@a[9, 0], @b, 10, 11, -11*SizeOf(Single), 10*SizeOf(Single));
+
+  for I := 0 to 9 do
+    for J := 0 to 10 do
+      CheckEquals(a[9 - I, J], b[J, I]);
+end;
+
+procedure TArrManipLowLvlTests.BlockTrReversedRows_2B;
+var a: array [0..9, 0..10] of Word;
+    b: array [0..10, 0..9] of Word;
+    I, J: Integer;
+begin
+  for I := 0 to 9 do
+    for J := 0 to 10 do begin
+      a[I, J] := 11*I + J + 1;
+      b[J, I] := 0;
+    end;
+
+  CTr_2B(@a[9, 0], @b, 10, 11, -11*SizeOf(Word), 10*SizeOf(Word));
+
+  for I := 0 to 9 do
+    for J := 0 to 10 do
+      CheckEquals(a[9 - I, J], b[J, I]);
+end;
+
+procedure TArrManipLowLvlTests.BlockTrReversedRows_1B;
+var a: array [0..9, 0..10] of Byte;
+    b: array [0..10, 0..9] of Byte;
+    I, J: Integer;
+begin
+  for I := 0 to 9 do
+    for J := 0 to 10 do begin
+      a[I, J] := 11*I + J + 1;
+      b[J, I] := 0;
+    end;
+
+  CTr_1B(@a[9, 0], @b, 10, 11, -11*SizeOf(Byte), 10*SizeOf(Byte));
+
+  for I := 0 to 9 do
+    for J := 0 to 10 do
+      CheckEquals(a[9 - I, J], b[J, I]);
+end;
+
 {$endregion}
 
 {$region 'TArrManipTests'}
@@ -433,6 +530,28 @@ begin
   for I := 0 to High(m) do
     for J := 0 to High(m[I]) do
       CheckEquals(1 + I + 3*J, m[I, J]);
+end;
+
+procedure TArrManipTests.Transpose2D_ReversedRowsAndDestination;
+var a, b: INDArray<Double>;
+    ai, bi: TNDAItems<Double>;
+    I, J: Integer;
+begin
+  a := TNDAUt.Empty<Double>([10, 11]);
+  ai := a;
+  for I := 0 to 9 do
+    for J := 0 to 10 do
+      ai[[I, J]] := 11*I + J + 1;
+  a := a[[NDIAll(-1), NDIAll]];
+  b := TNDAUt.Full<Double>([11, 10], 0);
+  b := b[[NDIAll(-1), NDIAll]];
+
+  TNDAMan.Transpose<Double>(a, b, [1, 0]);
+
+  bi := b;
+  for I := 0 to 9 do
+    for J := 0 to 10 do
+      CheckEquals(11*(9 - I) + J + 1, bi[[J, I]], 0);
 end;
 
 procedure TArrManipTests.Transpose3D_210;
