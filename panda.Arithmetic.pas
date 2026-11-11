@@ -2325,8 +2325,8 @@ begin
       with PCmplx128(R)^ do begin
         d := Re * Re + Im * Im;
         tmpRe := Re;
-        Re := (s.Re * tmpRe - s.Im * Im) / d;
-        Im := (s.Im * tmpRe + s.Re * Im) / d;
+        Re := (s.Re * tmpRe + s.Im * Im) / d;
+        Im := (s.Im * tmpRe - s.Re * Im) / d;
       end;
       Inc(R, IncR);
     end;
@@ -2341,8 +2341,8 @@ begin
       d := Re * Re + Im * Im;
       s := PCmplx128(L)^;
       tmpRe := Re;
-      Re := (s.Re * tmpRe - s.Im * Im) / d;
-      Im := (s.Im * tmpRe + s.Re * Im) / d;
+      Re := (s.Re * tmpRe + s.Im * Im) / d;
+      Im := (s.Im * tmpRe - s.Re * Im) / d;
     end;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -2367,8 +2367,8 @@ begin
     while L < pEnd do begin
       with PCmplx128(L)^ do begin
         tmpRe := Re;
-        Re := (tmpRe * s.Re - Im * s.Im) / d;
-        Im := (tmpRe * s.Im + Im * s.Re) / d;
+        Re := (tmpRe * s.Re + Im * s.Im) / d;
+        Im := (Im * s.Re - tmpRe * s.Im) / d;
       end;
       Inc(L, IncL);
     end;
@@ -2383,8 +2383,8 @@ begin
     d := s.Re * s.Re + s.Im * s.Im;
     with PCmplx128(L)^ do begin
       tmpRe := Re;
-      Re := (tmpRe * s.Re - Im * s.Im) / d;
-      Im := (tmpRe * s.Im + Im * s.Re) / d;
+      Re := (tmpRe * s.Re + Im * s.Im) / d;
+      Im := (Im * s.Re - tmpRe * s.Im) / d;
     end;
     Inc(L, IncL);
     Inc(R, IncR);

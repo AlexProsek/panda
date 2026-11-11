@@ -7,6 +7,7 @@ interface
 procedure cvt(pSrc: PByte; pDst: PSingle; aCount: NativeInt); overload;
 procedure cvt(pSrc: PSingle; pDst: PByte; aCount: NativeInt); overload;
 procedure cvt(pSrc: PInteger; pDst: PSingle; aCount: NativeInt); overload;
+procedure cvt(pSrc: PInteger; pDst: PDouble; aCount: NativeInt); overload;
 procedure cvt(pSrc: PInteger; pDst: PInt64; aCount: NativeInt); overload;
 procedure cvt(pSrc: PInt64; pDst: PDouble; aCount: NativeInt); overload;
 procedure cvt(pSrc: PSingle; pDst: PDouble; aCount: NativeInt); overload;
@@ -354,6 +355,25 @@ asm
   dec rax
   jnz @Lrest
 @end:
+end;
+{$else}
+var pEnd: PByte;
+begin
+  pEnd := PByte(pSrc) + aCount * SizeOf(Integer);
+  while PByte(pSrc) < pEnd do begin
+    pDst^ := pSrc^;
+    Inc(pSrc);
+    Inc(pDst);
+  end;
+end;
+{$endif}
+
+procedure cvt(pSrc: PInteger; pDst: PDouble; aCount: NativeInt);
+{$if defined(zzASMx64)}
+// RCX <- pSrc, RDX <- pDst, R8 <- aCount
+asm
+  mov r9, r8
+  shr r8, 1
 end;
 {$else}
 var pEnd: PByte;

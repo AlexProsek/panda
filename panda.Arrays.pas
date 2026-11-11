@@ -620,9 +620,12 @@ type
   function CheckCContLvl(const aArr: INDArray; aRequiredLvl: Integer): Boolean;
   function BroadcastLvl(A, B: INDArray): Integer;
   function BroadcastableQ(const A, B: INDArray; out aAxis: Integer): Boolean;
-  function RBroadcastableQ(const L, R: INDArray; out aAxis: Integer): Boolean;
-  function LBroadcastableQ(const L, R: INDArray; out aAxis: Integer): Boolean;
-  function GetPartShape(const A: INDArray; const aIdx: INDIndexSeq): TNDAShape;
+  function RBroadcastableQ(const L, R: INDArray; out aAxis: Integer): Boolean; overload; inline;
+  function RBroadcastableQ(const LSh, RSh: TNDAShape; out aAxis: Integer): Boolean; overload;
+  function LBroadcastableQ(const L, R: INDArray; out aAxis: Integer): Boolean; overload; inline;
+  function LBroadcastableQ(const LSh, RSh: TNDAShape; out aAxis: Integer): Boolean; overload;
+  function GetPartShape(const A: INDArray; const aIdx: INDIndexSeq): TNDAShape; overload; inline;
+  function GetPartShape(const aSh: TNDAShape; const aIdx: INDIndexSeq): TNDAShape; overload;
   function CompatibleQ(const aShapes: array of TNDAShape; out aResShape: TNDAShape): Boolean; overload;
   function CompatibleQ(const aArrays: array of INDArray; out aResShape: TNDAShape; out aType: PTypeInfo): Boolean; overload;
   function GetCommonType(const aArrays: array of INDArray; out aType: PTypeInfo): Boolean;
@@ -929,17 +932,19 @@ begin
 end;
 
 function RBroadcastableQ(const L, R: INDArray; out aAxis: Integer): Boolean;
-var sL, sR: TNDAShape;
-    I: Integer;
 begin
-  if L.NDim <> R.NDim then exit(False);
+  Result := RBroadcastableQ(L.Shape, R.Shape, aAxis);
+end;
+
+function RBroadcastableQ(const LSh, RSh: TNDAShape; out aAxis: Integer): Boolean;
+var I: Integer;
+begin
+  if Length(LSh) <> Length(RSh) then exit(False);
 
   aAxis := -1;
-  sL := L.Shape;
-  sR := R.Shape;
-  for I := High(sL) downto 0 do
-    if sL[I] <> sR[I] then begin
-      if sR[I] = 1 then begin
+  for I := High(LSh) downto 0 do
+    if LSh[I] <> RSh[I] then begin
+      if RSh[I] = 1 then begin
         if aAxis >= 0 then exit(False);
         aAxis := I;
       end else
@@ -949,17 +954,19 @@ begin
 end;
 
 function LBroadcastableQ(const L, R: INDArray; out aAxis: Integer): Boolean;
-var sL, sR: TNDAShape;
-    I: Integer;
 begin
-  if L.NDim <> R.NDim then exit(False);
+  Result := LBroadcastableQ(L.Shape, R.Shape, aAxis);
+end;
+
+function LBroadcastableQ(const LSh, RSh: TNDAShape; out aAxis: Integer): Boolean;
+var I: Integer;
+begin
+  if Length(LSh) <> Length(RSh) then exit(False);
 
   aAxis := -1;
-  sL := L.Shape;
-  sR := R.Shape;
-  for I := High(sL) downto 0 do
-    if sL[I] <> sR[I] then begin
-      if sL[I] = 1 then begin
+  for I := High(LSh) downto 0 do
+    if LSh[I] <> RSh[I] then begin
+      if LSh[I] = 1 then begin
         if aAxis >= 0 then exit(False);
         aAxis := I;
       end else
@@ -969,22 +976,25 @@ begin
 end;
 
 function GetPartShape(const A: INDArray; const aIdx: INDIndexSeq): TNDAShape;
-var I, J, top, nDim, seqLen: Integer;
-    shape: TNDAShape;
 begin
-  nDim := A.NDim;
+  Result := GetPartShape(A.Shape, aIdx);
+end;
+
+function GetPartShape(const aSh: TNDAShape; const aIdx: INDIndexSeq): TNDAShape;
+var I, J, top, nDim, seqLen: Integer;
+begin
+  nDim := Length(aSh);
   seqLen := Length(aIdx);
   if seqLen > nDim then
     raise ENDAIndexError.CreateFmt(csTooManyIndices, [nDim, seqlen]);
 
-  shape := A.Shape;
   top := 0;
   SetLength(Result, nDim);
   for I := 0 to seqLen - 1 do
     case aIdx[I].IndexType of
       nditInt: ;
       nditSpan: begin
-        Result[top] := NDISpanSize(shape[I], aIdx[I] as INDSpanIndex);
+        Result[top] := NDISpanSize(aSh[I], aIdx[I] as INDSpanIndex);
         Inc(top);
       end;
       nditSet: begin
@@ -998,7 +1008,7 @@ begin
     end;
 
   for J := seqLen to nDim - 1 do begin
-    Result[top] := shape[J];
+    Result[top] := aSh[J];
     Inc(top);
   end;
   SetLength(Result, top);
@@ -1812,12 +1822,13 @@ end;
 procedure TNDA.SetPart_SetIdx(const aIdx: INDIndexSeq; const aValue: INDArray);
 var it: TNDASliceItChain;
     itv: TNDASliceIt;
-    sh, shv, shs: TNDAShape;
+    sh, shv, shs, sht: TNDAShape;
     ff: TIPProcVV;
     setIdx, spanIdx: INDIndexSeq;
     axesPerm: TArray<Integer>;
     arr: INDArray;
     elSz: Integer;
+    sameShape: Boolean;
 
   function GetPermutedArray(var aPerm: TArray<Integer>): INDArray;
   var I, count, nDim: Integer;
@@ -1832,6 +1843,34 @@ var it: TNDASliceItChain;
         aPerm[I] := I;
     end;
     Result := PermuteAxes(aPerm);
+  end;
+
+  function GetValueAxesPerm(const aPerm: TArray<Integer>): TArray<Integer>;
+  var axisMap: TArray<Integer>;
+      I, axis, count, top: Integer;
+  begin
+    SetLength(axisMap, Length(aPerm));
+    count := 0;
+    for I := 0 to High(axisMap) do begin
+      axisMap[I] := -1;
+      if I < Length(aIdx) then
+        if aIdx[I].IndexType = nditInt then
+          continue;
+
+      axisMap[I] := count;
+      Inc(count);
+    end;
+
+    SetLength(Result, count);
+    top := 0;
+    for I := 0 to High(aPerm) do begin
+      axis := axisMap[aPerm[I]];
+      if axis < 0 then
+        continue;
+
+      Result[top] := axis;
+      Inc(top);
+    end;
   end;
 
 begin
@@ -1865,11 +1904,19 @@ begin
         TNDAUt.MapR(it.CurrentSlice, aValue, ff);
       end;
     end else begin // Length(spanIdx) > 0
-      if SameQ(sh, shv, axesPerm) then begin
+      sameShape := SameQ(sh, shv, axesPerm);
+      if not sameShape then begin
+        sht := GetPartShape(Self, aIdx);
+        sameShape := SameQ(sht, shv);
+        if sameShape and (Length(shv) < Length(sh)) then
+          axesPerm := GetValueAxesPerm(axesPerm);
+      end;
+
+      if sameShape then begin
         itv := TNDASliceIt.Create(aValue, 0, Length(sh) - Length(shs) - 1, axesPerm);
         try
           while it.MoveNext and itv.MoveNext do
-           SetSlicePart(it.CurrentSlice, spanIdx, itv.CurrentSlice);
+            SetSlicePart(it.CurrentSlice, spanIdx, itv.CurrentSlice);
         finally
           itv.Free;
         end;
@@ -1980,7 +2027,7 @@ begin
     s := GetPartShape(Self, aIdx);
     Result := TNDABuffer<T>.Create(s);
     it1 := TNDASliceItChain.Create(Self as INDArray, aIdx);
-    it2 := TNDASliceIt.Create(Result, 0, Length(aIdx) - 1);
+    it2 := TNDASliceIt.Create(Result, 0, Min(Length(aIdx), Length(s) - it1.CurrentSlice.NDim) - 1);
     try
       while it1.MoveNext do begin
         it2.MoveNext;
@@ -2002,6 +2049,7 @@ procedure TNDA<T>.SetSlicePart(const aSlice: INDArray; const aIdx: INDIndexSeq; 
 var slice, val: INDArray<T>;
 begin
   slice := TNDArray<T>.Create(aSlice.Data, aSlice.Shape, aSlice.Strides);
+  slice.SetFlags(aSlice.Flags and NDAF_WRITEABLE);
   if not Supports(aValue, INDArray<T>, val) then
     val := TNDArray<T>.Create(aValue.Data, aValue.Shape, aValue.Strides);
   slice[aIdx] := val;
@@ -2331,6 +2379,7 @@ class procedure TNDArrayView.GetViewProps(const aArray: INDArray;
   out aOffset: NativeInt; out aFlags: Cardinal;
   const aAxesPerm: TArray<Integer>);
 var I, J, dim, nDim: Integer;
+    sz: NativeInt;
     spanIdx: INDSpanIndex;
     arrShape, arrStrides: TArray<NativeInt>;
     bCCont, bSpan: Boolean;
@@ -2358,16 +2407,17 @@ begin
     case aIdx[I].IndexType of
       nditSpan: begin
         spanIdx := (aIdx[I] as INDSpanIndex);
-        aShape[dim] := NDISpanSize(arrShape[I], spanIdx);
+        sz := NDISpanSize(arrShape[I], spanIdx);
+        aShape[dim] := sz;
         aStrides[dim] := arrStrides[I] * spanIdx.Step;
         Inc(aOffset, arrStrides[I] * NDISpanLow(arrShape[I], spanIdx));
-        bCCont := bCCont and (spanIdx.Step = 1);
-        bSpan := True;
+        bCCont := bCCont and ((spanIdx.Step = 1) or (sz = 1));
+        bSpan := bSpan or (sz > 1);
         Inc(dim);
       end;
 
       nditInt: begin
-        bCCont := bCCont and (not bSpan);
+        bCCont := bCCont and ((arrShape[I] = 1) or (not bSpan));
         Inc(aOffset, arrStrides[I] * (aIdx[I] as INDIntIndex).Value);
       end;
     else
@@ -2387,6 +2437,8 @@ begin
     bCCont := bCCont and (Abs(arrShape[nDim - 1]) = aShape[dim - 1]);
   if bCCont then
     aFlags := aFlags or NDAF_C_CONTIGUOUS;
+  if WriteableQ(aArray) then
+    aFlags := aFlags or NDAF_WRITEABLE;
 end;
 
 function TNDArrayView.GetItemType: PTypeInfo;
@@ -2808,6 +2860,7 @@ var I, J, K, top: Integer;
     idx: INDIndexSeq;
     it: TNDASliceIt;
     arr: INDArray;
+    bSpan: Boolean;
 begin
   SetLength(fIts, Length(aIdx));
   top := 0;
@@ -2820,11 +2873,15 @@ begin
 
   if J > 0 then begin
     SetLength(idx, J);
-    for I := 0 to J - 1 do
+    K := -1;
+    for I := 0 to J - 1 do begin
       idx[I] := aIdx[I];
+      if idx[I].IndexType = nditSpan then
+        K := I;
+    end;
     fData := TNDArrayView.Create(aArr, idx);
-    if aIdx[J - 1].IndexType = nditSpan then begin
-      it := TNDASliceIt.Create(fData, 0, J - 1);
+    if K >= 0 then begin
+      it := TNDASliceIt.Create(fData, 0, K);
       arr := it.CurrentSlice;
       fIts[top] := it;
       Inc(top);
@@ -2835,27 +2892,34 @@ begin
     arr := aArr;
   end;
 
-  for I := J to High(aIdx) do begin
-    if aIdx[I].IndexType = nditSet then begin
-      if I > J then begin
-        SetLength(idx, I - J);
-        for K := J to I - 1 do
-          idx[K - J] := aIdx[K];
-        arr := TNDArrayView.Create(arr, idx);
-        it := TNDASliceIt.Create(arr, 0, Length(idx) - 1);
+  bSpan := False;
+  for I := J to High(aIdx) do
+    case aIdx[I].IndexType of
+      nditSet: begin
+        if I > J then begin
+          SetLength(idx, I - J);
+          for K := J to I - 1 do
+            idx[K - J] := aIdx[K];
+          arr := TNDArrayView.Create(arr, idx);
+          if bSpan then begin
+            it := TNDASliceIt.Create(arr, 0, Length(idx) - 1);
+            arr := it.CurrentSlice;
+            fIts[top] := it;
+            Inc(top);
+          end;
+        end;
+
+        it := TNDASliceSetIt.Create(arr, (aIdx[I] as INDSetIndex).Indices);
         arr := it.CurrentSlice;
         fIts[top] := it;
         Inc(top);
+        J := I + 1;
+        bSpan := False;
       end;
 
-      it := TNDASliceSetIt.Create(arr, (aIdx[I] as INDSetIndex).Indices);
-      arr := it.CurrentSlice;
-      fIts[top] := it;
-      Inc(top);
-      J := I + 1;
-      continue;
+      nditSpan:
+        bSpan := True;
     end;
-  end;
 
   if Length(aIdx) > J then begin
     SetLength(idx, Length(aIdx) - J);
@@ -3044,7 +3108,7 @@ begin
 //      exit;
 //    end;
 
-    while L < pEnd do begin
+    while L <> pEnd do begin
       PT(L)^ := s;
       Inc(L, IncL);
     end;
@@ -3054,7 +3118,7 @@ begin
       exit;
     end;
 
-    while L < pEnd do begin
+    while L <> pEnd do begin
       PT(L)^ := PT(R)^;
       Inc(L, IncL);
       Inc(R, IncR);
@@ -3071,15 +3135,19 @@ begin
 
   AddCvtFunc<Byte,    Single>(cvt_UI8F32);
 
-  AddCvtFunc<Integer, Single>(cvt_I32F32);
-  AddCvtFunc<Integer,  Int64>(cvt_I32I64);
+  AddCvtFunc<Integer,    Single>(cvt_I32F32);
+  AddCvtFunc<Integer,    Double>(cvt_I32F64);
+  AddCvtFunc<Integer,     Int64>(cvt_I32I64);
+  AddCvtFunc<Integer, TCmplx128>(cvt_I32C128);
 
-  AddCvtFunc<Int64,   Double>(cvt_I64F64);
+  AddCvtFunc<Int64,      Double>(cvt_I64F64);
+  AddCvtFunc<Int64,   TCmplx128>(cvt_I64C128);
 
-  AddCvtFunc<Single,    Byte>(cvt_F32UI8);
-  AddCvtFunc<Single,  Double>(cvt_F32F64);
+  AddCvtFunc<Single,       Byte>(cvt_F32UI8);
+  AddCvtFunc<Single,     Double>(cvt_F32F64);
 
-  AddCvtFunc<Double,  Single>(cvt_F64F32);
+  AddCvtFunc<Double,     Single>(cvt_F64F32);
+  AddCvtFunc<Double,  TCmplx128>(cvt_F64C128);
 
   fConstrs := TObjectDictionary<PTypeInfo, TNDAFactory>.Create([doOwnsValues]);
 

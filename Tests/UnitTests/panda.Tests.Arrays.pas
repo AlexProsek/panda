@@ -75,6 +75,12 @@ type
     procedure GetMatSpanCorners;
     procedure GetMatSpanTopLeftMinor;
 
+    procedure GetMat_SetAndIntIdx;
+
+    procedure GetT3_SetIntSetIdx;
+    procedure GetT3_SetSpanSetIdx;
+    procedure GetT3_SpanIntSetIdx;
+
     procedure FillVecByValue;
     procedure FillVecRangeByValue;
     procedure FillMatRowsByValue;
@@ -91,6 +97,25 @@ type
     procedure SetMatIdxSetLvl0;
     procedure SetMatIdxSetLvl0_SameShapeVal;
     procedure SetMatIdxSetLvl1;
+
+    procedure SetMat_SetAndSpanIdx_ScalarVal;
+    procedure SetMat_SetAndIntIdx_VecVal;
+    procedure SetMat_SetAndIntIdx_VecVal2;
+    procedure SetMat_RevSpanSet;
+
+    procedure SetT3_SetIntIntIdx;
+    procedure SetT3_SetIntSetIdx;
+    procedure SetT3_SetSpanSetIdx;
+    procedure SetT3_SpanSetSetIdx;
+    procedure SetT3_SpanSpanSetIdx;
+    procedure SetT3_SpanSetSpanIdx;
+    procedure SetT3_SpanIntSet_ScalarVal;
+
+    procedure SetT4_SetIntIntIntIdx;
+    procedure SetT4_SetIntSetSpanIdx;
+    procedure SetT4_SpanSetSpanSetIdx;
+    procedure SetT4_SpanSpanSpanSetIdx;
+    procedure SetT4_IntSpanSetSpanIdx;
 
     procedure FillVecIdxSetByValue;
 
@@ -123,6 +148,7 @@ type
     procedure GetSetPartShape1D;
     procedure GetIdxPartShape2D;
     procedure GetSpanPartShape2D;
+    procedure GetSetAndIdxPartShape2D;
     procedure GetSpanPart;
 
     procedure IdxSplit;
@@ -298,6 +324,21 @@ type
   end;
 
 implementation
+
+uses
+    panda.Formatter
+  ;
+
+function NDA2Str(const aArr: INDArray): String;
+var fmt: TNDAFormatter;
+begin
+  fmt := TNDAFormatter.Create;
+  try
+    Result := fmt.GetString(aArr);
+  finally
+    fmt.Free;
+  end;
+end;
 
 type
   TBufferTrackedValue = class(TInterfacedObject)
@@ -912,6 +953,75 @@ begin
   CheckEquals(5, bm[1, 1]);
 end;
 
+procedure TArrayTests.GetMat_SetAndIntIdx;
+var a, b: INDArray<Integer>;
+    v: TArray<Integer>;
+begin
+  a := TNDAUt.AsArray<Integer>([1], [1, 1]);
+  b := a[[NDISet([0]), NDI(0)]];
+
+  CheckTrue(TNDAUt.TryAsDynArray<Integer>(b, v));
+  CheckEquals([1], v);
+
+  a := TNDAUt.AsArray<Integer>([1, 2], [2, 1]);
+  b := a[[NDISet([1, 0]), NDI(0)]];
+
+  CheckTrue(TNDAUt.TryAsDynArray<Integer>(b, v));
+  CheckEquals([2, 1], v);
+
+  a := TNDAUt.AsArray<Integer>([[1, 2], [3, 4]]);
+  b := a[[NDISet([1, 0]), NDI(1)]];
+
+  CheckTrue(TNDAUt.TryAsDynArray<Integer>(b, v));
+  CheckEquals([4, 2], v);
+end;
+
+procedure TArrayTests.GetT3_SetIntSetIdx;
+var a, b: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[[1, 2, 3], [4, 5, 6]], [[7, 8, 9], [10, 11, 12]]]);
+  b := a[[NDISet([1, 0]), NDI(0), NDISet([2, 0])]];
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(b, m));
+  CheckEquals(2, Length(m));
+  CheckEquals([9, 7], m[0]);
+  CheckEquals([3, 1], m[1]);
+end;
+
+procedure TArrayTests.GetT3_SetSpanSetIdx;
+var a, b: INDArray<Integer>;
+    t: TArray<TArray<TArray<Integer>>>;
+begin
+  a := TNDAUt.AsArray<Integer>([
+    [[ 1,  2,  3,  4], [ 5,  6,  7,  8], [ 9, 10, 11, 12]],
+    [[13, 14, 15, 16], [17, 18, 19, 20], [21, 22, 23, 24]]
+  ]);
+  b := a[[NDISet([1, 0]), NDIAll(2), NDISet([2, 0])]];
+
+  CheckTrue(TNDAUt.TryAsDynArray3D<Integer>(b, t));
+  CheckEquals(2, Length(t));
+
+  CheckEquals([15, 13], t[0, 0]);
+  CheckEquals([23, 21], t[0, 1]);
+  CheckEquals([ 3,  1], t[1, 0]);
+  CheckEquals([11,  9], t[1, 1]);
+end;
+
+procedure TArrayTests.GetT3_SpanIntSetIdx;
+var a, b: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([1, 2], [2, 1, 1]);
+  b := a[[NDISpan(0, 1), NDI(0), NDISet([0])]];
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(b, m));
+  CheckEquals(2, Length(m));
+  CheckEquals([1], m[0]);
+  CheckEquals([2], m[1]);
+end;
+
+
 procedure TArrayTests.FillVecByValue;
 var a: INDArray<Integer>;
     arr: TArray<Integer>;
@@ -1165,6 +1275,375 @@ begin
   CheckEquals([4, 8, 4], m[2]);
 end;
 
+procedure TArrayTests.SetMat_SetAndSpanIdx_ScalarVal;
+var a: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([1], [1, 1]);
+  a[[NDISet([0]), NDISpan(0,0)]] := TNDAUt.Scalar<Integer>(2);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(a, m));
+  CheckEquals(1, Length(m));
+  CheckEquals([2], m[0]);
+end;
+
+procedure TArrayTests.SetMat_SetAndIntIdx_VecVal;
+var a: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([1], [1, 1]);
+  a[[NDISet([0]), NDI(0)]] := TNDAUt.AsArray<Integer>([2]);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(a, m));
+  CheckEquals(1, Length(m));
+  CheckEquals([2], m[0]);
+
+  a := TNDAUt.AsArray<Integer>([1], [1, 1]);
+  a[[NDI(0), NDISet([0])]] := TNDAUt.AsArray<Integer>([3]);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(a, m));
+  CheckEquals(1, Length(m));
+  CheckEquals([3], m[0]);
+end;
+
+procedure TArrayTests.SetMat_SetAndIntIdx_VecVal2;
+var a: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1], [2]]);
+  a[[NDISet([1, 0]), NDI(0)]] := TNDAUt.AsArray<Integer>([3, 4]);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(a, m));
+  CheckEquals(2, Length(m));
+  CheckEquals([4], m[0]);
+  CheckEquals([3], m[1]);
+
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6]]);
+  a[[NDISet([1, 0]), NDI(1)]] := TNDAUt.AsArray<Integer>([7, 8]);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(a, m));
+  CheckEquals(2, Length(m));
+  CheckEquals([1, 8, 3], m[0]);
+  CheckEquals([4, 7, 6], m[1]);
+end;
+
+procedure TArrayTests.SetMat_RevSpanSet;
+var a: INDArray<Integer>;
+    m: TArray<TArray<Integer>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+  a[[NDISpan(-1, 0, -2), NDISet([2, 0])]] := TNDAUt.AsArray<Integer>([[8, 7], [6, 5]]);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(a, m));
+  CheckEquals(3, Length(m));
+  CheckEquals([5, 2, 6], m[0]);
+  CheckEquals([4, 5, 6], m[1]);
+  CheckEquals([7, 8, 8], m[2]);
+
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+  a[[NDISpan(-1, 0, -2), NDISet([2, 0])]] := TNDAUt.Scalar<Integer>(10);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Integer>(a, m));
+  CheckEquals(3, Length(m));
+  CheckEquals([10, 2, 10], m[0]);
+  CheckEquals([ 4, 5,  6], m[1]);
+  CheckEquals([10, 8, 10], m[2]);
+end;
+
+procedure TArrayTests.SetT3_SetIntIntIdx;
+var a: INDArray<Integer>;
+    t: TArray<TArray<TArray<Integer>>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[[1, 2, 3], [4, 5, 6]], [[7, 8, 9], [10, 11, 12]]]);
+  a[[NDISet([1, 0]), NDI(0), NDI(1)]] := TNDAUt.AsArray<Integer>([20, 21]);
+
+  CheckTrue(TNDAUt.TryAsDynArray3D<Integer>(a, t));
+  CheckEquals(2, Length(t));
+  CheckEquals([ 1, 21,  3], t[0, 0]);
+  CheckEquals([ 4,  5,  6], t[0, 1]);
+  CheckEquals([ 7, 20,  9], t[1, 0]);
+  CheckEquals([10, 11, 12], t[1, 1]);
+end;
+
+procedure TArrayTests.SetT3_SetIntSetIdx;
+var a: INDArray<Integer>;
+    t: TArray<TArray<TArray<Integer>>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[[1, 2, 3], [4, 5, 6]], [[7, 8, 9], [10, 11, 12]]]);
+  a[[NDISet([1, 0]), NDI(0), NDISet([2, 0])]] := TNDAUt.AsArray<Integer>([[20, 21], [22, 23]]);
+
+  CheckTrue(TNDAUt.TryAsDynArray3D<Integer>(a, t));
+  CheckEquals(2, Length(t));
+  CheckEquals([23,  2, 22], t[0, 0]);
+  CheckEquals([ 4,  5,  6], t[0, 1]);
+  CheckEquals([21,  8, 20], t[1, 0]);
+  CheckEquals([10, 11, 12], t[1, 1]);
+
+  a := TNDAUt.AsArray<Integer>([[[1, 2, 3], [4, 5, 6]], [[7, 8, 9], [10, 11, 12]]]);
+  a[[NDISet([1, 0]), NDI(1), NDISet([2, 0])]] := TNDAUt.AsArray<Integer>([[20, 21], [22, 23]]);
+
+  CheckTrue(TNDAUt.TryAsDynArray3D<Integer>(a, t));
+  CheckEquals(2, Length(t));
+  CheckEquals([ 1,  2,  3], t[0, 0]);
+  CheckEquals([23,  5, 22], t[0, 1]);
+  CheckEquals([ 7,  8,  9], t[1, 0]);
+  CheckEquals([21, 11, 20], t[1, 1]);
+end;
+
+procedure TArrayTests.SetT3_SetSpanSetIdx;
+var a, b: INDArray<Integer>;
+    t: TArray<TArray<TArray<Integer>>>;
+begin
+  a := TNDAUt.AsArray<Integer>([
+    [[ 1,  2,  3,  4], [ 5,  6,  7,  8], [ 9, 10, 11, 12]],
+    [[13, 14, 15, 16], [17, 18, 19, 20], [21, 22, 23, 24]]
+  ]);
+  b := TNDAUt.AsArray<Integer>([
+    [[30, 31], [32, 33]],
+    [[34, 35], [36, 37]]
+  ]);
+  a[[NDISet([1, 0]), NDIAll(2), NDISet([2, 0])]] := b;
+
+  CheckTrue(TNDAUt.TryAsDynArray3D<Integer>(a, t));
+  CheckEquals(2, Length(t));
+
+  CheckEquals([35,  2, 34,  4], t[0, 0]);
+  CheckEquals([ 5,  6,  7,  8], t[0, 1]);
+  CheckEquals([37, 10, 36, 12], t[0, 2]);
+
+  CheckEquals([31, 14, 30, 16], t[1, 0]);
+  CheckEquals([17, 18, 19, 20], t[1, 1]);
+  CheckEquals([33, 22, 32, 24], t[1, 2]);
+end;
+
+procedure TArrayTests.SetT3_SpanSetSetIdx;
+var a, b: INDArray<Integer>;
+    t: TArray<TArray<TArray<Integer>>>;
+begin
+  a := TNDAUt.AsArray<Integer>([
+    [[ 1,  2,  3,  4], [ 5,  6,  7,  8], [ 9, 10, 11, 12]],
+    [[13, 14, 15, 16], [17, 18, 19, 20], [21, 22, 23, 24]],
+    [[25, 26, 27, 28], [29, 30, 31, 32], [33, 34, 35, 36]]
+  ]);
+  b := TNDAUt.AsArray<Integer>([
+    [[40, 41], [42, 43]],
+    [[44, 45], [46, 47]]
+  ]);
+  a[[NDIAll(2), NDISet([2, 0]), NDISet([2, 1])]] := b;
+
+  CheckTrue(TNDAUt.TryAsDynArray3D<Integer>(a, t));
+  CheckEquals(3, Length(t));
+
+  CheckEquals([ 1, 43, 42,  4], t[0, 0]);
+  CheckEquals([ 5,  6,  7,  8], t[0, 1]);
+  CheckEquals([ 9, 41, 40, 12], t[0, 2]);
+
+  CheckEquals([13, 14, 15, 16], t[1, 0]);
+  CheckEquals([17, 18, 19, 20], t[1, 1]);
+  CheckEquals([21, 22, 23, 24], t[1, 2]);
+
+  CheckEquals([25, 47, 46, 28], t[2, 0]);
+  CheckEquals([29, 30, 31, 32], t[2, 1]);
+  CheckEquals([33, 45, 44, 36], t[2, 2]);
+end;
+
+procedure TArrayTests.SetT3_SpanSpanSetIdx;
+var a, b: INDArray<Integer>;
+    t: TArray<TArray<TArray<Integer>>>;
+begin
+  a := TNDAUt.AsArray<Integer>([
+    [[ 1,  2,  3,  4], [ 5,  6,  7,  8], [ 9, 10, 11, 12]],
+    [[13, 14, 15, 16], [17, 18, 19, 20], [21, 22, 23, 24]],
+    [[25, 26, 27, 28], [29, 30, 31, 32], [33, 34, 35, 36]]
+  ]);
+  b := TNDAUt.AsArray<Integer>([
+    [[40, 41], [42, 43]],
+    [[44, 45], [46, 47]]
+  ]);
+  a[[NDIAll(2), NDIAll(2), NDISet([2, 1])]] := b;
+
+  CheckTrue(TNDAUt.TryAsDynArray3D<Integer>(a, t));
+  CheckEquals(3, Length(t));
+
+  CheckEquals([ 1, 41, 40,  4], t[0, 0]);
+  CheckEquals([ 5,  6,  7,  8], t[0, 1]);
+  CheckEquals([ 9, 43, 42, 12], t[0, 2]);
+
+  CheckEquals([13, 14, 15, 16], t[1, 0]);
+  CheckEquals([17, 18, 19, 20], t[1, 1]);
+  CheckEquals([21, 22, 23, 24], t[1, 2]);
+
+  CheckEquals([25, 45, 44, 28], t[2, 0]);
+  CheckEquals([29, 30, 31, 32], t[2, 1]);
+  CheckEquals([33, 47, 46, 36], t[2, 2]);
+end;
+
+procedure TArrayTests.SetT3_SpanSetSpanIdx;
+var a, b: INDArray<Integer>;
+    t: TArray<TArray<TArray<Integer>>>;
+begin
+  a := TNDAUt.AsArray<Integer>([
+    [[ 1,  2,  3,  4], [ 5,  6,  7,  8], [ 9, 10, 11, 12]],
+    [[13, 14, 15, 16], [17, 18, 19, 20], [21, 22, 23, 24]],
+    [[25, 26, 27, 28], [29, 30, 31, 32], [33, 34, 35, 36]]
+  ]);
+  b := TNDAUt.AsArray<Integer>([
+    [[40, 41], [42, 43]],
+    [[44, 45], [46, 47]]
+  ]);
+  a[[NDIAll(2), NDISet([2, 0]), NDIAll(2)]] := b;
+
+  CheckTrue(TNDAUt.TryAsDynArray3D<Integer>(a, t));
+  CheckEquals(3, Length(t));
+
+  CheckEquals([42,  2, 43,  4], t[0, 0]);
+  CheckEquals([ 5,  6,  7,  8], t[0, 1]);
+  CheckEquals([40, 10, 41, 12], t[0, 2]);
+
+  CheckEquals([13, 14, 15, 16], t[1, 0]);
+  CheckEquals([17, 18, 19, 20], t[1, 1]);
+  CheckEquals([21, 22, 23, 24], t[1, 2]);
+
+  CheckEquals([46, 26, 47, 28], t[2, 0]);
+  CheckEquals([29, 30, 31, 32], t[2, 1]);
+  CheckEquals([44, 34, 45, 36], t[2, 2]);
+end;
+
+procedure TArrayTests.SetT3_SpanIntSet_ScalarVal;
+var a: INDArray<Integer>;
+    t: TArray<TArray<TArray<Integer>>>;
+begin
+//  a := TNDAUt.AsArray<Integer>([1], [1,1,1]);
+//  a[[NDISpan(0,0), NDI(0), NDISet([0])]] := TNDAUt.Scalar<Integer>(10);
+//
+//  CheckTrue(TNDAUt.TryAsDynArray3D<Integer>(a, t));
+//  CheckEquals(1, Length(t));
+//  CheckEquals([10], t[0, 0]);
+
+  a := TNDAUt.AsArray<Integer>([1, 2], [2, 1, 1]);
+  a[[NDISpan(0, 1), NDI(0), NDISet([0])]] := TNDAUt.Scalar<Integer>(10);
+
+  CheckTrue(TNDAUt.TryAsDynArray3D<Integer>(a, t));
+  CheckEquals(2, Length(t));
+  CheckEquals([10], t[0, 0]);
+  CheckEquals([10], t[1, 0]);
+end;
+
+procedure TArrayTests.SetT4_SetIntIntIntIdx;
+var a, b, expected: INDArray<Integer>;
+    I, J, K, L, P: Integer;
+begin
+  a := iRng2NDA([2, 2, 3, 4]);
+  b := iRng2NDA([2], 100);
+  expected := iRng2NDA([2, 2, 3, 4]);
+  for P := 0 to 1 do
+    expected.SetItem([1 - P, 1, 1, 2], b.GetItem([P]));
+
+  a[[NDISet([1, 0]), NDI(1), NDI(1), NDI(2)]] := b;
+
+  for I := 0 to 1 do
+    for J := 0 to 1 do
+      for K := 0 to 2 do
+        for L := 0 to 3 do
+          CheckEquals(expected.GetItem([I, J, K, L]), a.GetItem([I, J, K, L]),
+            Format('Item [%d, %d, %d, %d]', [I, J, K, L]));
+end;
+
+procedure TArrayTests.SetT4_SetIntSetSpanIdx;
+var a, b, expected: INDArray<Integer>;
+    I, J, K, L, P, Q, R: Integer;
+begin
+  a := iRng2NDA([2, 2, 3, 4]);
+  b := iRng2NDA([2, 2, 2], 100);
+  expected := iRng2NDA([2, 2, 3, 4]);
+  for P := 0 to 1 do
+    for Q := 0 to 1 do
+      for R := 0 to 1 do
+        expected.SetItem([1 - P, 1, 2 - 2 * Q, 2 * R], b.GetItem([P, Q, R]));
+
+  a[[NDISet([1, 0]), NDI(1), NDISet([2, 0]), NDIAll(2)]] := b;
+
+  for I := 0 to 1 do
+    for J := 0 to 1 do
+      for K := 0 to 2 do
+        for L := 0 to 3 do
+          CheckEquals(expected.GetItem([I, J, K, L]), a.GetItem([I, J, K, L]),
+            Format('Item [%d, %d, %d, %d]', [I, J, K, L]));
+end;
+
+procedure TArrayTests.SetT4_SpanSetSpanSetIdx;
+var a, b, expected: INDArray<Integer>;
+    I, J, K, L, P, Q, R, S: Integer;
+begin
+  a := iRng2NDA([3, 3, 5, 4]);
+  b := iRng2NDA([2, 2, 3, 2], 100);
+  expected := iRng2NDA([3, 3, 5, 4]);
+  for P := 0 to 1 do
+    for Q := 0 to 1 do
+      for R := 0 to 2 do
+        for S := 0 to 1 do
+          expected.SetItem([2 * P, 2 - 2 * Q, 2 * R, 3 - 2 * S],
+            b.GetItem([P, Q, R, S]));
+
+  a[[NDIAll(2), NDISet([2, 0]), NDIAll(2), NDISet([3, 1])]] := b;
+
+  for I := 0 to 2 do
+    for J := 0 to 2 do
+      for K := 0 to 4 do
+        for L := 0 to 3 do
+          CheckEquals(expected.GetItem([I, J, K, L]), a.GetItem([I, J, K, L]),
+            Format('Item [%d, %d, %d, %d]', [I, J, K, L]));
+end;
+
+procedure TArrayTests.SetT4_SpanSpanSpanSetIdx;
+var a, b, expected: INDArray<Integer>;
+    I, J, K, L, P, Q, R, S: Integer;
+begin
+  a := iRng2NDA([3, 3, 3, 4]);
+  b := iRng2NDA([2, 2, 2, 2], 100);
+  expected := iRng2NDA([3, 3, 3, 4]);
+  for P := 0 to 1 do
+    for Q := 0 to 1 do
+      for R := 0 to 1 do
+        for S := 0 to 1 do
+          expected.SetItem([2 * P, 2 * Q, 2 * R, 3 - 2 * S],
+            b.GetItem([P, Q, R, S]));
+
+  a[[NDIAll(2), NDIAll(2), NDIAll(2), NDISet([3, 1])]] := b;
+
+  for I := 0 to 2 do
+    for J := 0 to 2 do
+      for K := 0 to 2 do
+        for L := 0 to 3 do
+          CheckEquals(expected.GetItem([I, J, K, L]), a.GetItem([I, J, K, L]),
+            Format('Item [%d, %d, %d, %d]', [I, J, K, L]));
+end;
+
+procedure TArrayTests.SetT4_IntSpanSetSpanIdx;
+var a, b, expected: INDArray<Integer>;
+    I, J, K, L, P, Q, R: Integer;
+    s: String;
+begin
+  a := iRng2NDA([2, 3, 3, 4]);
+  b := iRng2NDA([2, 2, 2], 100);
+  expected := iRng2NDA([2, 3, 3, 4]);
+  for P := 0 to 1 do
+    for Q := 0 to 1 do
+      for R := 0 to 1 do
+        expected.SetItem([1, 2 * P, 2 - 2 * Q, 2 * R], b.GetItem([P, Q, R]));
+
+  a[[NDI(1), NDIAll(2), NDISet([2, 0]), NDIAll(2)]] := b;
+
+  s := NDA2Str(a);
+
+  for I := 0 to 1 do
+    for J := 0 to 2 do
+      for K := 0 to 2 do
+        for L := 0 to 3 do
+          CheckEquals(expected.GetItem([I, J, K, L]), a.GetItem([I, J, K, L]),
+            Format('Item [%d, %d, %d, %d]', [I, J, K, L]));
+end;
+
 procedure TArrayTests.FillVecIdxSetByValue;
 var a: INDArray<Integer>;
     arr: TArray<Integer>;
@@ -1320,7 +1799,6 @@ begin
 
   b := a[[NDIAll, NDIAll, NDI(0)]];
   CheckTrue((b.Flags and NDAF_C_CONTIGUOUS) = 0);
-
 end;
 
 {$endregion}
@@ -1432,6 +1910,16 @@ begin
   CheckEquals(2, Length(s));
   CheckEquals(2, s[0]);
   CheckEquals(2, s[1]);
+end;
+
+procedure TIndicesTests.GetSetAndIdxPartShape2D;
+var a: INDArray<Integer>;
+    s: TNDAShape;
+begin
+  a := iRng2NDA([3, 3]);
+
+  s := GetPartShape(a, [NDISet([0]), NDI(0)]);
+  CheckEquals([1], s);
 end;
 
 procedure TIndicesTests.GetSpanPart;

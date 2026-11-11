@@ -106,16 +106,6 @@ type
     procedure GramParallel_PaddedBuffers;
     procedure GramParallel_ReversedBuffers;
     procedure GramParallel_NegativeWorkers;
-  {$ifopt C+}
-    procedure GramParallel_NilInput;
-    procedure GramParallel_VectorInput;
-    procedure GramParallel_TensorInput;
-    procedure GramParallel_InvalidResultShape;
-    procedure GramParallel_InvalidWorkspaceShape;
-    procedure GramParallel_StridedResult;
-    procedure GramParallel_StridedWorkspace;
-    procedure GramParallel_OverlappingRows;
-  {$endif}
 
     procedure GramSingle_NilInput;
     procedure GramSingle_VectorInput;
@@ -159,17 +149,6 @@ type
     procedure GramParallelSingle_ReversedRows;
     procedure GramParallelSingle_PaddedBuffers;
     procedure GramParallelSingle_ReversedBuffers;
-    procedure GramParallelSingle_NegativeWorkers;
-  {$ifopt C+}
-    procedure GramParallelSingle_NilInput;
-    procedure GramParallelSingle_VectorInput;
-    procedure GramParallelSingle_TensorInput;
-    procedure GramParallelSingle_InvalidResultShape;
-    procedure GramParallelSingle_InvalidWorkspaceShape;
-    procedure GramParallelSingle_StridedResult;
-    procedure GramParallelSingle_StridedWorkspace;
-    procedure GramParallelSingle_OverlappingRows;
-  {$endif}
     procedure MatMulNative_Dot_EvenRowsEvenCols;
     procedure MatMulNative_Dot_EvenRowsOddCols;
     procedure MatMulNative_Dot_OddRowsEvenCols;
@@ -213,12 +192,6 @@ type
     procedure MatMul_TensorA;
     procedure MatMul_TensorB;
     procedure MatMul_IncompatibleDimensions;
-{$ifopt C+}
-    procedure MatMul_InvalidResultShape;
-    procedure MatMul_InvalidWorkspaceShape;
-    procedure MatMul_StridedResult;
-    procedure MatMul_StridedWorkspace;
-{$endif}
 
     procedure MatMulParallel_Workers1;
     procedure MatMulParallel_Workers2;
@@ -238,18 +211,7 @@ type
     procedure MatMulParallel_PaddedBuffers;
     procedure MatMulParallel_ReversedBuffers;
     procedure MatMulParallel_NegativeWorkers;
-    procedure MatMulParallel_NilA;
-    procedure MatMulParallel_NilB;
-    procedure MatMulParallel_NonmatrixA;
-    procedure MatMulParallel_NonmatrixB;
     procedure MatMulParallel_IncompatibleDimensions;
-{$ifopt C+}
-    procedure MatMulParallel_InvalidResultShape;
-    procedure MatMulParallel_InvalidWorkspaceShape;
-    procedure MatMulParallel_StridedResult;
-    procedure MatMulParallel_StridedWorkspace;
-    procedure MatMulParallel_OverlappingRows;
-{$endif}
   {$ifdef BLAS}
     procedure MatMulSingle_BLAS_ContiguousBuffers;
     procedure MatMulSingle_BLAS_ReversedA;
@@ -276,19 +238,6 @@ type
     procedure MatMulSingle_PaddedBuffers;
     procedure MatMulSingle_ReversedWorkspace;
     procedure MatMulSingle_ReversedResult;
-    procedure MatMulSingle_NilA;
-    procedure MatMulSingle_NilB;
-    procedure MatMulSingle_VectorA;
-    procedure MatMulSingle_VectorB;
-    procedure MatMulSingle_TensorA;
-    procedure MatMulSingle_TensorB;
-    procedure MatMulSingle_IncompatibleDimensions;
-{$ifopt C+}
-    procedure MatMulSingle_InvalidResultShape;
-    procedure MatMulSingle_InvalidWorkspaceShape;
-    procedure MatMulSingle_StridedResult;
-    procedure MatMulSingle_StridedWorkspace;
-{$endif}
 
     procedure MatMulParallelSingle_Workers1;
     procedure MatMulParallelSingle_Workers2;
@@ -307,19 +256,7 @@ type
     procedure MatMulParallelSingle_ReversedInputs;
     procedure MatMulParallelSingle_PaddedBuffers;
     procedure MatMulParallelSingle_ReversedBuffers;
-    procedure MatMulParallelSingle_NegativeWorkers;
-    procedure MatMulParallelSingle_NilA;
-    procedure MatMulParallelSingle_NilB;
-    procedure MatMulParallelSingle_NonmatrixA;
-    procedure MatMulParallelSingle_NonmatrixB;
     procedure MatMulParallelSingle_IncompatibleDimensions;
-{$ifopt C+}
-    procedure MatMulParallelSingle_InvalidResultShape;
-    procedure MatMulParallelSingle_InvalidWorkspaceShape;
-    procedure MatMulParallelSingle_StridedResult;
-    procedure MatMulParallelSingle_StridedWorkspace;
-    procedure MatMulParallelSingle_OverlappingRows;
-{$endif}
   end;
 
 implementation
@@ -1584,53 +1521,6 @@ begin
   end;
 end;
 
-{$ifopt C+}
-procedure TMathTests.MatMul_InvalidResultShape;
-var a, b, c, bt: INDArray<Double>;
-begin
-  a := nda.Empty<Double>([2, 3]);
-  b := nda.Empty<Double>([3, 4]);
-  c := nda.Empty<Double>([4, 2]);
-  ExpectedException := EAssertionFailed;
-
-  ndaMatMul(a, b, c, bt);
-end;
-
-procedure TMathTests.MatMul_InvalidWorkspaceShape;
-var a, b, c, bt: INDArray<Double>;
-begin
-  a := nda.Empty<Double>([2, 3]);
-  b := nda.Empty<Double>([3, 4]);
-  bt := nda.Empty<Double>([3, 4]);
-  ExpectedException := EAssertionFailed;
-
-  ndaMatMul(a, b, c, bt);
-end;
-
-procedure TMathTests.MatMul_StridedResult;
-var a, b, c, bt: INDArray<Double>;
-begin
-  a := nda.Empty<Double>([2, 3]);
-  b := nda.Empty<Double>([3, 4]);
-  c := nda.Empty<Double>([2, 8]);
-  c := c[[NDIAll, NDIAll(2)]];
-  ExpectedException := EAssertionFailed;
-
-  ndaMatMul(a, b, c, bt);
-end;
-
-procedure TMathTests.MatMul_StridedWorkspace;
-var a, b, c, bt: INDArray<Double>;
-begin
-  a := nda.Empty<Double>([2, 3]);
-  b := nda.Empty<Double>([3, 4]);
-  bt := nda.Empty<Double>([4, 6]);
-  bt := bt[[NDIAll, NDIAll(2)]];
-  ExpectedException := EAssertionFailed;
-
-  ndaMatMul(a, b, c, bt);
-end;
-{$endif}
 
 {$endregion}
 
@@ -1865,44 +1755,6 @@ begin
   end;
 end;
 
-procedure TMathTests.MatMulParallel_NilA;
-var a, b, c: INDArray<Double>;
-begin
-  b := nda.Empty<Double>([2, 3]);
-  ExpectedException := ENDAShapeError;
-
-  c := ndaMatMulParallel(a, b);
-end;
-
-procedure TMathTests.MatMulParallel_NilB;
-var a, b, c: INDArray<Double>;
-begin
-  a := nda.Empty<Double>([3, 2]);
-  ExpectedException := ENDAShapeError;
-
-  c := ndaMatMulParallel(a, b);
-end;
-
-procedure TMathTests.MatMulParallel_NonmatrixA;
-var a, b, c: INDArray<Double>;
-begin
-  a := nda.Empty<Double>([2]);
-  b := nda.Empty<Double>([2, 3]);
-  ExpectedException := ENDAShapeError;
-
-  c := ndaMatMulParallel(a, b);
-end;
-
-procedure TMathTests.MatMulParallel_NonmatrixB;
-var a, b, c: INDArray<Double>;
-begin
-  a := nda.Empty<Double>([3, 2]);
-  b := nda.Empty<Double>([2, 3, 4]);
-  ExpectedException := ENDAShapeError;
-
-  c := ndaMatMulParallel(a, b);
-end;
-
 procedure TMathTests.MatMulParallel_IncompatibleDimensions;
 var a, b, c, bt: INDArray<Double>;
 begin
@@ -1920,66 +1772,6 @@ begin
   end;
 end;
 
-{$ifopt C+}
-procedure TMathTests.MatMulParallel_InvalidResultShape;
-var a, b, c, bt: INDArray<Double>;
-begin
-  a := nda.Empty<Double>([3, 2]);
-  b := nda.Empty<Double>([2, 4]);
-  c := nda.Empty<Double>([4, 3]);
-  ExpectedException := EAssertionFailed;
-
-  ndaMatMulParallel(a, b, c, bt, 2);
-end;
-
-procedure TMathTests.MatMulParallel_InvalidWorkspaceShape;
-var a, b, c, bt: INDArray<Double>;
-begin
-  a := nda.Empty<Double>([3, 2]);
-  b := nda.Empty<Double>([2, 4]);
-  bt := nda.Empty<Double>([2, 4]);
-  ExpectedException := EAssertionFailed;
-
-  ndaMatMulParallel(a, b, c, bt, 2);
-end;
-
-procedure TMathTests.MatMulParallel_StridedResult;
-var a, b, c, bt: INDArray<Double>;
-begin
-  a := nda.Empty<Double>([3, 2]);
-  b := nda.Empty<Double>([2, 4]);
-  c := nda.Empty<Double>([3, 8]);
-  c := c[[NDIAll, NDIAll(2)]];
-  ExpectedException := EAssertionFailed;
-
-  ndaMatMulParallel(a, b, c, bt, 2);
-end;
-
-procedure TMathTests.MatMulParallel_StridedWorkspace;
-var a, b, c, bt: INDArray<Double>;
-begin
-  a := nda.Empty<Double>([3, 2]);
-  b := nda.Empty<Double>([2, 4]);
-  bt := nda.Empty<Double>([4, 4]);
-  bt := bt[[NDIAll, NDIAll(2)]];
-  ExpectedException := EAssertionFailed;
-
-  ndaMatMulParallel(a, b, c, bt, 2);
-end;
-
-procedure TMathTests.MatMulParallel_OverlappingRows;
-var a, b, c, bt, storage: INDArray<Double>;
-begin
-  a := nda.Empty<Double>([3, 2]);
-  b := nda.Empty<Double>([2, 3]);
-  storage := nda.Empty<Double>([5]);
-  c := TNDArray<Double>.Create(storage.Data,
-    TArray<NativeInt>.Create(3, 3), TArray<NativeInt>.Create(8, 8));
-  ExpectedException := EAssertionFailed;
-
-  ndaMatMulParallel(a, b, c, bt, 2);
-end;
-{$endif}
 
 {$endregion}
 
@@ -2257,87 +2049,6 @@ begin
   end;
 end;
 
-{$ifopt C+}
-procedure TMathTests.GramParallel_NilInput;
-var a, g: INDArray<Double>;
-begin
-  ExpectedException := EAssertionFailed;
-
-  g := ndaGramParallel(a);
-end;
-
-procedure TMathTests.GramParallel_VectorInput;
-var a, g: INDArray<Double>;
-begin
-  a := nda.Empty<Double>([3]);
-  ExpectedException := EAssertionFailed;
-
-  g := ndaGramParallel(a);
-end;
-
-procedure TMathTests.GramParallel_TensorInput;
-var a, g: INDArray<Double>;
-begin
-  a := nda.Empty<Double>([2, 3, 4]);
-  ExpectedException := EAssertionFailed;
-
-  g := ndaGramParallel(a);
-end;
-
-procedure TMathTests.GramParallel_InvalidResultShape;
-var a, g, at: INDArray<Double>;
-begin
-  a := nda.Empty<Double>([2, 3]);
-  g := nda.Empty<Double>([3, 2]);
-  ExpectedException := EAssertionFailed;
-
-  ndaGramParallel(a, g, at, 2);
-end;
-
-procedure TMathTests.GramParallel_InvalidWorkspaceShape;
-var a, g, at: INDArray<Double>;
-begin
-  a := nda.Empty<Double>([2, 3]);
-  at := nda.Empty<Double>([2, 3]);
-  ExpectedException := EAssertionFailed;
-
-  ndaGramParallel(a, g, at, 2);
-end;
-
-procedure TMathTests.GramParallel_StridedResult;
-var a, g, at: INDArray<Double>;
-begin
-  a := nda.Empty<Double>([2, 3]);
-  g := nda.Empty<Double>([3, 6]);
-  g := g[[NDIAll, NDIAll(2)]];
-  ExpectedException := EAssertionFailed;
-
-  ndaGramParallel(a, g, at, 2);
-end;
-
-procedure TMathTests.GramParallel_StridedWorkspace;
-var a, g, at: INDArray<Double>;
-begin
-  a := nda.Empty<Double>([2, 3]);
-  at := nda.Empty<Double>([3, 4]);
-  at := at[[NDIAll, NDIAll(2)]];
-  ExpectedException := EAssertionFailed;
-
-  ndaGramParallel(a, g, at, 2);
-end;
-
-procedure TMathTests.GramParallel_OverlappingRows;
-var a, g, at, storage: INDArray<Double>;
-begin
-  a := nda.Empty<Double>([2, 3]);
-  storage := nda.Empty<Double>([5]);
-  g := TNDArray<Double>.Create(storage.Data,
-    TArray<NativeInt>.Create(3, 3), TArray<NativeInt>.Create(8, 8));
-  ExpectedException := EAssertionFailed;
-
-  ndaGramParallel(a, g, at, 2);
-end;
-{$endif}
 
 {$endregion}
 
@@ -2819,103 +2530,6 @@ begin
   CheckTrue(ndaAllClose(nda.AsArray<Single>([[17, 18, -21], [18, 29, -36], [-21, -36, 45]]), g, tol), 'Gram values');
 end;
 
-procedure TMathTests.GramParallelSingle_NegativeWorkers;
-var a, g, at: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([2, 3]);
-
-  try
-    ndaGramParallel(a, g, at, -1);
-    Fail('Expected EArgumentOutOfRangeException.');
-  except
-    on E: EArgumentOutOfRangeException do begin
-      CheckFalse(Assigned(g));
-      CheckFalse(Assigned(at));
-    end;
-  end;
-end;
-
-{$ifopt C+}
-procedure TMathTests.GramParallelSingle_NilInput;
-var a, g: INDArray<Single>;
-begin
-  ExpectedException := EAssertionFailed;
-
-  g := ndaGramParallel(a);
-end;
-
-procedure TMathTests.GramParallelSingle_VectorInput;
-var a, g: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([3]);
-  ExpectedException := EAssertionFailed;
-
-  g := ndaGramParallel(a);
-end;
-
-procedure TMathTests.GramParallelSingle_TensorInput;
-var a, g: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([2, 3, 4]);
-  ExpectedException := EAssertionFailed;
-
-  g := ndaGramParallel(a);
-end;
-
-procedure TMathTests.GramParallelSingle_InvalidResultShape;
-var a, g, at: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([2, 3]);
-  g := nda.Empty<Single>([3, 2]);
-  ExpectedException := EAssertionFailed;
-
-  ndaGramParallel(a, g, at, 2);
-end;
-
-procedure TMathTests.GramParallelSingle_InvalidWorkspaceShape;
-var a, g, at: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([2, 3]);
-  at := nda.Empty<Single>([2, 3]);
-  ExpectedException := EAssertionFailed;
-
-  ndaGramParallel(a, g, at, 2);
-end;
-
-procedure TMathTests.GramParallelSingle_StridedResult;
-var a, g, at: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([2, 3]);
-  g := nda.Empty<Single>([3, 6]);
-  g := g[[NDIAll, NDIAll(2)]];
-  ExpectedException := EAssertionFailed;
-
-  ndaGramParallel(a, g, at, 2);
-end;
-
-procedure TMathTests.GramParallelSingle_StridedWorkspace;
-var a, g, at: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([2, 3]);
-  at := nda.Empty<Single>([3, 4]);
-  at := at[[NDIAll, NDIAll(2)]];
-  ExpectedException := EAssertionFailed;
-
-  ndaGramParallel(a, g, at, 2);
-end;
-
-procedure TMathTests.GramParallelSingle_OverlappingRows;
-var a, g, at, storage: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([2, 3]);
-  storage := nda.Empty<Single>([5]);
-  g := TNDArray<Single>.Create(storage.Data,
-    TArray<NativeInt>.Create(3, 3), TArray<NativeInt>.Create(SizeOf(Single), SizeOf(Single)));
-  ExpectedException := EAssertionFailed;
-
-  ndaGramParallel(a, g, at, 2);
-end;
-{$endif}
 
 {$endregion}
 
@@ -3242,142 +2856,6 @@ begin
   CheckTrue(ndaAllClose(nda.AsArray<Single>([[0, -9, 7], [13, 16, 2], [0, 27, -21]]), c, tol));
 end;
 
-procedure TMathTests.MatMulSingle_NilA;
-var a, b, c, bt: INDArray<Single>;
-begin
-  b := nda.Empty<Single>([2, 3]);
-
-  try
-    ndaMatMul(a, b, c, bt);
-    Fail('Expected ENDAShapeError.');
-  except
-    on E: ENDAShapeError do begin
-      CheckFalse(Assigned(c));
-      CheckFalse(Assigned(bt));
-    end;
-  end;
-end;
-
-procedure TMathTests.MatMulSingle_NilB;
-var a, b, c, bt: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([2, 3]);
-
-  try
-    ndaMatMul(a, b, c, bt);
-    Fail('Expected ENDAShapeError.');
-  except
-    on E: ENDAShapeError do begin
-      CheckFalse(Assigned(c));
-      CheckFalse(Assigned(bt));
-    end;
-  end;
-end;
-
-procedure TMathTests.MatMulSingle_VectorA;
-var a, b, c: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([2]);
-  b := nda.Empty<Single>([2, 3]);
-  ExpectedException := ENDAShapeError;
-
-  c := ndaMatMul(a, b);
-end;
-
-procedure TMathTests.MatMulSingle_VectorB;
-var a, b, c: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([3, 2]);
-  b := nda.Empty<Single>([2]);
-  ExpectedException := ENDAShapeError;
-
-  c := ndaMatMul(a, b);
-end;
-
-procedure TMathTests.MatMulSingle_TensorA;
-var a, b, c: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([2, 3, 4]);
-  b := nda.Empty<Single>([4, 2]);
-  ExpectedException := ENDAShapeError;
-
-  c := ndaMatMul(a, b);
-end;
-
-procedure TMathTests.MatMulSingle_TensorB;
-var a, b, c: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([2, 3]);
-  b := nda.Empty<Single>([3, 4, 2]);
-  ExpectedException := ENDAShapeError;
-
-  c := ndaMatMul(a, b);
-end;
-
-procedure TMathTests.MatMulSingle_IncompatibleDimensions;
-var a, b, c, bt: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([2, 3]);
-  b := nda.Empty<Single>([4, 2]);
-
-  try
-    ndaMatMul(a, b, c, bt);
-    Fail('Expected ENDAShapeError.');
-  except
-    on E: ENDAShapeError do begin
-      CheckFalse(Assigned(c));
-      CheckFalse(Assigned(bt));
-    end;
-  end;
-end;
-
-{$ifopt C+}
-procedure TMathTests.MatMulSingle_InvalidResultShape;
-var a, b, c, bt: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([2, 3]);
-  b := nda.Empty<Single>([3, 4]);
-  c := nda.Empty<Single>([4, 2]);
-  ExpectedException := EAssertionFailed;
-
-  ndaMatMul(a, b, c, bt);
-end;
-
-procedure TMathTests.MatMulSingle_InvalidWorkspaceShape;
-var a, b, c, bt: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([2, 3]);
-  b := nda.Empty<Single>([3, 4]);
-  bt := nda.Empty<Single>([3, 4]);
-  ExpectedException := EAssertionFailed;
-
-  ndaMatMul(a, b, c, bt);
-end;
-
-procedure TMathTests.MatMulSingle_StridedResult;
-var a, b, c, bt: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([2, 3]);
-  b := nda.Empty<Single>([3, 4]);
-  c := nda.Empty<Single>([2, 8]);
-  c := c[[NDIAll, NDIAll(2)]];
-  ExpectedException := EAssertionFailed;
-
-  ndaMatMul(a, b, c, bt);
-end;
-
-procedure TMathTests.MatMulSingle_StridedWorkspace;
-var a, b, c, bt: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([2, 3]);
-  b := nda.Empty<Single>([3, 4]);
-  bt := nda.Empty<Single>([4, 6]);
-  bt := bt[[NDIAll, NDIAll(2)]];
-  ExpectedException := EAssertionFailed;
-
-  ndaMatMul(a, b, c, bt);
-end;
-{$endif}
 
 procedure TMathTests.CheckMatMulParallelSingle(aM, aK, aN, aMaxWorkers: Integer);
 var a, b, c, serial, expected: INDArray<Single>;
@@ -3591,61 +3069,6 @@ begin
   CheckTrue(ndaAllClose(TNDAMan.Transpose<Single>(b), bt, tol));
 end;
 
-procedure TMathTests.MatMulParallelSingle_NegativeWorkers;
-var a, b, c, bt: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([3, 2]);
-  b := nda.Empty<Single>([2, 3]);
-
-  try
-    ndaMatMulParallel(a, b, c, bt, -1);
-    Fail('Expected EArgumentOutOfRangeException.');
-  except
-    on E: EArgumentOutOfRangeException do begin
-      CheckFalse(Assigned(c));
-      CheckFalse(Assigned(bt));
-    end;
-  end;
-end;
-
-procedure TMathTests.MatMulParallelSingle_NilA;
-var a, b, c: INDArray<Single>;
-begin
-  b := nda.Empty<Single>([2, 3]);
-  ExpectedException := ENDAShapeError;
-
-  c := ndaMatMulParallel(a, b);
-end;
-
-procedure TMathTests.MatMulParallelSingle_NilB;
-var a, b, c: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([3, 2]);
-  ExpectedException := ENDAShapeError;
-
-  c := ndaMatMulParallel(a, b);
-end;
-
-procedure TMathTests.MatMulParallelSingle_NonmatrixA;
-var a, b, c: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([2]);
-  b := nda.Empty<Single>([2, 3]);
-  ExpectedException := ENDAShapeError;
-
-  c := ndaMatMulParallel(a, b);
-end;
-
-procedure TMathTests.MatMulParallelSingle_NonmatrixB;
-var a, b, c: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([3, 2]);
-  b := nda.Empty<Single>([2, 3, 4]);
-  ExpectedException := ENDAShapeError;
-
-  c := ndaMatMulParallel(a, b);
-end;
-
 procedure TMathTests.MatMulParallelSingle_IncompatibleDimensions;
 var a, b, c, bt: INDArray<Single>;
 begin
@@ -3663,66 +3086,6 @@ begin
   end;
 end;
 
-{$ifopt C+}
-procedure TMathTests.MatMulParallelSingle_InvalidResultShape;
-var a, b, c, bt: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([3, 2]);
-  b := nda.Empty<Single>([2, 4]);
-  c := nda.Empty<Single>([4, 3]);
-  ExpectedException := EAssertionFailed;
-
-  ndaMatMulParallel(a, b, c, bt, 2);
-end;
-
-procedure TMathTests.MatMulParallelSingle_InvalidWorkspaceShape;
-var a, b, c, bt: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([3, 2]);
-  b := nda.Empty<Single>([2, 4]);
-  bt := nda.Empty<Single>([2, 4]);
-  ExpectedException := EAssertionFailed;
-
-  ndaMatMulParallel(a, b, c, bt, 2);
-end;
-
-procedure TMathTests.MatMulParallelSingle_StridedResult;
-var a, b, c, bt: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([3, 2]);
-  b := nda.Empty<Single>([2, 4]);
-  c := nda.Empty<Single>([3, 8]);
-  c := c[[NDIAll, NDIAll(2)]];
-  ExpectedException := EAssertionFailed;
-
-  ndaMatMulParallel(a, b, c, bt, 2);
-end;
-
-procedure TMathTests.MatMulParallelSingle_StridedWorkspace;
-var a, b, c, bt: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([3, 2]);
-  b := nda.Empty<Single>([2, 4]);
-  bt := nda.Empty<Single>([4, 4]);
-  bt := bt[[NDIAll, NDIAll(2)]];
-  ExpectedException := EAssertionFailed;
-
-  ndaMatMulParallel(a, b, c, bt, 2);
-end;
-
-procedure TMathTests.MatMulParallelSingle_OverlappingRows;
-var a, b, c, bt, storage: INDArray<Single>;
-begin
-  a := nda.Empty<Single>([3, 2]);
-  b := nda.Empty<Single>([2, 3]);
-  storage := nda.Empty<Single>([5]);
-  c := TNDArray<Single>.Create(storage.Data,
-    TArray<NativeInt>.Create(3, 3), TArray<NativeInt>.Create(SizeOf(Single), SizeOf(Single)));
-  ExpectedException := EAssertionFailed;
-
-  ndaMatMulParallel(a, b, c, bt, 2);
-end;
-{$endif}
 
 {$endregion}
 
