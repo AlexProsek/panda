@@ -5,6 +5,10 @@ interface
 uses
     TestFramework
   , panda.Tests.NDATestCase
+  , panda.Intfs
+  , panda.Arrays
+  , panda.vCvt
+  , panda.Nums
   , panda.cvCvt
   , System.SysUtils
   ;
@@ -44,6 +48,17 @@ type
     procedure SwapInPlace16_5;
     procedure SwapInPlace32_4;
     procedure SwapInPlace64_2;
+  end;
+
+  TNormZeroTests = class(TNDATestCase)
+  protected const
+    sTol = 1e-6;
+    dTol = 1e-12;
+  published
+    procedure NormZeroF32_4;
+    procedure NormZeroF32_5;
+    procedure NormZeroF64_4;
+    procedure NormZeroF64_5;
   end;
 
 implementation
@@ -409,9 +424,64 @@ end;
 
 {$endregion}
 
+{$region 'TNormZeroTests'}
+
+procedure TNormZeroTests.NormZeroF32_4;
+var src, dst: TArray<Single>;
+begin
+  src := TArray<Single>.Create(0., 1., -0., -2);
+  SetLength(dst, Length(src));
+
+  NormalizeZero(PSingle(src), PSingle(dst), Length(src));
+
+  CheckEquals(src, dst, sTol);
+  CheckEquals(0, PUInt32(PByte(dst) + 8)^);
+end;
+
+procedure TNormZeroTests.NormZeroF32_5;
+var src, dst: TArray<Single>;
+begin
+  src := TArray<Single>.Create(0., 1., -0., -2, -0.0);
+  SetLength(dst, Length(src));
+
+  NormalizeZero(PSingle(src), PSingle(dst), Length(src));
+
+  CheckEquals(src, dst, sTol);
+  CheckEquals(0, PUInt32(PByte(dst) + 8)^);
+  CheckEquals(0, PUInt32(PByte(dst) + 16)^);
+end;
+
+procedure TNormZeroTests.NormZeroF64_4;
+var src, dst: TArray<Double>;
+begin
+  src := TArray<Double>.Create(0., 1., -0., -2);
+  SetLength(dst, Length(src));
+
+  NormalizeZero(PDouble(src), PDouble(dst), Length(src));
+
+  CheckEquals(src, dst, dTol);
+  CheckEquals(0, PUInt64(PByte(dst) + 16)^);
+end;
+
+procedure TNormZeroTests.NormZeroF64_5;
+var src, dst: TArray<Double>;
+begin
+  src := TArray<Double>.Create(0., 1., -0., -2, -0.0);
+  SetLength(dst, Length(src));
+
+  NormalizeZero(PDouble(src), PDouble(dst), Length(src));
+
+  CheckEquals(src, dst, dTol);
+  CheckEquals(0, PUInt64(PByte(dst) + 16)^);
+  CheckEquals(0, PUInt64(PByte(dst) + 32)^);
+end;
+
+{$endregion}
+
 initialization
 
   RegisterTest(TCvtTests.Suite);
   RegisterTest(TByteSwappingTests.Suite);
+  RegisterTest(TNormZeroTests.Suite);
 
 end.

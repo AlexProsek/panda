@@ -13,6 +13,9 @@ procedure cvt(pSrc: PInt64; pDst: PDouble; aCount: NativeInt); overload;
 procedure cvt(pSrc: PSingle; pDst: PDouble; aCount: NativeInt); overload;
 procedure cvt(pSrc: PDouble; pDst: PSingle; aCount: NativeInt); overload;
 
+procedure NormalizeZero(pSrc, pDst: PSingle; aCount: NativeInt); overload;
+procedure NormalizeZero(pSrc, pDst: PDouble; aCount: NativeInt); overload;
+
 procedure bswap16(pSrc, pDst: PByte; aCount: NativeInt);
 procedure bswap32(pSrc, pDst: PByte; aCount: NativeInt);
 procedure bswap64(pSrc, pDst: PByte; aCount: NativeInt);
@@ -21,6 +24,7 @@ implementation
 
 uses
     System.SysUtils
+  , panda.Nums
   ;
 
 procedure bswap16(pSrc, pDst: PByte; aCount: NativeInt);
@@ -578,7 +582,7 @@ end;
 {$else}
 var pEnd: PByte;
 begin
-  pEnd := PByte(pSrc) + aCount * SizeOf(Single);
+  pEnd := PByte(pSrc) + aCount * cF32Sz;
   while PByte(pSrc) < pEnd do begin
     pDst^ := pSrc^;
     Inc(pSrc);
@@ -620,9 +624,109 @@ end;
 {$else}
 var pEnd: PByte;
 begin
-  pEnd := PByte(pSrc) + aCount * SizeOf(Double);
+  pEnd := PByte(pSrc) + aCount * cF64Sz;
   while PByte(pSrc) < pEnd do begin
     pDst^ := pSrc^;
+    Inc(pSrc);
+    Inc(pDst);
+  end;
+end;
+{$endif}
+
+procedure NormalizeZero(pSrc, pDst: PSingle; aCount: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- pSrc, RDX <- pDst, R8 <- aCount
+const cMask: UInt32 = $7FFFFFFF;
+asm
+  movd xmm0, cMask
+  xorps xmm1, xmm1
+  mov r9, r8
+  shr r8, 2
+  jz @rest
+  shufps xmm0, xmm0, 0 // xmm2 <- 4 x cMask
+@L:
+  movups xmm2, [rcx]
+  movaps xmm3, xmm2
+  pand xmm2, xmm0
+  pcmpgtd xmm2, xmm1
+  pand xmm3, xmm2
+  movups [rdx], xmm3
+  add rcx, 16
+  add rdx, 16
+  dec r8
+  jnz @L
+@rest:
+  and r9, 3
+  jz @end
+@Lrest:
+  movss xmm2, [rcx]
+  movss xmm3, xmm2
+  pand xmm2, xmm0
+  pcmpgtd xmm2, xmm1
+  pand xmm3, xmm2
+  movss [rdx], xmm3
+  add rcx, 4
+  add rdx, 4
+  dec r9
+  jnz @Lrest
+@end:
+end;
+{$else}
+var pEnd: PByte;
+begin
+  pEnd := PByte(pSrc) + aCount * cF32Sz;
+  while PByte(pSrc) < pEnd do begin
+    if (PUInt32(pSrc)^ and $7FFFFFFF) = 0 then
+      pDst^ := 0
+    else
+      pDst^ := pSrc^;
+    Inc(pSrc);
+    Inc(pDst);
+  end;
+end;
+{$endif}
+
+procedure NormalizeZero(pSrc, pDst: PDouble; aCount: NativeInt);
+{$if defined(ASMx64)}
+// RCX <- pSrc, RDX <- pDst, R8 <- aCount
+const cMask: UInt64 = $7FFFFFFFFFFFFFFF;
+asm
+  movddup xmm0, cMask
+  xorps xmm1, xmm1
+  mov r9, r8
+  shr r8, 1
+  jz @rest
+@L:
+  movupd xmm2, [rcx]
+  movapd xmm3, xmm2
+  pand xmm2, xmm0
+  pcmpgtq xmm2, xmm1
+  pand xmm3, xmm2
+  movupd [rdx], xmm3
+  add rcx, 16
+  add rdx, 16
+  dec r8
+  jnz @L
+@rest:
+  and r9, 1
+  jz @end
+  movsd xmm2, [rcx]
+  movsd xmm3, xmm2
+  pand xmm2, xmm0
+  pcmpgtq xmm2, xmm1
+  pand xmm3, xmm2
+  movsd [rdx], xmm3
+@end:
+end;
+{$else}
+var pEnd: PByte;
+begin
+  pEnd := PByte(pSrc) + aCount * cF64Sz;
+  while PByte(pSrc) < pEnd do begin
+    if (PUInt64(pSrc)^ and $7FFFFFFFFFFFFFFF) = 0 then
+      pDst^ := 0
+    else
+      pDst^ := pSrc^;
     Inc(pSrc);
     Inc(pDst);
   end;
