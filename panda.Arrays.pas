@@ -863,14 +863,19 @@ end;
 
 function GetCContLvl(const aArr: INDArray; out aBlockSz: NativeInt): Integer;
 var shape, strides: TArray<NativeInt>;
-    nDim: Integer;
+    itSz, nDim: Integer;
 begin
   nDim := aArr.NDim;
   shape := aArr.Shape;
   strides := aArr.Strides;
-  aBlockSz := aArr.ItemSize;
+  itSz := aArr.ItemSize;
+  aBlockSz := itSz;
   Result := nDim - 1;
-  if strides[Result] <> aBlockSz then exit(nDim);
+  if strides[Result] <> aBlockSz then begin
+    aBlockSz := 1;
+    exit(nDim);
+  end;
+
   while Result > 0 do begin
     aBlockSz := shape[Result] * aBlockSz;
     if strides[Result - 1] <> aBlockSz then break;
@@ -878,6 +883,7 @@ begin
   end;
   if Result = 0 then
     aBlockSz := shape[0] * aBlockSz;
+  aBlockSz := aBlockSz div itSz;
 end;
 
 function GetCommonCContLvl(const A, B: INDArray; out aSz: NativeInt): Integer;
@@ -1392,7 +1398,7 @@ procedure pack1(aSrc, aDst: PByte; aCount, aStep: NativeInt);
 var pEnd: PByte;
 begin
   pEnd := aSrc + aCount * aStep;
-  while aSrc < pEnd do begin
+  while aSrc <> pEnd do begin
     aDst^ := aSrc^;
     Inc(aSrc, aStep);
     Inc(aDst);
@@ -1403,7 +1409,7 @@ procedure pack2(aSrc, aDst: PByte; aCount, aStep: NativeInt);
 var pEnd: PByte;
 begin
   pEnd := aSrc + aCount * aStep;
-  while aSrc < pEnd do begin
+  while aSrc <> pEnd do begin
     PWord(aDst)^ := PWord(aSrc)^;
     Inc(aSrc, aStep);
     Inc(aDst, 2);
@@ -1414,7 +1420,7 @@ procedure pack4(aSrc, aDst: PByte; aCount, aStep: NativeInt);
 var pEnd: PByte;
 begin
   pEnd := aSrc + aCount * aStep;
-  while aSrc < pEnd do begin
+  while aSrc <> pEnd do begin
     PInteger(aDst)^ := PInteger(aSrc)^;
     Inc(aSrc, aStep);
     Inc(aDst, 4);
@@ -1425,7 +1431,7 @@ procedure pack8(aSrc, aDst: PByte; aCount, aStep: NativeInt);
 var pEnd: PByte;
 begin
   pEnd := aSrc + aCount * aStep;
-  while aSrc < pEnd do begin
+  while aSrc <> pEnd do begin
     PInt64(aDst)^ := PInt64(aSrc)^;
     Inc(aSrc, aStep);
     Inc(aDst, 8);
@@ -1436,7 +1442,7 @@ procedure pack16(aSrc, aDst: PByte; aCount, aStep: NativeInt);
 var pEnd: PByte;
 begin
   pEnd := aSrc + aCount * aStep;
-  while aSrc < pEnd do begin
+  while aSrc <> pEnd do begin
     PCmplx128(aDst)^ := PCmplx128(aSrc)^;
     Inc(aSrc, aStep);
     Inc(aDst, 16);
@@ -1447,7 +1453,7 @@ procedure packN(aSrc, aDst: PByte; aCount, aStep, aElSz: NativeInt);
 var pEnd: PByte;
 begin
   pEnd := aSrc + aCount * aStep;
-  while aSrc < pEnd do begin
+  while aSrc <> pEnd do begin
     Move(aSrc^, aDst^, aElSz);
     Inc(aSrc, aStep);
     Inc(aDst, aElSz);
@@ -2064,7 +2070,7 @@ begin
   vLvl := GetCContLvl(aDst, vSz);
   aLvl := Max(aLvl, vLvl);
   if aLvl = 0 then begin
-    TNDAUt.Copy<T>(aValue.Data, aDst.Data, aSz div SizeOf(T));
+    TNDAUt.Copy<T>(aValue.Data, aDst.Data, aSz);
     exit;
   end;
   aSz := Min(aSz, vSz);
@@ -2080,14 +2086,13 @@ begin
   it1 := TNDAIt.Create(aDst, Min(aLvl - 1, hiLvl - 1));
   it2 := TNDAIt.Create(aValue, Min(aLvl - 1, hiLvl - 1));
   try
-    if aSz = SizeOf(T) then begin
+    if aSz = 1 then begin
       s1 := aDst.Strides[hiLvl];
       s2 := aValue.Strides[hiLvl];
       aSz := aDst.Shape[hiLvl];
       while it1.MoveNext and it2.MoveNext do
         TNDAUt.Copy<T>(it2.Current, it1.Current, aSz, s2, s1);
     end else begin
-      aSz := aSz div SizeOf(T);
       while it1.MoveNext and it2.MoveNext do
         TNDAUt.Copy<T>(it2.Current, it1.Current, aSz);
     end;
@@ -2314,7 +2319,7 @@ begin
   end else
   if itSz < SizeOf(T) then begin
     GetCContLvl(fArray, bSz);
-    if bSz < SizeOf(T) then
+    if bSz * fArray.ItemSize < SizeOf(T) then
       raise ENDACastError.Create(csInvReinterpret);
 
     fShape := Copy(aArray.Shape);
@@ -3541,7 +3546,7 @@ begin
   end;
 
   cLvl := GetCContLvl(L, sz);
-  if sz = lSz then begin
+  if sz = 1 then begin
     Dec(cLvl);
     sz := L.Strides[cLvl];
     if cLvl = 0 then begin
@@ -3558,7 +3563,7 @@ begin
       it.Free;
     end;
   end else begin
-    count := sz div lSz;
+    count := sz;
     it := TNDAIt.Create(L, cLvl - 1);
     try
       while it.MoveNext do
@@ -3584,7 +3589,7 @@ begin
   end;
 
   cLvl := GetCContLvl(R, sz);
-  if sz = rSz then begin
+  if sz = 1 then begin
     Dec(cLvl);
     sz := R.Strides[cLvl];
     if cLvl = 0 then begin
@@ -3601,7 +3606,7 @@ begin
       it.Free;
     end;
   end else begin
-    count := sz div rSz;
+    count := sz;
     it := TNDAIt.Create(R, cLvl - 1);
     try
       while it.MoveNext do
@@ -3663,10 +3668,9 @@ begin
     try
       szL := L.ItemSize;
       szR := R.ItemSize;
-      cnt := aCSz div szL;
       while itL.MoveNext do begin
         itR.MoveNext;
-        aFnc(cnt, itL.Current, szL, itR.Current, szR);
+        aFnc(aCSz, itL.Current, szL, itR.Current, szR);
       end;
     finally
       itL.Free;
@@ -3881,11 +3885,10 @@ begin
       szL := L.ItemSize;
       szR := R.ItemSize;
       szRes := aRes.ItemSize;
-      cnt := aCSz div szL;
       while itL.MoveNext do begin
         itR.MoveNext;
         itRes.MoveNext;
-        aFnc(cnt, itL.Current, szL, itR.Current, szR, itRes.Current, szRes);
+        aFnc(aCSz, itL.Current, szL, itR.Current, szR, itRes.Current, szRes);
       end;
     finally
       itL.Free;
@@ -3966,7 +3969,7 @@ begin
   end;
 
   cLvl := GetCommonCContLvl(R, aRes, sz);
-  if sz = Min(rSz, resSz) then begin
+  if cLvl = R.NDim then begin
     Dec(cLvl);
     sz := R.Strides[cLvl];
     resSz := aRes.Strides[cLvl];
@@ -3986,12 +3989,11 @@ begin
       itRes.Free;
     end;
   end else begin
-    count := sz div rSz;
     it := TNDAIt.Create(R, cLvl - 1);
     itRes := TNDAIt.Create(aRes, cLvl - 1);
     try
       while it.MoveNext and itRes.MoveNext do
-        aFnc(count, pL, 0, it.Current, rSz, itRes.Current, resSz);
+        aFnc(sz, pL, 0, it.Current, rSz, itRes.Current, resSz);
     finally
       it.Free;
       itRes.Free;
@@ -4015,7 +4017,7 @@ begin
   end;
 
   cLvl := GetCommonCContLvl(L, aRes, sz);
-  if sz = Min(lSz, resSz) then begin
+  if cLvl = L.NDim then begin
     Dec(cLvl);
     sz := L.Strides[cLvl];
     resSz := aRes.Strides[cLvl];
@@ -4035,12 +4037,11 @@ begin
       itRes.Free;
     end;
   end else begin
-    count := sz div lSz;
     it := TNDAIt.Create(L, cLvl - 1);
     itRes := TNDAIt.Create(aRes, cLvl - 1);
     try
       while it.MoveNext and itRes.MoveNext do
-        aFnc(count, it.Current, lSz, pR, 0, itRes.Current, resSz);
+        aFnc(sz, it.Current, lSz, pR, 0, itRes.Current, resSz);
     finally
       it.Free;
       itRes.Free;
@@ -4139,13 +4140,14 @@ begin
   cLvl := GetCContLvl(aArr, sz);
   it := TNDAIt.Create(aArr, cLvl - 1);
   try
-    if sz = SizeOf(T) then begin
+    if sz = 1 then begin
       while it.MoveNext do begin
         TNDA<T>.PT(aDst)^ := TNDA<T>.PT(it.Current)^;
         Inc(aDst, SizeOf(T));
       end;
     end else begin
-      count := sz div SizeOf(T);
+      count := sz;
+      sz := sz * SizeOf(T);
       while it.MoveNext do begin
         Copy<T>(it.Current, aDst, count);
         Inc(aDst, sz);

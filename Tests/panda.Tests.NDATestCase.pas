@@ -156,16 +156,20 @@ procedure TNDATestCase.CheckEquals(const aExpected, aValue: array of Single; con
 var I: Integer;
 begin
   CheckEquals(Length(aExpected), Length(aValue));
-  for I := 0 to High(aExpected) do
+  for I := 0 to High(aExpected) do begin
+    CheckFalse(aValue[I].IsNan);
     CheckEquals(Extended(aExpected[I]), Extended(aValue[I]), aTol);
+  end;
 end;
 
 procedure TNDATestCase.CheckEquals(const aExpected, aValue: array of Double; const aTol: Double);
 var I: Integer;
 begin
   CheckEquals(Length(aExpected), Length(aValue));
-  for I := 0 to High(aExpected) do
+  for I := 0 to High(aExpected) do begin
+    CheckFalse(aValue[I].IsNan);
     CheckEquals(Extended(aExpected[I]), Extended(aValue[I]), aTol);
+  end;
 end;
 
 procedure TNDATestCase.CheckEquals(const aExpected: array of String; const aValue: array of String);

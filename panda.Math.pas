@@ -897,7 +897,7 @@ var pEnd: PByte;
 begin
   Result := 0;
   pEnd := aData + aStep * aCount;
-  while aData < pEnd do begin
+  while aData <> pEnd do begin
     Inc(Result, PInteger(aData)^);
     Inc(aData, aStep);
   end;
@@ -922,11 +922,10 @@ begin
   lvl := GetCContLvl(aArr, sz);
   it := TNDAIt.Create(aArr, lvl - 1);
   try
-    if sz = SizeOf(Integer) then begin
+    if sz = 1 then begin
       while it.MoveNext do
         Inc(aRes, PInteger(it.Current)^);
     end else begin
-      sz := sz div SizeOf(Integer);
       while it.MoveNext do
         Inc(aRes, cvTotal(PInteger(it.Current), sz));
     end;
@@ -940,7 +939,7 @@ var pEnd: PByte;
 begin
   Result := 0;
   pEnd := aData + aStep * aCount;
-  while aData < pEnd do begin
+  while aData <> pEnd do begin
     Result := Result + PSingle(aData)^;
     Inc(aData, aStep);
   end;
@@ -965,11 +964,10 @@ begin
   lvl := GetCContLvl(aArr, sz);
   it := TNDAIt.Create(aArr, lvl - 1);
   try
-    if sz = SizeOf(Single) then begin
+    if sz = 1 then begin
       while it.MoveNext do
         aRes := aRes + PSingle(it.Current)^;
     end else begin
-      sz := sz div SizeOf(Single);
       while it.MoveNext do
         aRes := aRes + cvTotal(PSingle(it.Current), sz);
     end;
@@ -983,7 +981,7 @@ var pEnd: PByte;
 begin
   Result := 0;
   pEnd := aData + aStep * aCount;
-  while aData < pEnd do begin
+  while aData <> pEnd do begin
     Result := Result + PDouble(aData)^;
     Inc(aData, aStep);
   end;
@@ -1008,11 +1006,10 @@ begin
   lvl := GetCContLvl(aArr, sz);
   it := TNDAIt.Create(aArr, lvl - 1);
   try
-    if sz = SizeOf(Double) then begin
+    if sz = 1 then begin
       while it.MoveNext do
         aRes := aRes + PDouble(it.Current)^;
     end else begin
-      sz := sz div SizeOf(Double);
       while it.MoveNext do
         aRes := aRes + cvTotal(PDouble(it.Current), sz);
     end;
@@ -1054,12 +1051,18 @@ end;
 
 procedure sdot(aN: NativeInt; pX: PByte; aXInc: NativeInt; pY: PByte; aYInc: NativeInt; aRes: PByte);
 begin
-  PSingle(aRes)^ := cblas.sdot(aN, PSingle(pX), aXInc shr 2, PSingle(pY), aYInc shr 2);
+  if (aXInc <= 0) or (aYInc <= 0) then
+    PSingle(aRes)^ := panda.cvArithmetic.sdot(aN, pX, aXInc, pY, aYInc)
+  else
+    PSingle(aRes)^ := cblas.sdot(aN, PSingle(pX), aXInc div cF32Sz, PSingle(pY), aYInc div cF32Sz);
 end;
 
 procedure ddot(aN: NativeInt; pX: PByte; aXInc: NativeInt; pY: PByte; aYInc: NativeInt; aRes: PByte);
 begin
-  PDouble(aRes)^ := cblas.ddot(aN, PDouble(pX), aXInc shr 3, PDouble(pY), aYInc shr 3);
+  if (aXInc <= 0) or (aYInc <= 0) then
+    PDouble(aRes)^ := panda.cvArithmetic.ddot(aN, pX, aXInc, pY, aYInc)
+  else
+    PDouble(aRes)^ := cblas.ddot(aN, PDouble(pX), aXInc div cF64Sz, PDouble(pY), aYInc div cF64Sz);
 end;
 
 {$else}

@@ -26,6 +26,7 @@ type
     procedure Format1DStepLv;
     procedure Format2DStepLvl1;
     procedure PyLikeFormat;
+    procedure FormatReversed;
   end;
 
   TParserTests = class(TNDATestCase)
@@ -227,6 +228,17 @@ end;
 
 
 {$endregion}
+
+procedure TFormatterTests.FormatReversed;
+var A: INDArray<Integer>;
+begin
+  A := TNDAUt.AsArray<Integer>([1,2,3,4,5,6], [2,3]);
+
+  CheckEquals('{{6, 5, 4}, {3, 2, 1}}',
+    fFmt.GetString(A[[NDISpan(1,0,-1), NDISpan(2,0,-1)]]));
+  CheckEquals('{{3, 1}, {6, 4}}',
+    fFmt.GetString(A[[NDIAll, NDISpan(2,0,-2)]]));
+end;
 
 initialization
 

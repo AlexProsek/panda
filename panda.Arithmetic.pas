@@ -47,6 +47,8 @@ type
   TTensorI32 = record
   private
     fArr: INDArray<Integer>;
+    function GetPart(const aIdx: INDIndexSeq): TTensorI32; inline;
+    procedure SetPart(const aIdx: INDIndexSeq; const aValue: TTensorI32); inline;
     function GetShape: TNDAShape; inline;
   public
     class operator Implicit(const aArr: INDArray<Integer>): TTensorI32; inline;
@@ -72,6 +74,7 @@ type
 
     property NDA: INDArray<Integer> read fArr;
     property Shape: TNDAShape read GetShape;
+    property Part[const aIdx: INDIndexSeq]: TTensorI32 read GetPart write SetPart; default;
   end;
 
   TTensorI64 = record
@@ -202,6 +205,8 @@ type
     class operator Add(const A, B: TTensorC128): TTensorC128;
     class operator Add(const A: TTensorC128; const B: TCmplx128): TTensorC128;
     class operator Add(const A: TCmplx128; const B: TTensorC128): TTensorC128;
+    class operator Add(const A: TTensorC128; const B: Double): TTensorC128;
+    class operator Add(const A: Double; const B: TTensorC128): TTensorC128;
     class operator Subtract(const A, B: TTensorC128): TTensorC128;
     class operator Subtract(const A: TTensorC128; const B: TCmplx128): TTensorC128;
     class operator Subtract(const A: TCmplx128; const B: TTensorC128): TTensorC128;
@@ -212,6 +217,11 @@ type
     class operator Divide(const A: TTensorC128; const B: TCmplx128): TTensorC128;
     class operator Divide(const A: TCmplx128; const B: TTensorC128): TTensorC128;
     class operator Divide(const A: TTensorC128; const B: Double): TTensorC128;
+    class operator Subtract(const A: TTensorC128; const B: Double): TTensorC128;
+    class operator Subtract(const A: Double; const B: TTensorC128): TTensorC128;
+    class operator Multiply(const A: TTensorC128; const B: Double): TTensorC128;
+    class operator Multiply(const A: Double; const B: TTensorC128): TTensorC128;
+    class operator Divide(const A: Double; const B: TTensorC128): TTensorC128;
     procedure Assign(const A: TTensorC128); inline;
     procedure AddTo(const aArr: TTensorC128); overload;
     procedure AddTo(const aValue: TCmplx128); overload;
@@ -267,7 +277,7 @@ begin
       end;
 
       pEnd := L + N * IncL;
-      while L < pEnd do begin
+      while L <> pEnd do begin
         PInteger(L)^ := 0;
         Inc(L, IncL);
       end;
@@ -276,7 +286,7 @@ begin
   end;
 
   pEnd := L + N * IncL;
-  while L < pEnd do begin
+  while L <> pEnd do begin
     if not PBoolean(R)^ then
       PInteger(L)^ := 0;
     Inc(L, IncL);
@@ -295,7 +305,7 @@ begin
   if aAStep = 0 then begin
     i := PInteger(pA)^;
     pEnd := pB + aBStep * aCount;
-    while pB < pEnd do begin
+    while pB <> pEnd do begin
       if Abs(PInteger(pB)^ - i) > aTol then exit(False);
       Inc(pB, aBStep);
     end;
@@ -305,7 +315,7 @@ begin
   if aBStep = 0 then begin
     i := PInteger(pB)^;
     pEnd := pA + aAStep * aCount;
-    while pA < pEnd do begin
+    while pA <> pEnd do begin
       if Abs(PInteger(pA)^ - i) > aTol then exit(False);
       Inc(pA, aAStep);
     end;
@@ -313,10 +323,10 @@ begin
   end;
 
   pEnd := pA + aAStep * aCount;
-  while pA < pEnd do begin
+  while pA <> pEnd do begin
     if Abs(PInteger(pA)^ - PInteger(pB)^) > aTol then exit(False);
     Inc(pA, aAStep);
-    Inc(pB, aAStep);
+    Inc(pB, aBStep);
   end;
   Result := True;
 end;
@@ -328,7 +338,7 @@ begin
   if aAStep = 0 then begin
     s := PSingle(pA)^;
     pEnd := pB + aBStep * aCount;
-    while pB < pEnd do begin
+    while pB <> pEnd do begin
       if Abs(PSingle(pB)^ - s) > aTol then exit(False);
       Inc(pB, aBStep);
     end;
@@ -338,7 +348,7 @@ begin
   if aBStep = 0 then begin
     s := PSingle(pB)^;
     pEnd := pA + aAStep * aCount;
-    while pA < pEnd do begin
+    while pA <> pEnd do begin
       if Abs(PSingle(pA)^ - s) > aTol then exit(False);
       Inc(pA, aAStep);
     end;
@@ -346,7 +356,7 @@ begin
   end;
 
   pEnd := pA + aAStep * aCount;
-  while pA < pEnd do begin
+  while pA <> pEnd do begin
     if Abs(PSingle(pA)^ - PSingle(pB)^) > aTol then exit(False);
     Inc(pA, aAStep);
     Inc(pB, aBStep);
@@ -361,7 +371,7 @@ begin
   if aAStep = 0 then begin
     s := PDouble(pA)^;
     pEnd := pB + aBStep * aCount;
-    while pB < pEnd do begin
+    while pB <> pEnd do begin
       if Abs(PDouble(pB)^ - s) > aTol then exit(False);
       Inc(pB, aBStep);
     end;
@@ -371,7 +381,7 @@ begin
   if aBStep = 0 then begin
     s := PDouble(pB)^;
     pEnd := pA + aAStep * aCount;
-    while pA < pEnd do begin
+    while pA <> pEnd do begin
       if Abs(PDouble(pA)^ - s) > aTol then exit(False);
       Inc(pA, aAStep);
     end;
@@ -379,7 +389,7 @@ begin
   end;
 
   pEnd := pA + aAStep * aCount;
-  while pA < pEnd do begin
+  while pA <> pEnd do begin
     if Abs(PDouble(pA)^ - PDouble(pB)^) > aTol then exit(False);
     Inc(pA, aAStep);
     Inc(pB, aBStep);
@@ -452,7 +462,7 @@ begin
     // R <- l and R
     if not PBoolean(L)^ then begin
       pEnd := R + N * IncR;
-      while R < pEnd do begin
+      while R <> pEnd do begin
         PBoolean(R)^ := False;
         Inc(R, IncR);
       end;
@@ -467,7 +477,7 @@ begin
   end;
 
   pEnd := R + N * IncR;
-  while R < pEnd do begin
+  while R <> pEnd do begin
     PBoolean(R)^ := PBoolean(L)^ and PBoolean(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -486,7 +496,7 @@ begin
     // R <- l or R
     if PBoolean(L)^ then begin
       pEnd := R + N * IncR;
-      while R < pEnd do begin
+      while R <> pEnd do begin
         PBoolean(R)^ := True;
         Inc(R, IncR);
       end;
@@ -501,7 +511,7 @@ begin
   end;
 
   pEnd := R + N * IncR;
-  while R < pEnd do begin
+  while R <> pEnd do begin
     PBoolean(R)^ := PBoolean(L)^ or PBoolean(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -520,7 +530,7 @@ begin
     // R <- l xor R
     if PBoolean(L)^ then begin
       pEnd := R + N * IncR;
-      while R < pEnd do begin
+      while R <> pEnd do begin
         PBoolean(R)^ := not PBoolean(R)^;
         Inc(R, IncR);
       end;
@@ -535,7 +545,7 @@ begin
   end;
 
   pEnd := R + N * IncR;
-  while R < pEnd do begin
+  while R <> pEnd do begin
     PBoolean(R)^ := PBoolean(L)^ xor PBoolean(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -556,9 +566,9 @@ begin
   end;
 
   pEnd := L + N * IncL;
-  while L < pEnd do begin
+  while L <> pEnd do begin
     PBoolean(L)^ := not PBoolean(L)^;
-    Inc(L);
+    Inc(L, IncL);
   end;
 end;
 
@@ -627,7 +637,7 @@ begin
     // R <- L + R
     s := PInteger(L)^;
     pEnd := R + N * IncR;
-    while R < pEnd do begin
+    while R <> pEnd do begin
       PInteger(R)^ := s + PInteger(R)^;
       Inc(R, IncR);
     end;
@@ -637,7 +647,7 @@ begin
 
   // R <- L + R
   pEnd := R + N * IncR;
-  while R < pEnd do begin
+  while R <> pEnd do begin
     PInteger(R)^ := PInteger(L)^ + PInteger(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -657,7 +667,7 @@ begin
     // R <- L - R
     s := PInteger(L)^;
     pEnd := R + N * IncR;
-    while R < pEnd do begin
+    while R <> pEnd do begin
       PInteger(R)^ := s - PInteger(R)^;
       Inc(R, IncR);
     end;
@@ -667,7 +677,7 @@ begin
 
   // R <- L - R
   pEnd := R + N * IncR;
-  while R < pEnd do begin
+  while R <> pEnd do begin
     PInteger(R)^ := PInteger(L)^ - PInteger(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -682,7 +692,7 @@ begin
     // L <- L - R
     s := PInteger(R)^;
     pEnd := L + N * IncL;
-    while L < pEnd do begin
+    while L <> pEnd do begin
       PInteger(L)^ := PInteger(L)^ - s;
       Inc(L, IncL);
     end;
@@ -692,7 +702,7 @@ begin
 
   // L <- L - R
   pEnd := L + N * IncL;
-  while L < pEnd do begin
+  while L <> pEnd do begin
     PInteger(L)^ := PInteger(L)^ - PInteger(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -707,7 +717,7 @@ begin
     // R <- L * R
     s := PInteger(L)^;
     pEnd := R + N * IncR;
-    while R < pEnd do begin
+    while R <> pEnd do begin
       PInteger(R)^ := s * PInteger(R)^;
       Inc(R, IncR);
     end;
@@ -717,7 +727,7 @@ begin
 
   // R <- L * R
   pEnd := R + N * IncR;
-  while R < pEnd do begin
+  while R <> pEnd do begin
     PInteger(R)^ := PInteger(L)^ * PInteger(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -738,7 +748,7 @@ begin
   if IncL = 0 then begin
     // Y <- l = R
     s := PInteger(L)^;
-    while Y < pEnd do begin
+    while Y <> pEnd do begin
       PBoolean(Y)^ := (s = PInteger(R)^);
       Inc(R, IncR);
       Inc(Y, IncY);
@@ -750,7 +760,7 @@ begin
   if IncR = 0 then begin
     // Y <- L = r
     s := PInteger(R)^;
-    while Y < pEnd do begin
+    while Y <> pEnd do begin
       PBoolean(Y)^ := (PInteger(L)^ = s);
       Inc(L, IncL);
       Inc(Y, IncY);
@@ -760,7 +770,7 @@ begin
   end;
 
   // Y <- L = R
-  while Y < pEnd do begin
+  while Y <> pEnd do begin
     PBoolean(Y)^ := (PInteger(L)^ = PInteger(R)^);
     Inc(L, IncL);
     Inc(R, IncR);
@@ -777,7 +787,7 @@ begin
   if IncL = 0 then begin
     // Y <- l <> R
     s := PInteger(L)^;
-    while Y < pEnd do begin
+    while Y <> pEnd do begin
       PBoolean(Y)^ := (s <> PInteger(R)^);
       Inc(R, IncR);
       Inc(Y, IncY);
@@ -789,7 +799,7 @@ begin
   if IncR = 0 then begin
     // Y <- L <> r
     s := PInteger(R)^;
-    while Y < pEnd do begin
+    while Y <> pEnd do begin
       PBoolean(Y)^ := (PInteger(L)^ <> s);
       Inc(L, IncL);
       Inc(Y, IncY);
@@ -799,7 +809,7 @@ begin
   end;
 
   // Y <- L <> R
-  while Y < pEnd do begin
+  while Y <> pEnd do begin
     PBoolean(Y)^ := (PInteger(L)^ <> PInteger(R)^);
     Inc(L, IncL);
     Inc(R, IncR);
@@ -821,7 +831,7 @@ begin
       exit;
     end;
 
-    while Y < pEnd do begin
+    while Y <> pEnd do begin
       PBoolean(Y)^ := (s > PInteger(R)^);
       Inc(R, IncR);
       Inc(Y, IncY);
@@ -838,7 +848,7 @@ begin
       exit;
     end;
 
-    while Y < pEnd do begin
+    while Y <> pEnd do begin
       PBoolean(Y)^ := (PInteger(L)^ > s);
       Inc(L, IncL);
       Inc(Y, IncY);
@@ -853,7 +863,7 @@ begin
     exit;
   end;
 
-  while Y < pEnd do begin
+  while Y <> pEnd do begin
     PBoolean(Y)^ := (PInteger(L)^ > PInteger(R)^);
     Inc(L, IncL);
     Inc(R, IncR);
@@ -875,7 +885,7 @@ begin
       exit;
     end;
 
-    while Y < pEnd do begin
+    while Y <> pEnd do begin
       PBoolean(Y)^ := (s >= PInteger(R)^);
       Inc(R, IncR);
       Inc(Y, IncY);
@@ -892,7 +902,7 @@ begin
       exit;
     end;
 
-    while Y < pEnd do begin
+    while Y <> pEnd do begin
       PBoolean(Y)^ := (PInteger(L)^ >= s);
       Inc(L, IncL);
       Inc(Y, IncY);
@@ -907,7 +917,7 @@ begin
     exit;
   end;
 
-  while Y < pEnd do begin
+  while Y <> pEnd do begin
     PBoolean(Y)^ := (PInteger(L)^ >= PInteger(R)^);
     Inc(L, IncL);
     Inc(R, IncR);
@@ -929,7 +939,7 @@ begin
       exit;
     end;
 
-    while Y < pEnd do begin
+    while Y <> pEnd do begin
       PBoolean(Y)^ := (s < PInteger(R)^);
       Inc(R, IncR);
       Inc(Y, IncY);
@@ -946,7 +956,7 @@ begin
       exit;
     end;
 
-    while Y < pEnd do begin
+    while Y <> pEnd do begin
       PBoolean(Y)^ := (PInteger(L)^ < s);
       Inc(L, IncL);
       Inc(Y, IncY);
@@ -961,7 +971,7 @@ begin
     exit;
   end;
 
-  while Y < pEnd do begin
+  while Y <> pEnd do begin
     PBoolean(Y)^ := (PInteger(L)^ < PInteger(R)^);
     Inc(L, IncL);
     Inc(R, IncR);
@@ -983,7 +993,7 @@ begin
       exit;
     end;
 
-    while Y < pEnd do begin
+    while Y <> pEnd do begin
       PBoolean(Y)^ := (s <= PInteger(R)^);
       Inc(R, IncR);
       Inc(Y, IncY);
@@ -1000,7 +1010,7 @@ begin
       exit;
     end;
 
-    while Y < pEnd do begin
+    while Y <> pEnd do begin
       PBoolean(Y)^ := (PInteger(L)^ <= s);
       Inc(L, IncL);
       Inc(Y, IncY);
@@ -1015,7 +1025,7 @@ begin
     exit;
   end;
 
-  while Y < pEnd do begin
+  while Y <> pEnd do begin
     PBoolean(Y)^ := (PInteger(L)^ <= PInteger(R)^);
     Inc(L, IncL);
     Inc(R, IncR);
@@ -1147,6 +1157,16 @@ begin
   Result := fArr.Shape;
 end;
 
+function TTensorI32.GetPart(const aIdx: INDIndexSeq): TTensorI32;
+begin
+  Result := fArr[aIdx];
+end;
+
+procedure TTensorI32.SetPart(const aIdx: INDIndexSeq; const aValue: TTensorI32);
+begin
+  fArr[aIdx] := aValue;
+end;
+
 {$endregion}
 
 {$region 'TTensorI64'}
@@ -1161,7 +1181,7 @@ begin
     // R <- L + R
     s := PInt64(L)^;
     pEnd := R + N * IncR;
-    while R < pEnd do begin
+    while R <> pEnd do begin
       PInt64(R)^ := s + PInt64(R)^;
       Inc(R, IncR);
     end;
@@ -1171,7 +1191,7 @@ begin
 
   // R <- L + R
   pEnd := R + N * IncR;
-  while R < pEnd do begin
+  while R <> pEnd do begin
     PInt64(R)^ := PInt64(L)^ + PInt64(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -1191,7 +1211,7 @@ begin
     // R <- L - R
     s := PInt64(L)^;
     pEnd := R + N * IncR;
-    while R < pEnd do begin
+    while R <> pEnd do begin
       PInt64(R)^ := s - PInt64(R)^;
       Inc(R, IncR);
     end;
@@ -1201,7 +1221,7 @@ begin
 
   // R <- L - R
   pEnd := R + N * IncR;
-  while R < pEnd do begin
+  while R <> pEnd do begin
     PInt64(R)^ := PInt64(L)^ - PInt64(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -1216,7 +1236,7 @@ begin
     // L <- L - R
     s := PInt64(R)^;
     pEnd := L + N * IncL;
-    while L < pEnd do begin
+    while L <> pEnd do begin
       PInt64(L)^ := PInt64(L)^ - s;
       Inc(L, IncL);
     end;
@@ -1226,7 +1246,7 @@ begin
 
   // L <- L - R
   pEnd := L + N * IncL;
-  while L < pEnd do begin
+  while L <> pEnd do begin
     PInt64(L)^ := PInt64(L)^ - PInt64(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -1241,7 +1261,7 @@ begin
     // R <- L * R
     s := PInt64(L)^;
     pEnd := R + N * IncR;
-    while R < pEnd do begin
+    while R <> pEnd do begin
       PInt64(R)^ := s * PInt64(R)^;
       Inc(R, IncR);
     end;
@@ -1251,7 +1271,7 @@ begin
 
   // R <- L * R
   pEnd := R + N * IncR;
-  while R < pEnd do begin
+  while R <> pEnd do begin
     PInt64(R)^ := PInt64(L)^ * PInt64(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -1383,7 +1403,7 @@ begin
     end;
 
     pEnd := R + N * IncR;
-    while R < pEnd do begin
+    while R <> pEnd do begin
       PSingle(R)^ := s + PSingle(R)^;
       Inc(R, IncR);
     end;
@@ -1398,7 +1418,7 @@ begin
   end;
 
   pEnd := R + N * IncR;
-  while R < pEnd do begin
+  while R <> pEnd do begin
     PSingle(R)^ := PSingle(L)^ + PSingle(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -1423,7 +1443,7 @@ begin
     end;
 
     pEnd := R + N * IncR;
-    while R < pEnd do begin
+    while R <> pEnd do begin
       PSingle(R)^ := s - PSingle(R)^;
       Inc(R, IncR);
     end;
@@ -1438,7 +1458,7 @@ begin
     exit;
   end;
 
-  while R < pEnd do begin
+  while R <> pEnd do begin
     PSingle(R)^ := PSingle(L)^ - PSingle(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -1458,7 +1478,7 @@ begin
     end;
 
     pEnd := L + N * IncL;
-    while L < pEnd do begin
+    while L <> pEnd do begin
       PSingle(L)^ := PSingle(L)^ - s;
       Inc(L, IncL);
     end;
@@ -1467,13 +1487,13 @@ begin
   end;
 
   // L <- L - R
-  pEnd := L + N * IncL;
   if (IncL = cF32Sz) and (IncR = cF32Sz) then begin
     VecSub(PSingle(L), PSingle(R), PSingle(L), N);
     exit;
   end;
 
-  while L < pEnd do begin
+  pEnd := L + N * IncL;
+  while L <> pEnd do begin
     PSingle(L)^ := PSingle(L)^ - PSingle(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -1493,7 +1513,7 @@ begin
     end;
 
     pEnd := R + N * IncR;
-    while R < pEnd do begin
+    while R <> pEnd do begin
       PSingle(R)^ := s * PSingle(R)^;
       Inc(R, IncR);
     end;
@@ -1508,7 +1528,7 @@ begin
   end;
 
   pEnd := R + N * IncR;
-  while R < pEnd do begin
+  while R <> pEnd do begin
     PSingle(R)^ := PSingle(L)^ * PSingle(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -1528,7 +1548,7 @@ begin
     // R <- l / R
     s := PSingle(L)^;
     pEnd := R + N * IncR;
-    while R < pEnd do begin
+    while R <> pEnd do begin
       PSingle(R)^ := s / PSingle(R)^;
       Inc(R, IncR);
     end;
@@ -1538,7 +1558,7 @@ begin
 
   // R <- L / R
   pEnd := R + N * IncR;
-  while R < pEnd do begin
+  while R <> pEnd do begin
     PSingle(R)^ := PSingle(L)^ / PSingle(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -1558,7 +1578,7 @@ begin
     end;
 
     pEnd := L + N * IncL;
-    while L < pEnd do begin
+    while L <> pEnd do begin
       PSingle(L)^ := PSingle(L)^ / s;
       Inc(L, IncL);
     end;
@@ -1568,7 +1588,7 @@ begin
 
   // L <- L / R
   pEnd := L + N * IncL;
-  while L < pEnd do begin
+  while L <> pEnd do begin
     PSingle(L)^ := PSingle(L)^ / PSingle(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -1733,7 +1753,7 @@ begin
     // R <- L + R
     s := PDouble(L)^;
     pEnd := R + N * IncR;
-    while R < pEnd do begin
+    while R <> pEnd do begin
       PDouble(R)^ := s + PDouble(R)^;
       Inc(R, IncR);
     end;
@@ -1743,7 +1763,7 @@ begin
 
   // R <- L + R
   pEnd := R + N * IncR;
-  while R < pEnd do begin
+  while R <> pEnd do begin
     PDouble(R)^ := PDouble(L)^ + PDouble(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -1763,7 +1783,7 @@ begin
     // R <- L - R
     s := PDouble(L)^;
     pEnd := R + N * IncR;
-    while R < pEnd do begin
+    while R <> pEnd do begin
       PDouble(R)^ := s - PDouble(R)^;
       Inc(R, IncR);
     end;
@@ -1773,7 +1793,7 @@ begin
 
   // R <- L - R
   pEnd := R + N * IncR;
-  while R < pEnd do begin
+  while R <> pEnd do begin
     PDouble(R)^ := PDouble(L)^ - PDouble(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -1788,7 +1808,7 @@ begin
     // L <- L - R
     s := PDouble(R)^;
     pEnd := L + N * IncL;
-    while L < pEnd do begin
+    while L <> pEnd do begin
       PDouble(L)^ := PDouble(L)^ - s;
       Inc(L, IncL);
     end;
@@ -1798,7 +1818,7 @@ begin
 
   // L <- L - R
   pEnd := L + N * IncL;
-  while L < pEnd do begin
+  while L <> pEnd do begin
     PDouble(L)^ := PDouble(L)^ - PDouble(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -1818,7 +1838,7 @@ begin
     end;
 
     pEnd := R + N * IncR;
-    while R < pEnd do begin
+    while R <> pEnd do begin
       PDouble(R)^ := s * PDouble(R)^;
       Inc(R, IncR);
     end;
@@ -1833,7 +1853,7 @@ begin
   end;
 
   pEnd := R + N * IncR;
-  while R < pEnd do begin
+  while R <> pEnd do begin
     PDouble(R)^ := PDouble(L)^ * PDouble(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -1853,7 +1873,7 @@ begin
     // R <- L / R
     s := PDouble(L)^;
     pEnd := R + N * IncR;
-    while R < pEnd do begin
+    while R <> pEnd do begin
       PDouble(R)^ := s / PDouble(R)^;
       Inc(R, IncR);
     end;
@@ -1863,7 +1883,7 @@ begin
 
   // R <- L / R
   pEnd := R + N * IncR;
-  while R < pEnd do begin
+  while R <> pEnd do begin
     PDouble(R)^ := PDouble(L)^ / PDouble(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -1878,7 +1898,7 @@ begin
     // L <- L / R
     s := PDouble(R)^;
     pEnd := L + N * IncL;
-    while L < pEnd do begin
+    while L <> pEnd do begin
       PDouble(L)^ := PDouble(L)^ / s;
       Inc(L, IncL);
     end;
@@ -1888,7 +1908,7 @@ begin
 
   // L <- L / R
   pEnd := L + N * IncL;
-  while L < pEnd do begin
+  while L <> pEnd do begin
     PDouble(L)^ := PDouble(L)^ / PDouble(R)^;
     Inc(L, IncL);
     Inc(R, IncR);
@@ -2041,7 +2061,7 @@ end;
 
 {$endregion}
 
-{$region 'TTesnorC64'}
+{$region 'TTensorC64'}
 
 {$region 'LR functions'}
 
@@ -2059,7 +2079,7 @@ begin
     end;
 
     pEnd := R + N * IncR;
-    while R < pEnd do begin
+    while R <> pEnd do begin
       with PCmplx64(R)^ do begin
         tmpRe := Re;
         Re := s.Re * tmpRe - s.Im * Im;
@@ -2078,7 +2098,7 @@ begin
   end;
 
   pEnd := R + N * IncR;
-  while R < pEnd do begin
+  while R <> pEnd do begin
     s := PCmplx64(L)^;
     with PCmplx64(R)^ do begin
       tmpRe := Re;
@@ -2147,7 +2167,7 @@ begin
     end;
 
     pEnd := R + N * IncR;
-    while R < pEnd do begin
+    while R <> pEnd do begin
       with PCmplx128(R)^ do begin
         Re := s.Re + Re;
         Im := s.Im + Im;
@@ -2165,7 +2185,7 @@ begin
   end;
 
   pEnd := R + N * IncR;
-  while R < pEnd do begin
+  while R <> pEnd do begin
     with PCmplx128(R)^ do begin
       Re := PCmplx128(L)^.Re + Re;
       Im := PCmplx128(L)^.Im + Im;
@@ -2193,7 +2213,7 @@ begin
 //    end;
 
     pEnd := R + N * IncR;
-    while R < pEnd do begin
+    while R <> pEnd do begin
       with PCmplx128(R)^ do begin
         Re := s.Re - Re;
         Im := s.Im - Im;
@@ -2205,13 +2225,13 @@ begin
   end;
 
   // R <- L - R
-  pEnd := R + N * IncR;
   if (IncL = cC128Sz) and (IncR = cC128Sz) then begin
     VecSub(PCmplx128(L), PCmplx128(R), PCmplx128(R), N);
     exit;
   end;
 
-  while R < pEnd do begin
+  pEnd := R + N * IncR;
+  while R <> pEnd do begin
     with PCmplx128(R)^ do begin
       Re := PCmplx128(L)^.Re - Re;
       Im := PCmplx128(L)^.Im - Im;
@@ -2234,7 +2254,7 @@ begin
 //    end;
 
     pEnd := L + N * IncL;
-    while L < pEnd do begin
+    while L <> pEnd do begin
       with PCmplx128(L)^ do begin
         Re := Re - s.Re;
         Im := Im - s.Im;
@@ -2246,13 +2266,13 @@ begin
   end;
 
   // L <- L - R
-  pEnd := L + N * IncL;
   if (IncL = cC128Sz) and (IncR = cC128Sz) then begin
     VecSub(PCmplx128(L), PCmplx128(R), PCmplx128(L), N);
     exit;
   end;
 
-  while L < pEnd do begin
+  pEnd := L + N * IncL;
+  while L <> pEnd do begin
     with PCmplx128(L)^ do begin
       Re := Re - PCmplx128(R)^.Re;
       Im := Im - PCmplx128(R)^.Im;
@@ -2276,7 +2296,7 @@ begin
     end;
 
     pEnd := R + N * IncR;
-    while R < pEnd do begin
+    while R <> pEnd do begin
       with PCmplx128(R)^ do begin
         tmpRe := Re;
         Re := s.Re * tmpRe - s.Im * Im;
@@ -2295,7 +2315,7 @@ begin
   end;
 
   pEnd := R + N * IncR;
-  while R < pEnd do begin
+  while R <> pEnd do begin
     s := PCmplx128(L)^;
     with PCmplx128(R)^ do begin
       tmpRe := Re;
@@ -2320,8 +2340,13 @@ begin
   if IncL = 0 then begin
     // R <- l / R
     s := PCmplx128(L)^;
+    if IncR = cC128Sz then begin
+      VecDiv(s, PCmplx128(R), PCmplx128(R), N);
+      exit;
+    end;
+
     pEnd := R + N * IncR;
-    while R < pEnd do begin
+    while R <> pEnd do begin
       with PCmplx128(R)^ do begin
         d := Re * Re + Im * Im;
         tmpRe := Re;
@@ -2336,7 +2361,7 @@ begin
 
   // R <- L / R
   pEnd := R + N * IncR;
-  while R < pEnd do begin
+  while R <> pEnd do begin
     with PCmplx128(R)^ do begin
       d := Re * Re + Im * Im;
       s := PCmplx128(L)^;
@@ -2364,7 +2389,7 @@ begin
 
     pEnd := L + N * IncL;
     d := s.Re * s.Re + s.Im * s.Im;
-    while L < pEnd do begin
+    while L <> pEnd do begin
       with PCmplx128(L)^ do begin
         tmpRe := Re;
         Re := (tmpRe * s.Re + Im * s.Im) / d;
@@ -2378,7 +2403,7 @@ begin
 
   // L <- L / R
   pEnd := L + N * IncL;
-  while L < pEnd do begin
+  while L <> pEnd do begin
     s := PCmplx128(R)^;
     d := s.Re * s.Re + s.Im * s.Im;
     with PCmplx128(L)^ do begin
@@ -2404,7 +2429,7 @@ begin
     end;
 
     pEnd := L + N * IncL;
-    while L < pEnd do begin
+    while L <> pEnd do begin
       with PCmplx128(L)^ do begin
         Re := s * Re;
         Im := s * Im;
@@ -2417,7 +2442,7 @@ begin
 
   // L <- L / R
   pEnd := L + N * IncL;
-  while L < pEnd do begin
+  while L <> pEnd do begin
     s := 1/PDouble(R)^;
     with PCmplx128(L)^ do begin
       Re := s * Re;
@@ -2429,6 +2454,86 @@ begin
 end;
 
 {$endregion}
+
+procedure AddR_C128_F64(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+var pEnd: PByte;
+begin
+  if (IncR = 0) and (IncL = cC128Sz) then begin
+    VecAdd(PCmplx128(L), PDouble(R)^, PCmplx128(L), N);
+    exit;
+  end;
+
+  pEnd := L + N * IncL;
+  while L <> pEnd do begin
+    PCmplx128(L)^.Re := PCmplx128(L)^.Re + PDouble(R)^;
+    Inc(L, IncL);
+    Inc(R, IncR);
+  end;
+end;
+
+procedure AddL_F64_C128(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+begin
+  AddR_C128_F64(N, R, IncR, L, IncL);
+end;
+
+procedure SubR_C128_F64(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+var pEnd: PByte;
+begin
+  if (IncR = 0) and (IncL = cC128Sz) then begin
+    VecSub(PCmplx128(L), PDouble(R)^, PCmplx128(L), N);
+    exit;
+  end;
+
+  pEnd := L + N * IncL;
+  while L <> pEnd do begin
+    PCmplx128(L)^.Re := PCmplx128(L)^.Re - PDouble(R)^;
+    Inc(L, IncL);
+    Inc(R, IncR);
+  end;
+end;
+
+procedure SubL_F64_C128(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+var pEnd: PByte;
+begin
+  if (IncL = 0) and (IncR = cC128Sz) then begin
+    VecSub(PDouble(L)^, PCmplx128(R), PCmplx128(R), N);
+    exit;
+  end;
+
+  pEnd := R + N * IncR;
+  while R <> pEnd do begin
+    with PCmplx128(R)^ do begin
+      Re := PDouble(L)^ - Re;
+      Im := -Im;
+    end;
+    Inc(L, IncL);
+    Inc(R, IncR);
+  end;
+end;
+
+procedure MulR_C128_F64(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+var pEnd: PByte;
+begin
+  if (IncR = 0) and (IncL = cC128Sz) then begin
+    VecMul(PDouble(L), PDouble(R)^, PDouble(L), 2*N);
+    exit;
+  end;
+
+  pEnd := L + N * IncL;
+  while L <> pEnd do begin
+    with PCmplx128(L)^ do begin
+      Re := PDouble(R)^ * Re;
+      Im := PDouble(R)^ * Im;
+    end;
+    Inc(L, IncL);
+    Inc(R, IncR);
+  end;
+end;
+
+procedure MulL_F64_C128(N: NativeInt; L: PByte; IncL: NativeInt; R: PByte; IncR: NativeInt);
+begin
+  MulR_C128_F64(N, R, IncR, L, IncL);
+end;
 
 class operator TTensorC128.Implicit(const aArr: INDArray<TCmplx128>): TTensorC128;
 begin
@@ -2456,6 +2561,18 @@ class operator TTensorC128.Add(const A: TCmplx128; const B: TTensorC128): TTenso
 begin
   Result.fArr := nil;
   TNDAUt.Map<TCmplx128>(A, B, Result.fArr, AddL_C128);
+end;
+
+class operator TTensorC128.Add(const A: TTensorC128; const B: Double): TTensorC128;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<TCmplx128, Double, TCmplx128>(A.NDA, B, Result.fArr, AddR_C128_F64);
+end;
+
+class operator TTensorC128.Add(const A: Double; const B: TTensorC128): TTensorC128;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Double, TCmplx128, TCmplx128>(A, B.NDA, Result.fArr, AddL_F64_C128);
 end;
 
 class operator TTensorC128.Subtract(const A, B: TTensorC128): TTensorC128;
@@ -2515,7 +2632,37 @@ end;
 class operator TTensorC128.Divide(const A: TTensorC128; const B: Double): TTensorC128;
 begin
   Result.fArr := nil;
-  TNDAUt.Map<TCmplx128, Double, TCmplx128>(A, B, Result.fArr, DivR_C128_F64)
+  TNDAUt.Map<TCmplx128, Double, TCmplx128>(A.NDA, B, Result.fArr, DivR_C128_F64);
+end;
+
+class operator TTensorC128.Subtract(const A: TTensorC128; const B: Double): TTensorC128;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<TCmplx128, Double, TCmplx128>(A.NDA, B, Result.fArr, SubR_C128_F64);
+end;
+
+class operator TTensorC128.Subtract(const A: Double; const B: TTensorC128): TTensorC128;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Double, TCmplx128, TCmplx128>(A, B.NDA, Result.fArr, SubL_F64_C128);
+end;
+
+class operator TTensorC128.Multiply(const A: TTensorC128; const B: Double): TTensorC128;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<TCmplx128, Double, TCmplx128>(A.NDA, B, Result.fArr, MulR_C128_F64);
+end;
+
+class operator TTensorC128.Multiply(const A: Double; const B: TTensorC128): TTensorC128;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<Double, TCmplx128, TCmplx128>(A, B.NDA, Result.fArr, MulL_F64_C128);
+end;
+
+class operator TTensorC128.Divide(const A: Double; const B: TTensorC128): TTensorC128;
+begin
+  Result.fArr := nil;
+  TNDAUt.Map<TCmplx128>(Cmplx128(A, 0), B.NDA, Result.fArr, DivL_C128);
 end;
 
 procedure TTensorC128.Assign(const A: TTensorC128);

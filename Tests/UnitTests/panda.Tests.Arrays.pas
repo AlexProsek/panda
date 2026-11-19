@@ -132,6 +132,8 @@ type
 
     procedure CConstFlag1D;
     procedure CConstFlag2D;
+    procedure PackReversedAllSizes;
+    procedure GetPackedReversed2D;
   end;
 
   TIndicesTests = class(TNDATestCase)
@@ -309,9 +311,10 @@ type
     procedure Scalar_Arr2D;
     procedure Scalar_CArr2D;
     procedure Arr2D_Scalar;
-    procedure Add2D_Arr2D;
+    procedure Arr2D_Arr2D;
     procedure Arr1D_Arr2D;
     procedure Arr2D_Arr1D;
+    procedure Arr2DRev_Arr2D;
   end;
 
   TNDACvtTests = class(TNDATestCase)
@@ -4145,7 +4148,7 @@ begin
   CheckEquals([False, False], m[1]);
 end;
 
-procedure TFncMapTests.Add2D_Arr2D;
+procedure TFncMapTests.Arr2D_Arr2D;
 var a, b: INDArray<Integer>;
     c, res: INDArray<Boolean>;
     m: TArray<TArray<Boolean>>;
@@ -4194,6 +4197,24 @@ begin
   CheckTrue(TNDAUt.TryAsDynArray2D<Boolean>(res, m));
   CheckEquals([True,  True ], m[0]);
   CheckEquals([False, False], m[1]);
+end;
+
+procedure TFncMapTests.Arr2DRev_Arr2D;
+var a, b: INDArray<Integer>;
+    res: INDArray<Boolean>;
+    m: TArray<TArray<Boolean>>;
+begin
+  a := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+  b := TNDAUt.AsArray<Integer>([[1, 4, 9], [4, 10, 18], [7, 16, 27]]);
+  res := TNDAUt.Full<Boolean>([3, 3], False);
+
+  TNDAUt.Map<Integer, Integer, Boolean>(a[[NDIAll(-1)]], b, res, F2);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Boolean>(res, m));
+  CheckEquals(3, Length(m));
+  CheckEquals([False, False, False], m[0]);
+  CheckEquals([False, False,  True], m[1]);
+  CheckEquals([ True,  True,  True], m[2]);
 end;
 
 {$endregion}
@@ -4265,6 +4286,41 @@ begin
 end;
 
 {$endregion}
+
+procedure TArrayTests.PackReversedAllSizes;
+const Sizes: array[0..5] of Integer = (1,2,4,8,16,3);
+var src, dst: TBytes;
+    itemSize, I, J: Integer;
+begin
+  for itemSize in Sizes do begin
+    SetLength(src, 5*itemSize);
+    SetLength(dst, 3*itemSize);
+    for I := 0 to 4 do
+      for J := 0 to itemSize - 1 do
+        src[I*itemSize + J] := I + 1;
+
+    PackBytes(@src[4*itemSize], PByte(dst), 3, -2*itemSize, itemSize);
+
+    for I := 0 to 2 do
+      for J := 0 to itemSize - 1 do
+        CheckEquals(5 - 2*I, dst[I*itemSize + J]);
+  end;
+end;
+
+procedure TArrayTests.GetPackedReversed2D;
+var A: INDArray<Integer>;
+    buffer: TBytes;
+    data: PInteger;
+    I: Integer;
+begin
+  A := TNDAUt.AsArray<Integer>([1,2,3,4,5,6], [2,3]);
+  A := A[[NDISpan(1,0,-1), NDISpan(2,0,-1)]];
+
+  data := PInteger(GetPackedDataPtr(A, buffer));
+
+  for I := 0 to 5 do
+    CheckEquals(6 - I, PInteger(PByte(data) + I*SizeOf(Integer))^);
+end;
 
 initialization
 

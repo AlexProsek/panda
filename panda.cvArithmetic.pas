@@ -18,6 +18,7 @@ procedure VecAdd(pA, pB, pRes: PCmplx128; aCount: NativeInt); inline; overload;
 procedure VecAdd(pA: PSingle; B: Single; pRes: PSingle; aCount: NativeInt); overload;
 procedure VecAdd(pA: PDouble; const B: Double; pRes: PDouble; aCount: NativeInt); overload;
 procedure VecAdd(pA: PCmplx128; const B: TCmplx128; pRes: PCmplx128; aCount: NativeInt); overload;
+procedure VecAdd(pA: PCmplx128; const B: Double; pRes: PCmplx128; aCount: NativeInt); overload;
 
 // pA^ <- pA^ + pB^
 procedure VecAddInPlace(pA, pB: PDouble; aAStep, aBStep, aCount: NativeInt); overload;
@@ -32,6 +33,8 @@ procedure VecSub(pA, pB, pRes: PCmplx128; aCount: NativeInt); inline; overload;
 procedure VecSub(pA: PDouble; const B: Double; pRes: PDouble; aCount: NativeInt); overload;
 procedure VecSub(pA: PSingle; B: Single; pRes: PSingle; aCount: NativeInt); overload;
 procedure VecSub(A: Single; pB: PSingle; pRes: PSingle; aCount: NativeInt); overload;
+procedure VecSub(pA: PCmplx128; const B: Double; pRes: PCmplx128; aCount: NativeInt); overload;
+procedure VecSub(const A: Double; pB, pRes: PCmplx128; aCount: NativeInt); overload;
 
 // pA^ <- pA^ - pB^
 procedure VecSubInPlace(pA, pB: PDouble; aAStep, aBStep, aCount: NativeInt); overload;
@@ -55,6 +58,7 @@ procedure VecMul(pA: PCmplx128; const B: TCmplx128; pRes: PCmplx128; aCount: Nat
 
 procedure VecDiv(pA, pB, pRes: PSingle; aCount: NativeInt); overload;
 procedure VecDiv(pA, pB, pRes: PCmplx128; aCount: NativeInt); overload;
+procedure VecDiv(const A: TCmplx128; pB, pRes: PCmplx128; aCount: NativeInt); overload;
 
 procedure VecAddWithSat(pA, pB, pRes: PUInt8; aCount: NativeInt); overload;
 procedure VecAddWithSat(pA, pB, pRes: PUInt16; aCount: NativeInt); overload;
@@ -173,7 +177,7 @@ procedure RaiseNotPositiveLength;
 {$endregion}
 
 var
-  cUnrollThreshold: NativeInt = 10000;
+  cUnrollThreshold: NativeInt = 1000;
 
 implementation
 
@@ -459,7 +463,7 @@ end;
 {$else}
 var pEnd: PByte;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(Single);
+  pEnd := PByte(pA) + aCount * cF32Sz;
   while PByte(pA) < pEnd do begin
     pRes^  := pA^ + pB^;
     Inc(pRes);
@@ -531,7 +535,7 @@ end;
 {$else}
 var pEnd: PByte;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(Double);
+  pEnd := PByte(pA) + aCount * cF64Sz;
   while PByte(pA) < pEnd do begin
     pRes^  := pA^ + pB^;
     Inc(pRes);
@@ -721,24 +725,58 @@ begin
 end;
 {$endif}
 
-procedure VecAddInPlace(pA, pB: PDouble; aAStep, aBStep, aCount: NativeInt);
+procedure VecAdd(pA: PCmplx128; const B: Double; pRes: PCmplx128; aCount: NativeInt);
+{$if defined(ASMx86)}
+asm
+  test ecx, ecx
+  jz @end
+  movsd xmm1, [ebp + 8]
+@L:
+  movupd xmm0, [eax]
+  addsd xmm0, xmm1
+  movupd [edx], xmm0
+  add eax, 16
+  add edx, 16
+  dec ecx
+  jnz @L
+@end:
+end;
+{$elseif defined(ASMx64)}
+asm
+  test r9, r9
+  jz @end
+@L:
+  movupd xmm0, [rcx]
+  addsd xmm0, xmm1
+  movupd [r8], xmm0
+  add rcx, 16
+  add r8, 16
+  dec r9
+  jnz @L
+@end:
+end;
+{$else}
 var pEnd: PByte;
+    value: TCmplx128;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(Double);
+  pEnd := PByte(pA) + aCount * cC128Sz;
   while PByte(pA) < pEnd do begin
-    pA^ := pA^ + pB^;
-    Inc(pA, aAStep);
-    Inc(pB, aBStep);
+    value := pA^;
+    value.Re := value.Re + B;
+    pRes^ := value;
+    Inc(pA);
+    Inc(pRes);
   end;
 end;
+{$endif}
 
-procedure VecAddInPlace(pA, pB: PSingle; aAStep, aBStep, aCount: NativeInt);
+procedure VecAddInPlace(pA, pB: PDouble; aAStep, aBStep, aCount: NativeInt);
 var pEnd, pEndu: PByte;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(Single);
-  if (aCount div aAStep) > cUnrollThreshold then begin
-    pEndu := PByte(pA) + (aCount and (not NativeInt(3))) * SizeOf(Single);
-    while PByte(pA) < pEndu do begin
+  pEnd := PByte(pA) + aCount * aAStep * cF64Sz;
+  if aCount > cUnrollThreshold then begin
+    pEndu := PByte(pA) + (aCount and (not NativeInt(3))) * aAStep * cF64Sz;
+    while PByte(pA) <> pEndu do begin
       pA^ := pA^ + pB^;
       Inc(pA, aAStep);
       Inc(pB, aBStep);
@@ -753,7 +791,35 @@ begin
       Inc(pB, aBStep);
     end;
   end;
-  while PByte(pA) < pEnd do begin
+  while PByte(pA) <> pEnd do begin
+    pA^ := pA^ + pB^;
+    Inc(pA, aAStep);
+    Inc(pB, aBStep);
+  end;
+end;
+
+procedure VecAddInPlace(pA, pB: PSingle; aAStep, aBStep, aCount: NativeInt);
+var pEnd, pEndu: PByte;
+begin
+  pEnd := PByte(pA) + aCount * aAStep * cF32Sz;
+  if aCount > cUnrollThreshold then begin
+    pEndu := PByte(pA) + (aCount and (not NativeInt(3))) * aAStep * cF32Sz;
+    while PByte(pA) <> pEndu do begin
+      pA^ := pA^ + pB^;
+      Inc(pA, aAStep);
+      Inc(pB, aBStep);
+      pA^ := pA^ + pB^;
+      Inc(pA, aAStep);
+      Inc(pB, aBStep);
+      pA^ := pA^ + pB^;
+      Inc(pA, aAStep);
+      Inc(pB, aBStep);
+      pA^ := pA^ + pB^;
+      Inc(pA, aAStep);
+      Inc(pB, aBStep);
+    end;
+  end;
+  while PByte(pA) <> pEnd do begin
     pA^ := pA^ + pB^;
     Inc(pA, aAStep);
     Inc(pB, aBStep);
@@ -895,7 +961,7 @@ end;
 procedure VecSub(pA, pB, pRes: PDouble; aCount: NativeInt);
 var pEnd: PByte;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(Double);
+  pEnd := PByte(pA) + aCount * cF64Sz;
   while PByte(pA) < pEnd do begin
     pRes^ := pA^ - pB^;
     Inc(pRes);
@@ -1010,7 +1076,7 @@ var pEnd, pEndu: PByte;
 begin
   pEnd := PByte(pA) + aCount * SizeOf(Single);
   if aCount > cUnrollThreshold then begin
-    pEndu := PByte(pA) + (aCount and (not NativeInt(3))) * SizeOf(Single);
+    pEndu := PByte(pA) + (aCount and (not NativeInt(3))) * cF32Sz;
     while PByte(pA) < pEndu do begin
       pRes^ := pA^ - pB^;
       Inc(pRes);
@@ -1150,11 +1216,116 @@ begin
 end;
 {$endif}
 
+procedure VecSub(pA: PCmplx128; const B: Double; pRes: PCmplx128; aCount: NativeInt);
+{$if defined(ASMx86)}
+asm
+  test ecx, ecx
+  jz @end
+  movsd xmm1, [ebp + 8]
+@L:
+  movupd xmm0, [eax]
+  subsd xmm0, xmm1
+  movupd [edx], xmm0
+  add eax, 16
+  add edx, 16
+  dec ecx
+  jnz @L
+@end:
+end;
+{$elseif defined(ASMx64)}
+asm
+  test r9, r9
+  jz @end
+@L:
+  movupd xmm0, [rcx]
+  subsd xmm0, xmm1
+  movupd [r8], xmm0
+  add rcx, 16
+  add r8, 16
+  dec r9
+  jnz @L
+@end:
+end;
+{$else}
+var pEnd: PByte;
+    value: TCmplx128;
+begin
+  pEnd := PByte(pA) + aCount * SizeOf(TCmplx128);
+  while PByte(pA) < pEnd do begin
+    value := pA^;
+    with value do
+      Re := Re - B;
+    pRes^ := value;
+    Inc(pA);
+    Inc(pRes);
+  end;
+end;
+{$endif}
+
+procedure VecSub(const A: Double; pB, pRes: PCmplx128; aCount: NativeInt);
+{$if defined(ASMx86)}
+asm
+  test ecx, ecx
+  jz @end
+  movsd xmm2, [ebp + 8]
+  movq xmm3, cSgnMaskF64
+  pslldq xmm3, 8
+@L:
+  movupd xmm0, [eax]
+  movapd xmm1, xmm2
+  subsd xmm1, xmm0
+  movsd xmm0, xmm1
+  xorpd xmm0, xmm3
+  movupd [edx], xmm0
+  add eax, 16
+  add edx, 16
+  dec ecx
+  jnz @L
+@end:
+end;
+{$elseif defined(ASMx64)}
+asm
+  test r9, r9
+  jz @end
+  movapd xmm2, xmm0
+  movq xmm3, cSgnMaskF64
+  pslldq xmm3, 8
+@L:
+  movupd xmm0, [rdx]
+  movapd xmm1, xmm2
+  subsd xmm1, xmm0
+  movsd xmm0, xmm1
+  xorpd xmm0, xmm3
+  movupd [r8], xmm0
+  add rdx, 16
+  add r8, 16
+  dec r9
+  jnz @L
+@end:
+end;
+{$else}
+var pEnd: PByte;
+    value: TCmplx128;
+begin
+  pEnd := PByte(pB) + aCount * cC128Sz;
+  while PByte(pB) < pEnd do begin
+    value := pB^;
+    with value do begin
+      Re := A - Re;
+      Im := -Im;
+    end;
+    pRes^ := value;
+    Inc(pB);
+    Inc(pRes);
+  end;
+end;
+{$endif}
+
 procedure VecSubInPlace(pA, pB: PDouble; aAStep, aBStep, aCount: NativeInt);
 var pEnd: PByte;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(Double);
-  while PByte(pA) < pEnd do begin
+  pEnd := PByte(pA) + aCount * aAStep * cF64Sz;
+  while PByte(pA) <> pEnd do begin
     pA^ := pA^ - pB^;
     Inc(pA, aAStep);
     Inc(pB, aBStep);
@@ -1164,8 +1335,8 @@ end;
 procedure VecSubInPlace(pA, pB: PSingle; aAStep, aBStep, aCount: NativeInt);
 var pEnd: PByte;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(Single);
-  while PByte(pA) < pEnd do begin
+  pEnd := PByte(pA) + aCount * aAStep * cF32Sz;
+  while PByte(pA) <> pEnd do begin
     pA^ := pA^ - pB^;
     Inc(pA, aAStep);
     Inc(pB, aBStep);
@@ -1258,7 +1429,7 @@ end;
 {$else}
 var pEnd: PByte;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(Double);
+  pEnd := PByte(pA) + aCount * cF64Sz;
   while PByte(pA) < pEnd do begin
     pRes^  := -pA^;
     Inc(pRes);
@@ -1352,8 +1523,8 @@ end;
 {$else}
 var pEnd, pEndu: PByte;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(Single);
-  pEndu := PByte(pA) + (aCount and (not NativeInt(3))) * SizeOf(Single);
+  pEnd := PByte(pA) + aCount * cF32Sz;
+  pEndu := PByte(pA) + (aCount and (not NativeInt(3))) * cF32Sz;
   while PByte(pA) < pEndu do begin
     PUInt64(pRes)^ := PUInt64(pA)^ xor cSgnMask;
     Inc(pRes, 2);
@@ -1373,7 +1544,7 @@ end;
 procedure VecAbs(pA, pRes: PDouble; aCount: NativeInt);
 var pEnd: PByte;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(Double);
+  pEnd := PByte(pA) + aCount * cF64Sz;
   while PByte(pA) < pEnd do begin
     pRes^ := Abs(pA^);
     Inc(pRes);
@@ -1385,8 +1556,8 @@ procedure VecAbs(pA, pRes: PSingle; aCount: NativeInt);
 const cMask = $7FFFFFFF7FFFFFFF;
 var pEnd, pEndu: PByte;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(Single);
-  pEndu := PByte(pA) + (aCount and (not NativeInt(3))) * SizeOf(Single);
+  pEnd := PByte(pA) + aCount * cF32Sz;
+  pEndu := PByte(pA) + (aCount and (not NativeInt(3))) * cF32Sz;
   while PByte(pA) < pEndu do begin
     PUInt64(pRes)^ := PUInt64(pA)^ and cMask;
     Inc(pRes, 2);
@@ -1523,7 +1694,7 @@ end;
 {$else}
 var pEnd: PByte;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(Single);
+  pEnd := PByte(pA) + aCount * cF32Sz;
   while PByte(pA) < pEnd do begin
     pRes^  := pA^ * pB^;
     Inc(pRes);
@@ -1613,7 +1784,7 @@ end;
 {$else}
 var pEnd: PByte;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(Double);
+  pEnd := PByte(pA) + aCount * cF64Sz;
   while PByte(pA) < pEnd do begin
     pRes^  := pA^ * pB^;
     Inc(pRes);
@@ -1784,7 +1955,7 @@ end;
 var pEnd: PByte;
     tmp: TCmplx128;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(TCmplx128);
+  pEnd := PByte(pA) + aCount * cC128Sz;
   while PByte(pA) < pEnd do begin
     with tmp do begin
       Re := pA^.Re * pB^.Re - pA^.Im * pB^.Im;
@@ -1868,7 +2039,7 @@ end;
 {$else}
 var pEnd: PByte;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(Single);
+  pEnd := PByte(pA) + aCount * cF32Sz;
   while PByte(pA) < pEnd do begin
     pRes^  := pA^ * B;
     Inc(pRes);
@@ -1903,10 +2074,32 @@ asm
   movq [edx], xmm0
 @end:
 end;
+{$elseif defined(ASMx64)}
+asm
+  movddup xmm1, xmm1
+  mov r10, r9
+  shr r9, 1
+  jz @rest
+@L:
+  movupd xmm0, [rcx]
+  mulpd xmm0, xmm1
+  movupd [r8], xmm0
+  add rcx, 16
+  add r8, 16
+  dec r9
+  jnz @L
+@rest:
+  and r10, 1
+  jz @end
+  movsd xmm0, [rcx]
+  mulsd xmm0, xmm1
+  movsd [r8], xmm0
+@end:
+end;
 {$else}
 var pEnd: PByte;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(Double);
+  pEnd := PByte(pA) + aCount * cF64Sz;
   while PByte(pA) < pEnd do begin
     pRes^  := pA^ * B;
     Inc(pRes);
@@ -2015,13 +2208,15 @@ asm
 end;
 {$else}
 var pEnd: PByte;
+    s: TCmplx128;
+    tmpRe: Double;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(TCmplx128);
+  s := B;
+  pEnd := PByte(pA) + aCount * cC128Sz;
   while PByte(pA) < pEnd do begin
-    with pRes^ do begin
-      Re := pA^.Re * B.Re - pA^.Im * B.Im;
-      Im := pA^.Re * B.Im + pA^.Im * B.Re;
-    end;
+    tmpRe := pA^.Re * s.Re - pA^.Im * s.Im;
+    pRes^.Im := pA^.Re * s.Im + pA^.Im * s.Re;
+    pRes^.Re := tmpRe;
     Inc(pRes);
     Inc(pA);
   end;
@@ -2146,18 +2341,96 @@ asm
 end;
 {$else}
 var pEnd: PByte;
-    denom: Double;
+    denom, tmpRe: Double;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(TCmplx128);
+  pEnd := PByte(pA) + aCount * cC128Sz;
   while PByte(pA) < pEnd do begin
     with pB^ do begin
       denom := Re * Re + Im * Im;
-      pRes^.Re := (pA^.Re * Re + pA^.Im * Im) / denom;
+      tmpRe := (pA^.Re * Re + pA^.Im * Im) / denom;
       pRes^.Im := (pA^.Im * Re - pA^.Re * Im) / denom;
+      pRes^.Re := tmpRe;
     end;
     Inc(pRes);
     Inc(pA);
     Inc(pB);
+  end;
+end;
+{$endif}
+
+procedure VecDiv(const A: TCmplx128; pB, pRes: PCmplx128; aCount: NativeInt);
+{$if defined(ASMx86)}
+asm
+  movddup xmm4, [eax]
+  movddup xmm5, [eax + 8]
+  mov eax, ecx
+  mov ecx, [ebp + 8]
+  test ecx, ecx
+  jz @end
+@L:
+  movapd xmm2, xmm4
+  movapd xmm3, xmm5
+  movupd xmm1, [edx]
+  mulpd xmm3, xmm1
+  pshufd xmm1, xmm1, $4e
+  mulpd xmm2, xmm1
+  addsubpd xmm3, xmm2
+  pshufd xmm3, xmm3, $4e
+  mulpd xmm1, xmm1
+  movhlps xmm2, xmm1
+  addsd xmm1, xmm2
+  movlhps xmm1, xmm1
+  divpd xmm3, xmm1
+  movupd [eax], xmm3
+  add edx, 16
+  add eax, 16
+  dec ecx
+  jnz @L
+@end:
+end;
+{$elseif defined(ASMx64)}
+asm
+  test r9, r9
+  jz @end
+  movddup xmm4, [rcx]
+  movddup xmm5, [rcx + 8]
+@L:
+  movapd xmm2, xmm4
+  movapd xmm3, xmm5
+  movupd xmm1, [rdx]
+  mulpd xmm3, xmm1
+  pshufd xmm1, xmm1, $4e
+  mulpd xmm2, xmm1
+  addsubpd xmm3, xmm2
+  pshufd xmm3, xmm3, $4e
+  mulpd xmm1, xmm1
+  movhlps xmm2, xmm1
+  addsd xmm1, xmm2
+  movlhps xmm1, xmm1
+  divpd xmm3, xmm1
+  movupd [r8], xmm3
+  add rdx, 16
+  add r8, 16
+  dec r9
+  jnz @L
+@end:
+end;
+{$else}
+var pEnd: PByte;
+    s: TCmplx128;
+    denom, tmpRe: Double;
+begin
+  s := A;
+  pEnd := PByte(pB) + aCount * cC128Sz;
+  while PByte(pB) < pEnd do begin
+    with pB^ do begin
+      denom := Re * Re + Im * Im;
+      tmpRe := (s.Re * Re + s.Im * Im) / denom;
+      pRes^.Im := (s.Im * Re - s.Re * Im) / denom;
+      pRes^.Re := tmpRe;
+    end;
+    Inc(pB);
+    Inc(pRes);
   end;
 end;
 {$endif}
@@ -3241,8 +3514,8 @@ end;
 {$else}
 var pEnd, pEndu: PByte;
 begin
-  pEnd := PByte(pX) + aCount * SizeOf(Double);
-  pEndu := PByte(pX) + (aCount and (not NativeInt(3))) * SizeOf(Double);
+  pEnd := PByte(pX) + aCount * cF64Sz;
+  pEndu := PByte(pX) + (aCount and (not NativeInt(3))) * cF64Sz;
   while PByte(pX) < pEndu do begin
     pX^ := a * pX^;
     Inc(pX);
@@ -3353,11 +3626,17 @@ end;
 var pEnd, pEndu: PByte;
     s: Single;
 begin
+  if (XStep = 1) and (YStep = 1) then begin
+    Move(pX^, pY^, aCount * cF32Sz);
+    exit;
+  end;
+
+  pEnd := PByte(pY) + aCount * YStep * cF32Sz;
+  pEndu := PByte(pY) + (aCount and (not NativeInt(3))) * YStep * cF32Sz;
+
   if XStep = 0 then begin
     s := pX^;
-    pEnd := PByte(pY) + aCount * YStep * SizeOf(Single);
-    pEndu := PByte(pY) + (aCount and (not NativeInt(3))) * YStep * SizeOf(Single);
-    while PByte(pY) < pEndu do begin
+    while PByte(pY) <> pEndu do begin
       pY^ := s;
       Inc(pY, YStep);
       pY^ := s;
@@ -3365,106 +3644,86 @@ begin
       pY^ := s;
       Inc(pY, YStep);
       pY^ := s;
-      Inc(pY, YStep)
+      Inc(pY, YStep);
     end;
-    while PByte(pY) < pEnd do begin
+    while PByte(pY) <> pEnd do begin
       pY^ := s;
       Inc(pY, YStep);
     end;
     exit;
   end;
 
-  pEnd := PByte(pX) + aCount * XStep * SizeOf(Single);
-  pEndu := PByte(pX) + (aCount and (not NativeInt(3))) * XStep * SizeOf(Single);
-  if (XStep = 1) and (YStep = 1) then begin
-    while PByte(pX) < pEndu do begin
-      pY^ := pX^;
-      Inc(pX);
-      Inc(pY);
-      pY^ := pX^;
-      Inc(pX);
-      Inc(pY);
-      pY^ := pX^;
-      Inc(pX);
-      Inc(pY);
-      pY^ := pX^;
-      Inc(pX);
-      Inc(pY);
-    end;
-    while PByte(pX) < pEnd do begin
-      pY^ := pX^;
-      Inc(pX);
-      Inc(pY);
-    end;
-  end else begin
-    while PByte(pX) < pEndu do begin
-      pY^ := pX^;
-      Inc(pX, XStep);
-      Inc(pY, YStep);
-      pY^ := pX^;
-      Inc(pX, XStep);
-      Inc(pY, YStep);
-      pY^ := pX^;
-      Inc(pX, XStep);
-      Inc(pY, YStep);
-      pY^ := pX^;
-      Inc(pX, XStep);
-      Inc(pY, YStep);
-    end;
-    while PByte(pX) < pEnd do begin
-      pY^ := pX^;
-      Inc(pX, XStep);
-      Inc(pY, YStep);
-    end;
+  while PByte(pY) <> pEndu do begin
+    pY^ := pX^;
+    Inc(pX, XStep);
+    Inc(pY, YStep);
+    pY^ := pX^;
+    Inc(pX, XStep);
+    Inc(pY, YStep);
+    pY^ := pX^;
+    Inc(pX, XStep);
+    Inc(pY, YStep);
+    pY^ := pX^;
+    Inc(pX, XStep);
+    Inc(pY, YStep);
+  end;
+  while PByte(pY) <> pEnd do begin
+    pY^ := pX^;
+    Inc(pX, XStep);
+    Inc(pY, YStep);
   end;
 end;
 {$endif}
 
 procedure dcopy(pX, pY: PDouble; aCount, XStep, YStep: NativeInt);
 var pEnd, pEndu: PByte;
+    s: Double;
 begin
-  pEnd := PByte(pX) + aCount * XStep * SizeOf(Double);
-  pEndu := PByte(pX) + (aCount and (not NativeInt(3))) * XStep * SizeOf(Double);
   if (XStep = 1) and (YStep = 1) then begin
-    while PByte(pX) < pEndu do begin
-      pY^ := pX^;
-      Inc(pX);
-      Inc(pY);
-      pY^ := pX^;
-      Inc(pX);
-      Inc(pY);
-      pY^ := pX^;
-      Inc(pX);
-      Inc(pY);
-      pY^ := pX^;
-      Inc(pX);
-      Inc(pY);
-    end;
-    while PByte(pX) < pEnd do begin
-      pY^ := pX^;
-      Inc(pX);
-      Inc(pY);
-    end;
-  end else begin
-    while PByte(pX) < pEndu do begin
-      pY^ := pX^;
-      Inc(pX, XStep);
+    Move(pX^, pY^, aCount * cF64Sz);
+    exit;
+  end;
+
+  pEnd := PByte(pY) + aCount * YStep * cF64Sz;
+  pEndu := PByte(pY) + (aCount and (not NativeInt(3))) * YStep * cF64Sz;
+
+  if XStep = 0 then begin
+    s := pX^;
+    while PByte(pY) <> pEndu do begin
+      pY^ := s;
       Inc(pY, YStep);
-      pY^ := pX^;
-      Inc(pX, XStep);
+      pY^ := s;
       Inc(pY, YStep);
-      pY^ := pX^;
-      Inc(pX, XStep);
+      pY^ := s;
       Inc(pY, YStep);
-      pY^ := pX^;
-      Inc(pX, XStep);
+      pY^ := s;
       Inc(pY, YStep);
     end;
-    while PByte(pX) < pEnd do begin
-      pY^ := pX^;
-      Inc(pX, XStep);
+    while PByte(pY) <> pEnd do begin
+      pY^ := s;
       Inc(pY, YStep);
     end;
+    exit;
+  end;
+
+  while PByte(pY) <> pEndu do begin
+    pY^ := pX^;
+    Inc(pX, XStep);
+    Inc(pY, YStep);
+    pY^ := pX^;
+    Inc(pX, XStep);
+    Inc(pY, YStep);
+    pY^ := pX^;
+    Inc(pX, XStep);
+    Inc(pY, YStep);
+    pY^ := pX^;
+    Inc(pX, XStep);
+    Inc(pY, YStep);
+  end;
+  while PByte(pY) <> pEnd do begin
+    pY^ := pX^;
+    Inc(pX, XStep);
+    Inc(pY, YStep);
   end;
 end;
 
@@ -4344,13 +4603,12 @@ end;
 {$endif}
 
 function sdot(aN: NativeInt; pX: PByte; aXInc: NativeInt; pY: PByte; aYInc: NativeInt): Single;
-var pEnd, pEndu: PByte;
+var I: NativeInt;
 begin
   if (aXInc <> SizeOf(Single)) or (aYInc <> SizeOf(Single)) then begin
     Result := 0;
-    pEnd := pX + aN * aXInc;
-    pEndu := pX + (aN and (not NativeInt(3))) * aXInc;
-    while pX < pEndu do begin
+    I := 0;
+    while aN - I >= 4 do begin
       Result := Result + PSingle(pX)^ * PSingle(pY)^;
       Inc(pX, aXInc);
       Inc(pY, aYInc);
@@ -4363,24 +4621,25 @@ begin
       Result := Result + PSingle(pX)^ * PSingle(pY)^;
       Inc(pX, aXInc);
       Inc(pY, aYInc);
+      Inc(I, 4);
     end;
-    while pX < pEnd do begin
+    while I < aN do begin
       Result := Result + PSingle(pX)^ * PSingle(pY)^;
       Inc(pX, aXInc);
       Inc(pY, aYInc);
+      Inc(I);
     end;
   end else
     dot(PSingle(pX), PSingle(pY), aN, Result);
 end;
 
 function ddot(aN: NativeInt; pX: PByte; aXInc: NativeInt; pY: PByte; aYInc: NativeInt): Double;
-var pEnd, pEndu: PByte;
+var I: NativeInt;
 begin
   if (aXInc <> SizeOf(Double)) or (aYInc <> SizeOf(Double)) then begin
     Result := 0;
-    pEnd := pX + aN * aXInc;
-    pEndu := pX + (aN and (not NativeInt(3))) * aXInc;
-    while pX < pEndu do begin
+    I := 0;
+    while aN - I >= 4 do begin
       Result := Result + PDouble(pX)^ * PDouble(pY)^;
       Inc(pX, aXInc);
       Inc(pY, aYInc);
@@ -4393,11 +4652,13 @@ begin
       Result := Result + PDouble(pX)^ * PDouble(pY)^;
       Inc(pX, aXInc);
       Inc(pY, aYInc);
+      Inc(I, 4);
     end;
-    while pX < pEnd do begin
+    while I < aN do begin
       Result := Result + PDouble(pX)^ * PDouble(pY)^;
       Inc(pX, aXInc);
       Inc(pY, aYInc);
+      Inc(I);
     end;
   end else
     dot(PDouble(pX), PDouble(pY), aN, Result);
@@ -4695,7 +4956,7 @@ var pXn: PSingle;
 begin
   pXn := pX;
   Inc(pXn);
-  pEnd := PByte(pX) + aCount * SizeOf(Single);
+  pEnd := PByte(pX) + aCount * cF32Sz;
   while PByte(pXn) < pEnd do begin
     pRes^ := pXn^ - pX^;
     Inc(pRes);
@@ -4707,16 +4968,17 @@ end;
 
 procedure Differences(pX, pRes: PDouble; aXStep, aResStep, aCount: NativeInt);
 var pXn: PDouble;
-    pEnd: PByte;
+    count: NativeInt;
 begin
+  count := (aCount - 1) div Abs(aXStep);
   pXn := pX;
   Inc(pXn, aXStep);
-  pEnd := PByte(pX) + aCount * SizeOf(Double);
-  while PByte(pXn) < pEnd do begin
+  while count > 0 do begin
     pRes^ := pXn^ - pX^;
     Inc(pRes, aResStep);
     pX := pXn;
     Inc(pXn, aXStep);
+    Dec(count);
   end;
 end;
 
@@ -4731,10 +4993,17 @@ asm
   mov edi, edx // EDI <- pRes
 
   mov eax, [ebp + 8]
+  cmp eax, 1
+  jle @end
+  mov ebx, ecx
+  test ebx, ebx
+  jns @positiveStep
+  neg ebx
+@positiveStep:
   dec eax
   xor edx, edx
-  div ecx
-  mov ebx, eax // ECX <- (aCount - 1) div aXStep
+  div ebx
+  mov ebx, eax
 
   mov eax, ecx // EAX <- aXStep
   mov edx, [ebp + 12] // EDX <- aResStep
@@ -4798,16 +5067,17 @@ asm
 end;
 {$else}
 var pXn: PSingle;
-    pEnd: PByte;
+    count: NativeInt;
 begin
+  count := (aCount - 1) div Abs(aXStep);
   pXn := pX;
   Inc(pXn, aXStep);
-  pEnd := PByte(pX) + aCount * SizeOf(Single);
-  while PByte(pXn) < pEnd do begin
+  while count > 0 do begin
     pRes^ := pXn^ - pX^;
     Inc(pRes, aResStep);
     pX := pXn;
     Inc(pXn, aXStep);
+    Dec(count);
   end;
 end;
 {$endif}
@@ -4875,7 +5145,7 @@ end;
 var pEnd: PByte;
     d: Double;
 begin
-  pEnd := PByte(pX) + aCount * SizeOf(Double);
+  pEnd := PByte(pX) + aCount * cF64Sz;
   while PByte(pX) < pEnd do begin
     d := pX^ - pY^;
     pRes^ := d * d;
@@ -4924,7 +5194,7 @@ end;
 var pEnd: PByte;
     d: Double;
 begin
-  pEnd := PByte(pX) + aCount * SizeOf(Single);
+  pEnd := PByte(pX) + aCount * cF32Sz;
   while PByte(pX) < pEnd do begin
     d := pX^ - pY^;
     pRes^ := d * d;
@@ -5815,7 +6085,7 @@ end;
 {$else}
 var pEnd: PByte;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(Double);
+  pEnd := PByte(pA) + aCount * cF64Sz;
   while PByte(pA) < pEnd do begin
     if pA^ < pB^ then
       pRes^ := pA^
@@ -5953,7 +6223,7 @@ end;
 {$else}
 var pEnd: PByte;
 begin
-  pEnd := PByte(pA) + aCount * SizeOf(Double);
+  pEnd := PByte(pA) + aCount * cF64Sz;
   while PByte(pA) < pEnd do begin
     if pA^ > pB^ then
       pRes^ := pA^

@@ -7,6 +7,7 @@ uses
   , panda.Tests.NDATestCase
   , panda.Intfs
   , panda.Arrays
+  , panda.Nums
   , panda.Arithmetic
   , pandalib
   ;
@@ -37,6 +38,8 @@ type
     procedure Divide_VV;
     procedure Divide_MV;
     procedure Divide_VM;
+    procedure ReversedOperators;
+    procedure ReversedInPlace;
   end;
 
   TTensorI32Tests = class(TNDATestCase)
@@ -58,6 +61,7 @@ type
     procedure Multiply_VV;
     procedure Multiply_MV;
     procedure Multiply_VM;
+    procedure ReversedOperators;
   end;
 
   TTensorI64Tests = class(TNDATestCase)
@@ -77,6 +81,8 @@ type
     procedure Multiply_VV;
     procedure Multiply_MV;
     procedure Multiply_VM;
+    procedure ReversedOperators;
+    procedure ReversedInPlace;
   end;
 
   TTensorF32Tests = class(TNDATestCase)
@@ -108,6 +114,8 @@ type
     procedure SubFrom_MV;
 
     procedure CvtInt32ToF32;
+    procedure ReversedOperators;
+    procedure ReversedInPlace;
   end;
 
   TArithmeticTests = class(TNDATestCase)
@@ -120,6 +128,15 @@ type
     procedure AllClose2Ds;
     procedure AllClose2Ds_HGaps;
     procedure AllClose3Ds_HGaps;
+    procedure AllCloseReversed_I32;
+    procedure AllCloseReversed_F32;
+    procedure AllCloseReversed_F64;
+    procedure AllCloseDifferentStrides;
+    procedure MaskReversed;
+    procedure MaskReversedScalar;
+    procedure ReversedC64Multiply;
+    procedure ReversedC128Operators;
+    procedure ReversedC128InPlace;
   end;
 
   TBoolArithmeticTests = class(TNDATestCase)
@@ -128,6 +145,7 @@ type
     procedure BoolOr1D;
     procedure BoolXor1D;
     procedure BoolNot1D;
+    procedure ReversedLogical;
   end;
 
 implementation
@@ -1377,6 +1395,417 @@ end;
 
 
 {$endregion}
+
+procedure TTensorI32Tests.ReversedOperators;
+var base: INDArray<Integer>;
+    A, B, R: TTensorI32;
+    values: TArray<Integer>;
+begin
+  base := TNDAUt.AsArray<Integer>([2,99,4,99,6]);
+  A := base[[NDISpan(4,0,-2)]];
+  B := TNDAUt.AsArray<Integer>([2,4,6]);
+
+  R := A + B;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Integer>(R, values));
+  CheckEquals([8,8,8], values);
+
+  R := A - B;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Integer>(R, values));
+  CheckEquals([4,0,-4], values);
+
+  R := A * B;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Integer>(R, values));
+  CheckEquals([12,16,12], values);
+
+  CheckEquals(2, base.GetItem([0]));
+  CheckEquals(6, base.GetItem([4]));
+end;
+
+procedure TTensorI64Tests.ReversedOperators;
+var base: INDArray<Int64>;
+    A, B, R: TTensorI64;
+    values: TArray<Int64>;
+begin
+  base := TNDAUt.AsArray<Int64>([2,99,4,99,6]);
+  A := base[[NDISpan(4,0,-2)]];
+  B := TNDAUt.AsArray<Int64>([2,4,6]);
+
+  R := A + B;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Int64>(R, values));
+  CheckEquals([8,8,8], values);
+
+  R := A - B;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Int64>(R, values));
+  CheckEquals([4,0,-4], values);
+
+  R := A * B;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Int64>(R, values));
+  CheckEquals([12,16,12], values);
+
+  CheckEquals(2, base.GetItem([0]));
+  CheckEquals(6, base.GetItem([4]));
+end;
+
+procedure TTensorI64Tests.ReversedInPlace;
+var base: INDArray<Int64>;
+    A, B: TTensorI64;
+begin
+  base := TNDAUt.AsArray<Int64>([2,99,4,99,6]);
+  A := base[[NDISpan(4,0,-2)]];
+  B := TNDAUt.AsArray<Int64>([1,2,3]);
+  B := B.NDA[[NDISpan(2,0,-1)]];
+
+  A.AddTo(B);
+
+  CheckEquals(9, A.NDA.GetItem([0]));
+  CheckEquals(6, A.NDA.GetItem([1]));
+  CheckEquals(3, A.NDA.GetItem([2]));
+
+  A.MultiplyBy(Int64(2));
+
+  CheckEquals(18, A.NDA.GetItem([0]));
+  CheckEquals(12, A.NDA.GetItem([1]));
+  CheckEquals(6, A.NDA.GetItem([2]));
+
+  CheckEquals(99, base.GetItem([1]));
+end;
+
+procedure TTensorF32Tests.ReversedOperators;
+var base: INDArray<Single>;
+    A, B, R: TTensorF32;
+    values: TArray<Single>;
+begin
+  base := TNDAUt.AsArray<Single>([2,99,4,99,6]);
+  A := base[[NDISpan(4,0,-2)]];
+  B := TNDAUt.AsArray<Single>([2,4,6]);
+
+  R := A + B;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Single>(R, values));
+  CheckEquals([8,8,8], values, 0);
+
+  R := A - B;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Single>(R, values));
+  CheckEquals([4,0,-4], values, 0);
+
+  R := A * B;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Single>(R, values));
+  CheckEquals([12,16,12], values, 0);
+
+  R := B / A;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Single>(R, values));
+  CheckEquals([1/3,1,3], values, 1e-6);
+
+  CheckEquals(2, base.GetItem([0]), 0);
+  CheckEquals(6, base.GetItem([4]), 0);
+end;
+
+procedure TTensorF32Tests.ReversedInPlace;
+var base: INDArray<Single>;
+    A, B: TTensorF32;
+begin
+  base := TNDAUt.AsArray<Single>([2,99,4,99,6]);
+  A := base[[NDISpan(4,0,-2)]];
+  B := TNDAUt.AsArray<Single>([1,2,3]);
+  B := B.NDA[[NDISpan(2,0,-1)]];
+
+  A.AddTo(B);
+
+  CheckEquals(9, A.NDA.GetItem([0]), 0);
+  CheckEquals(6, A.NDA.GetItem([1]), 0);
+  CheckEquals(3, A.NDA.GetItem([2]), 0);
+
+  A.SubtractFrom(B);
+
+  CheckEquals(6, A.NDA.GetItem([0]), 0);
+  CheckEquals(4, A.NDA.GetItem([1]), 0);
+  CheckEquals(2, A.NDA.GetItem([2]), 0);
+
+  A.MultiplyBy(Single(2));
+
+  CheckEquals(12, A.NDA.GetItem([0]), 0);
+  CheckEquals(8, A.NDA.GetItem([1]), 0);
+  CheckEquals(4, A.NDA.GetItem([2]), 0);
+
+  A.DivideBy(Single(2));
+
+  CheckEquals(6, A.NDA.GetItem([0]), 0);
+  CheckEquals(4, A.NDA.GetItem([1]), 0);
+  CheckEquals(2, A.NDA.GetItem([2]), 0);
+
+  CheckEquals(99, base.GetItem([1]), 0);
+end;
+
+procedure TTensorF64Tests.ReversedOperators;
+var base: INDArray<Double>;
+    A, B, R: TTensorF64;
+    values: TArray<Double>;
+begin
+  base := TNDAUt.AsArray<Double>([2,99,4,99,6]);
+  A := base[[NDISpan(4,0,-2)]];
+  B := TNDAUt.AsArray<Double>([2,4,6]);
+
+  R := A + B;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Double>(R, values));
+  CheckEquals([8,8,8], values, 0);
+
+  R := A - B;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Double>(R, values));
+  CheckEquals([4,0,-4], values, 0);
+
+  R := A * B;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Double>(R, values));
+  CheckEquals([12,16,12], values, 0);
+
+  R := B / A;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Double>(R, values));
+  CheckEquals([1/3,1,3], values, 1e-6);
+
+  CheckEquals(2, base.GetItem([0]), 0);
+  CheckEquals(6, base.GetItem([4]), 0);
+end;
+
+procedure TTensorF64Tests.ReversedInPlace;
+var base: INDArray<Double>;
+    A, B: TTensorF64;
+begin
+  base := TNDAUt.AsArray<Double>([2,99,4,99,6]);
+  A := base[[NDISpan(4,0,-2)]];
+  B := TNDAUt.AsArray<Double>([1,2,3]);
+  B := B.NDA[[NDISpan(2,0,-1)]];
+
+  A.AddTo(B);
+
+  CheckEquals(9, A.NDA.GetItem([0]), 0);
+  CheckEquals(6, A.NDA.GetItem([1]), 0);
+  CheckEquals(3, A.NDA.GetItem([2]), 0);
+
+  A.SubtractFrom(B);
+
+  CheckEquals(6, A.NDA.GetItem([0]), 0);
+  CheckEquals(4, A.NDA.GetItem([1]), 0);
+  CheckEquals(2, A.NDA.GetItem([2]), 0);
+
+  A.MultiplyBy(Double(2));
+
+  CheckEquals(12, A.NDA.GetItem([0]), 0);
+  CheckEquals(8, A.NDA.GetItem([1]), 0);
+  CheckEquals(4, A.NDA.GetItem([2]), 0);
+
+  A.DivideBy(Double(2));
+
+  CheckEquals(6, A.NDA.GetItem([0]), 0);
+  CheckEquals(4, A.NDA.GetItem([1]), 0);
+  CheckEquals(2, A.NDA.GetItem([2]), 0);
+
+  CheckEquals(99, base.GetItem([1]), 0);
+end;
+
+procedure TArithmeticTests.AllCloseReversed_I32;
+var A, B: INDArray<Integer>;
+begin
+  A := TNDAUt.AsArray<Integer>([1,2,3]);
+  A := A[[NDISpan(2,0,-1)]];
+  B := TNDAUt.AsArray<Integer>([3,2,1]);
+
+  CheckTrue(ndaAllClose(A, B));
+
+  B.SetItem([1], 99);
+
+  CheckFalse(ndaAllClose(A, B));
+
+end;
+
+procedure TArithmeticTests.AllCloseReversed_F32;
+var A, B: INDArray<Single>;
+begin
+  A := TNDAUt.AsArray<Single>([1,2,3]);
+  A := A[[NDISpan(2,0,-1)]];
+  B := TNDAUt.AsArray<Single>([3,2,1]);
+
+  CheckTrue(ndaAllClose(A, B));
+
+  B.SetItem([1], 99);
+
+  CheckFalse(ndaAllClose(A, B));
+
+  CheckFalse(ndaAllClose(A, Single(9)));
+
+end;
+
+procedure TArithmeticTests.AllCloseReversed_F64;
+var A, B: INDArray<Double>;
+begin
+  A := TNDAUt.AsArray<Double>([1,2,3]);
+  A := A[[NDISpan(2,0,-1)]];
+  B := TNDAUt.AsArray<Double>([3,2,1]);
+
+  CheckTrue(ndaAllClose(A, B));
+
+  B.SetItem([1], 99);
+
+  CheckFalse(ndaAllClose(A, B));
+
+  CheckFalse(ndaAllClose(A, Double(9)));
+
+end;
+
+procedure TArithmeticTests.AllCloseDifferentStrides;
+var A, B: INDArray<Integer>;
+begin
+  A := TNDAUt.AsArray<Integer>([1,2,3]);
+  B := TNDAUt.AsArray<Integer>([3,2,1,99,99]);
+  B := B[[NDISpan(2,0,-1)]];
+
+  CheckTrue(ndaAllClose(A, B));
+end;
+
+procedure TArithmeticTests.MaskReversed;
+var base: INDArray<Integer>;
+    A: TTensorI32;
+    mask: TTensorBool;
+begin
+  base := TNDAUt.AsArray<Integer>([1,99,2,99,3]);
+  A := base[[NDISpan(4,0,-2)]];
+  mask := TNDAUt.AsArray<Boolean>([False,True,False]);
+
+  A.MaskBy(mask);
+
+  CheckEquals(0, A.NDA.GetItem([0]));
+  CheckEquals(2, A.NDA.GetItem([1]));
+  CheckEquals(0, A.NDA.GetItem([2]));
+  CheckEquals(99, base.GetItem([1]));
+end;
+
+procedure TArithmeticTests.MaskReversedScalar;
+var base: INDArray<Integer>;
+    A: TTensorI32;
+    mask: TTensorBool;
+begin
+  base := TNDAUt.AsArray<Integer>([1,99,2,99,3]);
+  A := base[[NDISpan(4,0,-2)]];
+  mask := TNDAUt.Scalar<Boolean>(False);
+
+  A.MaskBy(mask);
+
+  CheckEquals(0, A.NDA.GetItem([0]));
+  CheckEquals(0, A.NDA.GetItem([1]));
+  CheckEquals(0, A.NDA.GetItem([2]));
+  CheckEquals(99, base.GetItem([1]));
+end;
+
+procedure TArithmeticTests.ReversedC64Multiply;
+var base: INDArray<TCmplx64>;
+    A, B, R: TTensorC64;
+begin
+  base := TNDAUt.AsArray<TCmplx64>([Cmplx64(1,2),Cmplx64(3,4),Cmplx64(5,6)]);
+  A := base[[NDISpan(2,0,-1)]];
+  B := base;
+
+  R := A * B;
+
+  CheckEquals(Cmplx64(-7,16), R.NDA.GetItem([0]), 0);
+  CheckEquals(Cmplx64(-7,24), R.NDA.GetItem([1]), 0);
+  CheckEquals(Cmplx64(-7,16), R.NDA.GetItem([2]), 0);
+end;
+
+procedure TArithmeticTests.ReversedC128Operators;
+var base: INDArray<TCmplx128>;
+    A, B, R: TTensorC128;
+    I: Integer;
+begin
+  base := TNDAUt.AsArray<TCmplx128>([Cmplx128(1,2),Cmplx128(3,4),Cmplx128(5,6)]);
+  A := base[[NDISpan(2,0,-1)]];
+  B := base;
+
+  R := A + B;
+
+  for I := 0 to 2 do
+    CheckEquals(Cmplx128(6,8), R.NDA.GetItem([I]), 0);
+
+  R := A - B;
+
+  CheckEquals(Cmplx128(4,4), R.NDA.GetItem([0]), 0);
+  CheckEquals(Cmplx128(0,0), R.NDA.GetItem([1]), 0);
+  CheckEquals(Cmplx128(-4,-4), R.NDA.GetItem([2]), 0);
+
+  R := A * B;
+
+  CheckEquals(Cmplx128(-7,16), R.NDA.GetItem([0]), 0);
+  CheckEquals(Cmplx128(-7,24), R.NDA.GetItem([1]), 0);
+  CheckEquals(Cmplx128(-7,16), R.NDA.GetItem([2]), 0);
+
+  R := A / B;
+
+  for I := 0 to 2 do
+    CheckEquals(A.NDA.GetItem([I])/B.NDA.GetItem([I]), R.NDA.GetItem([I]), 1e-12);
+end;
+
+procedure TArithmeticTests.ReversedC128InPlace;
+var base: INDArray<TCmplx128>;
+    A, B: TTensorC128;
+begin
+  base := TNDAUt.AsArray<TCmplx128>([Cmplx128(1,2),Cmplx128(3,4),Cmplx128(5,6)]);
+  A := base[[NDISpan(2,0,-1)]];
+  B := TNDAUt.AsArray<TCmplx128>([Cmplx128(2,1),Cmplx128(3,2),Cmplx128(4,3)]);
+
+  A.AddTo(B);
+
+  CheckEquals(Cmplx128(7,7), A.NDA.GetItem([0]), 0);
+  CheckEquals(Cmplx128(6,6), A.NDA.GetItem([1]), 0);
+  CheckEquals(Cmplx128(5,5), A.NDA.GetItem([2]), 0);
+
+  A.SubtractFrom(B);
+  A.MultiplyBy(B);
+  A.DivideBy(B);
+
+  CheckEquals(Cmplx128(5,6), A.NDA.GetItem([0]), 1e-12);
+  CheckEquals(Cmplx128(3,4), A.NDA.GetItem([1]), 1e-12);
+  CheckEquals(Cmplx128(1,2), A.NDA.GetItem([2]), 1e-12);
+end;
+
+procedure TBoolArithmeticTests.ReversedLogical;
+var base: INDArray<Boolean>;
+    A, B, R: TTensorBool;
+    values: TArray<Boolean>;
+begin
+  base := TNDAUt.AsArray<Boolean>([True,False,False,True]);
+  A := base[[NDISpan(3,0,-1)]];
+  B := TNDAUt.AsArray<Boolean>([True,True,False,False]);
+
+  R := A and B;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Boolean>(R, values));
+  CheckEquals([True,False,False,False], values);
+
+  R := A or B;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Boolean>(R, values));
+  CheckEquals([True,True,False,True], values);
+
+  R := A xor B;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Boolean>(R, values));
+  CheckEquals([False,True,False,True], values);
+
+  R := not A;
+
+  CheckTrue(TNDAUt.TryAsDynArray<Boolean>(R, values));
+  CheckEquals([False,True,True,False], values);
+end;
 
 initialization
 

@@ -257,6 +257,11 @@ type
     procedure MatMulParallelSingle_PaddedBuffers;
     procedure MatMulParallelSingle_ReversedBuffers;
     procedure MatMulParallelSingle_IncompatibleDimensions;
+    procedure TotalReversed_Integer;
+    procedure TotalReversed_Single;
+    procedure TotalReversed_Double;
+    procedure DotReversed_Single;
+    procedure DotReversed_Double;
   end;
 
 implementation
@@ -3088,6 +3093,70 @@ end;
 
 
 {$endregion}
+
+procedure TMathTests.TotalReversed_Integer;
+var A: INDArray<Integer>;
+    resultValue: Integer;
+begin
+  A := TNDAUt.AsArray<Integer>([1,2,3,4,5]);
+  A := A[[NDISpan(4,0,-2)]];
+
+  CheckTrue(TNDAUt.TryAsScalar<Integer>(ndaTotal(A), resultValue));
+
+  CheckEquals(9, resultValue);
+end;
+
+procedure TMathTests.TotalReversed_Single;
+var A: INDArray<Single>;
+    resultValue: Single;
+begin
+  A := TNDAUt.AsArray<Single>([1,2,3,4,5]);
+  A := A[[NDISpan(4,0,-2)]];
+
+  CheckTrue(TNDAUt.TryAsScalar<Single>(ndaTotal(A), resultValue));
+
+  CheckEquals(9, resultValue, 0);
+end;
+
+procedure TMathTests.TotalReversed_Double;
+var A: INDArray<Double>;
+    resultValue: Double;
+begin
+  A := TNDAUt.AsArray<Double>([1,2,3,4,5]);
+  A := A[[NDISpan(4,0,-2)]];
+
+  CheckTrue(TNDAUt.TryAsScalar<Double>(ndaTotal(A), resultValue));
+
+  CheckEquals(9, resultValue, 0);
+end;
+
+procedure TMathTests.DotReversed_Single;
+var A, B, R: INDArray<Single>;
+    value: Single;
+begin
+  A := TNDAUt.AsArray<Single>([1,2,3,4,5]);
+  A := A[[NDISpan(4,0,-2)]];
+  B := TNDAUt.AsArray<Single>([2,3,4]);
+
+  R := ndaDot(A, B);
+
+  CheckTrue(TNDAUt.TryAsScalar<Single>(R, value));
+  CheckEquals(23, value, 0);
+end;
+
+procedure TMathTests.DotReversed_Double;
+var A, B, R: INDArray<Double>;
+    value: Double;
+begin
+  A := TNDAUt.AsArray<Double>([1,2,3,4,5]);
+  A := A[[NDISpan(4,0,-2)]];
+  B := TNDAUt.AsArray<Double>([2,3,4]);
+
+  R := ndaDot(A, B);
+
+  CheckTrue(TNDAUt.TryAsScalar<Double>(R, value));
+  CheckEquals(23, value, 0);
+end;
 
 initialization
 

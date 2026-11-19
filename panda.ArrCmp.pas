@@ -50,7 +50,7 @@ begin
     end;
 
     pEnd := R + N * IncR;
-    while R < pEnd do begin
+    while R <> pEnd do begin
       PSingle(R)^ := Max(s,  PSingle(R)^);
       Inc(R, IncR);
     end;
@@ -65,7 +65,7 @@ begin
   end;
 
   pEnd := R + N * IncR;
-  while R < pEnd do begin
+  while R <> pEnd do begin
     PSingle(R)^ := Max(PSingle(L)^, PSingle(R)^);
     Inc(L, IncL);
     Inc(R, IncR);
@@ -104,8 +104,8 @@ begin
     end;
 
     pEnd := R + N * IncR;
-    while R < pEnd do begin
-      if R^ < t  then
+    while R <> pEnd do begin
+      if R^ <= t  then
         R^ := 0;
       Inc(R, IncR);
     end;
@@ -120,8 +120,8 @@ begin
 //  end;
 
   pEnd := R + N * IncR;
-  while R < pEnd do begin
-    if R^ < L^ then
+  while R <> pEnd do begin
+    if R^ <= L^ then
       R^ := 0;
     Inc(L, IncL);
     Inc(R, IncR);

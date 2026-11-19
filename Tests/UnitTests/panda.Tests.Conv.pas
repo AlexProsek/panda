@@ -35,6 +35,7 @@ type
     procedure Corr_K2D_A3D;
     procedure Corr_K2D_A1D;
     procedure Corr_K3D_A2D;
+    procedure CorrelateReversed;
   end;
 
 implementation
@@ -392,6 +393,21 @@ begin
   for I := 0 to sh[1] - 1 do
     for J := 0 to sh[2] - 1 do
       CheckEquals(5*cLs[I,J]+6*cLs[I,J+1]+7*cLs[I+1,J]+8*cLs[I+1,J+1], res[[1,I,J]], tol);
+end;
+
+procedure TCorrTests.CorrelateReversed;
+var kernel, source, R: INDArray<Single>;
+    v: TArray<Single>;
+begin
+  kernel := TNDAUt.AsArray<Single>([1, 2, 3]);
+  kernel := kernel[[NDISpan(2, 0, -1)]];
+  source := TNDAUt.AsArray<Single>([1, 2, 3, 4, 5]);
+  source := source[[NDISpan(4, 0, -1)]];
+
+  R := ndaCorrelate(kernel, source);
+
+  CheckTrue(TNDAUt.TryAsDynArray<Single>(R, v));
+  CheckEquals([26, 20, 14], v, tol);
 end;
 
 {$endregion}

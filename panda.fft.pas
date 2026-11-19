@@ -960,7 +960,7 @@ begin
   pEnd := pSrc + srcStep * N;
   pDst0 := aDst.Data;
   pDst1 := pDst0 + dstStep * (N shr 1);
-  while pSrc < pEnd do begin
+  while pSrc <> pEnd do begin
     PCmplx64(pDst0)^ := PCmplx64(pSrc)^;
     Inc(pDst0, dstStep);
     Inc(pSrc, srcStep);
@@ -1021,7 +1021,7 @@ begin
   pEnd := pSrc + srcStep * N;
   pDst0 := aDst.Data;
   pDst1 := pDst0 + dstStep * (N shr 1);
-  while pSrc < pEnd do begin
+  while pSrc <> pEnd do begin
     PCmplx128(pDst0)^ := PCmplx128(pSrc)^;
     Inc(pDst0, dstStep);
     Inc(pSrc, srcStep);
@@ -1092,7 +1092,7 @@ begin
   pDst0 := aDst.Data;
   pDst1 := pDst0 + 1 * N3 * dstStep;
   pDst2 := pDst0 + 2 * N3 * dstStep;
-  while pSrc < pEnd do begin
+  while pSrc <> pEnd do begin
     PCmplx64(pDst0)^ := PCmplx64(pSrc)^;
     Inc(pDst0, dstStep);
     Inc(pSrc, srcStep);
@@ -1167,7 +1167,7 @@ begin
   pDst0 := aDst.Data;
   pDst1 := pDst0 + 1 * N3 * dstStep;
   pDst2 := pDst0 + 2 * N3 * dstStep;
-  while pSrc < pEnd do begin
+  while pSrc <> pEnd do begin
     PCmplx128(pDst0)^ := PCmplx128(pSrc)^;
     Inc(pDst0, dstStep);
     Inc(pSrc, srcStep);
@@ -1243,7 +1243,7 @@ begin
   pDst1 := pDst0 + 1 * N4 * dstStep;
   pDst2 := pDst0 + 2 * N4 * dstStep;
   pDst3 := pDst0 + 3 * N4 * dstStep;
-  while pSrc < pEnd do begin
+  while pSrc <> pEnd do begin
     PCmplx64(pDst0)^ := PCmplx64(pSrc)^;
     Inc(pDst0, dstStep);
     Inc(pSrc, srcStep);
@@ -1322,7 +1322,7 @@ begin
   pDst1 := pDst0 + 1 * N4 * dstStep;
   pDst2 := pDst0 + 2 * N4 * dstStep;
   pDst3 := pDst0 + 3 * N4 * dstStep;
-  while pSrc < pEnd do begin
+  while pSrc <> pEnd do begin
     PCmplx128(pDst0)^ := PCmplx128(pSrc)^;
     Inc(pDst0, dstStep);
     Inc(pSrc, srcStep);
@@ -1461,7 +1461,7 @@ begin
   pSrc := aSrc.Data;
   pDst := aDst.Data;
   pEnd := aSrc.Data + aSrc.Stride * aSrc.Length;
-  while pSrc < pEnd do begin
+  while pSrc <> pEnd do begin
     PCmplx64(pDst)^ := PCmplx64(pSrc)^;
     Inc(pSrc, aSrc.Stride);
     Inc(pDst, aDst.Stride);
@@ -1506,7 +1506,7 @@ begin
   pSrc := aSrc.Data;
   pDst := aDst.Data;
   pEnd := aSrc.Data + aSrc.Stride * aSrc.Length;
-  while pSrc < pEnd do begin
+  while pSrc <> pEnd do begin
     PCmplx128(pDst)^ := PCmplx128(pSrc)^;
     Inc(pSrc, aSrc.Stride);
     Inc(pDst, aDst.Stride);
@@ -1561,7 +1561,7 @@ begin
   po := offt.Data;
   pw := w.Data;
   pEnd := pe + efft.Stride * efft.Length;
-  while pe < pEnd do begin
+  while pe <> pEnd do begin
     c := PCmplx64(pw)^ * PCmplx64(po)^;
     PCmplx64(po)^ := PCmplx64(pe)^ - c;
     PCmplx64(pe)^ := PCmplx64(pe)^ + c;
@@ -1684,7 +1684,7 @@ begin
   po := offt.Data;
   pw := w.Data;
   pEnd := pe + efft.Stride * efft.Length;
-  while pe < pEnd do begin
+  while pe <> pEnd do begin
     c := PCmplx128(pw)^ * PCmplx128(po)^;
     PCmplx128(po)^ := PCmplx128(pe)^ - c;
     PCmplx128(pe)^ := PCmplx128(pe)^ + c;
@@ -4885,7 +4885,7 @@ begin
   end;
 
   // Result := [efft + w*offt, efft - w*offt];
-  fFnc_fftcomb2(aDst.Span(0, N), fWv.Span(0, N2, aSrc.Stride div cCSz));
+  fFnc_fftcomb2(aDst.Span(0, N), fWv.Span(0, N2, fN div N));
 end;
 
 procedure TFFTEvalBase<TF, TC>.FFT3(const aSrc, aDst: TVec<TC>);
@@ -4918,7 +4918,7 @@ begin
     FFT(aSrc.Span(2, N3, 3), aDst.Span(2*N3, N3));
   end;
 
-  fFnc_fftcomb3(aDst.Span(0, N), fWv.Span(0, N3, aSrc.Stride div cCSz));
+  fFnc_fftcomb3(aDst.Span(0, N), fWv.Span(0, N3, fN div N));
 end;
 
 procedure TFFTEvalBase<TF, TC>.FFT4(const aSrc, aDst: TVec<TC>);
@@ -4954,7 +4954,7 @@ begin
     FFT(aSrc.Span(3, N4, 4), aDst.Span(3*N4, N4));
   end;
 
-  fFnc_fftcomb4(aDst.Span(0, N), fWv.Span(0, N4, aSrc.Stride div cCSz));
+  fFnc_fftcomb4(aDst.Span(0, N), fWv.Span(0, N4, fN div N));
 end;
 
 procedure TFFTEvalBase<TF, TC>.FFT5(const aSrc, aDst: TVec<TC>);
@@ -4971,7 +4971,7 @@ begin
     FFT(aSrc.Span(2, N5, 5), aDst.Span(2*N5, N5));
     FFT(aSrc.Span(3, N5, 5), aDst.Span(3*N5, N5));
     FFT(aSrc.Span(4, N5, 5), aDst.Span(4*N5, N5));
-    fFnc_fftcomb5(aDst.Span(0, N), fWv.Span(0, N5, aSrc.Stride div cCSz));
+    fFnc_fftcomb5(aDst.Span(0, N), fWv.Span(0, N5, fN div N));
   end;
 end;
 
@@ -5011,7 +5011,7 @@ begin
     exit;
   end;
 
-  srcv.Init(aSrc.Data, fN);
+  srcv.Init(aSrc.Data, fN, aSrc.Strides[0]);
   fFactTop := High(fFactors);
   fFactPwr := fFactors[fFactTop].Power;
   FFT(srcv, fBuffv);
@@ -5073,17 +5073,20 @@ end;
 
 procedure TRealFFTEval<TF, TC>.Execute(const aSrc: INDArray<TF>);
 var srcv, res, w: TVec<TC>;
+    src: INDArray<TF>;
 begin
   Assert(Assigned(aSrc) and (aSrc.NDim = 1) and (2*fN = aSrc.Shape[0]));
 
+  src := TNDAUt.AsContiguousArray<TF>(aSrc);
+
   if fN = 1 then begin
     with fBuff do begin
-      // Re := PF(aSrc.Data)^, Im := 0
-      PF(Data)^ := PF(aSrc.Data)^;
+      // Re := PF(src.Data)^, Im := 0
+      PF(Data)^ := PF(src.Data)^;
       PF(Data + cFSz)^ := Default(TF);
     end;
   end else begin
-    srcv.Init(aSrc.Data, fN);
+    srcv.Init(src.Data, fN);
     fFactTop := High(fFactors);
     fFactPwr := fFactors[fFactTop].Power;
     FFT(srcv, fBuffv);
@@ -5156,13 +5159,16 @@ end;
 
 procedure TRealIFFTEval<TF, TC>.Execute(const aSrc: INDArray<TC>);
 var w, srcv, resv: TVec<TC>;
+    src: INDArray<TC>;
 begin
   Assert(
     Assigned(aSrc) and (aSrc.NDim = 1) and (aSrc.Shape[0] = fN + 1)
   );
 
+  src := TNDAUt.AsContiguousArray<TC>(aSrc);
+
   w.Init(fW.Data, 2*fN);
-  srcv.Init(aSrc.Data, fN + 1);
+  srcv.Init(src.Data, fN + 1);
   fFnc_FTReconstruct(srcv, w, fBuffv.Span(0, fN));
 
   srcv.Init(fBuffv.Data, fN);
@@ -5197,7 +5203,7 @@ begin
   end else begin
     if fNormalize then
       fFnc_Norm(fBuffv.ItemPtr[fN], fBuffv.ItemPtr[fN], 2*fN, GetNormFactor());
-    TNDAUt.Fill<TF>(aDst, TNDAUt.AsType<TF>(fBuff[[NDISpan(fN, 2*fN - 1)]]));
+    TNDAUt.Fill<TF>(aDst, TNDAUt.View<TF>(fBuff[[NDISpan(fN, 2*fN - 1)]]));
   end;
 end;
 
@@ -5323,7 +5329,22 @@ procedure TRealFFTEval2D<TF, TC>.Execute(const aSrc: INDArray<TF>; var aDst: IND
 var I, N, rStep, cStep, bStep, NDstCols: NativeInt;
     x, y, r0, r1, c0, c1: TVec<TC>;
     pBuff: PByte;
+    src: INDArray<TF>;
+    dst: INDArray<TC>;
 begin
+  if not CContiguousQ(aSrc) then begin
+    src := TNDAUt.AsContiguousArray<TF>(aSrc);
+    Execute(src, aDst);
+    exit;
+  end;
+
+  if Assigned(aDst) and not CContiguousQ(aDst) then begin
+    dst := nil;
+    Execute(aSrc, dst);
+    TNDAUt.Fill<TC>(aDst, dst);
+    exit;
+  end;
+
   Assert((aSrc.NDim = 2) and (aSrc.Shape[0] = fNRows) and (aSrc.Shape[1] = fNCols));
 
   NDstCols := (fNCols div 2) + 1;
@@ -5374,7 +5395,7 @@ begin
   end;
 
   c0.Init(pBuff, NDstCols, fBuff.Strides[0]);
-  c1.Init(c0.Data + cC64Sz, NDstCols, c0.Stride);
+  c1.Init(c0.Data + cCSz, NDstCols, c0.Stride);
 
   if I < fNRows then begin
     fFnc_InterleaveRows(r0.Data, r1.Data, x.Data, fNCols);
@@ -5562,7 +5583,22 @@ end;
 
 procedure TRealIFFTEval2D<TF, TC>.Execute(const aSrc: INDArray<TC>; var aDst: INDArray<TF>);
 var srcSh: TNDAShape;
+    src: INDArray<TC>;
+    dst: INDArray<TF>;
 begin
+  if not CContiguousQ(aSrc) then begin
+    src := TNDAUt.AsContiguousArray<TC>(aSrc);
+    Execute(src, aDst);
+    exit;
+  end;
+
+  if Assigned(aDst) and not CContiguousQ(aDst) then begin
+    dst := nil;
+    Execute(aSrc, dst);
+    TNDAUt.Fill<TF>(aDst, dst);
+    exit;
+  end;
+
   Assert(Assigned(aSrc) and (aSrc.NDim = 2));
 
   srcSh := aSrc.Shape;

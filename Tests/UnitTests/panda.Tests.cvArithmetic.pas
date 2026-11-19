@@ -6,6 +6,7 @@ uses
     TestFramework
   , panda.Nums
   , panda.Tests.NDATestCase
+  , panda.cvMath
   , panda.cvArithmetic
   , System.SysUtils
   , System.Math
@@ -195,6 +196,22 @@ type
     procedure NormL2_Double_10;
     procedure NormLInf_Double_8;
     procedure NormLInf_Double_10;
+    procedure MixedScalar_Add;
+    procedure MixedScalar_Subtract;
+    procedure MixedScalar_SubtractFrom;
+    procedure MixedScalar_Divide;
+    procedure MixedScalarSignedZero;
+    procedure ScaleDoubleCounts;
+    procedure AddSubtractReversed_Single;
+    procedure CopyReversed_Single;
+    procedure DotReversed_Single;
+    procedure DifferencesReversed_Single;
+    procedure AddSubtractReversed_Double;
+    procedure CopyReversed_Double;
+    procedure DotReversed_Double;
+    procedure DifferencesReversed_Double;
+    procedure AccumReversed;
+    procedure ComplexDivideInPlace;
   end;
 
 implementation
@@ -2448,6 +2465,412 @@ begin
 
   res := NormLInf(PDouble(x), Length(x));
   CheckEquals(10, res, dtol);
+end;
+
+procedure TTestVectorMath.MixedScalar_Add;
+var source, dest: TBytes;
+    pX, pY: PCmplx128;
+    value, expected, numerator: TCmplx128;
+    scalar: Double;
+    count, I: Integer;
+begin
+  scalar := 3;
+  numerator := Cmplx128(3,-2);
+  SetLength(source, 1 + 6*cC128Sz);
+  SetLength(dest, Length(source));
+  pX := PCmplx128(@source[1]);
+  pY := PCmplx128(@dest[1]);
+  for count := 0 to 5 do begin
+    FillChar(dest[0], Length(dest), $7F);
+    for I := 0 to 5 do
+      PCmplx128(PByte(pX) + I*cC128Sz)^ := Cmplx128(I + 1, 2*I - 1);
+
+    VecAdd(pX, scalar, pY, count);
+
+    for I := 0 to count - 1 do begin
+      value := Cmplx128(I + 1, 2*I - 1);
+      expected := Cmplx128(value.Re + scalar, value.Im);
+      CheckEquals(expected, PCmplx128(PByte(pY) + I*cC128Sz)^, dTol);
+      CheckEquals(value, PCmplx128(PByte(pX) + I*cC128Sz)^, 0);
+    end;
+    CheckEquals($7F, dest[0]);
+    CheckEquals($7F, dest[1 + count*cC128Sz]);
+
+    VecAdd(pX, scalar, pX, count);
+
+    for I := 0 to count - 1 do begin
+      value := Cmplx128(I + 1, 2*I - 1);
+      expected := Cmplx128(value.Re + scalar, value.Im);
+      CheckEquals(expected, PCmplx128(PByte(pX) + I*cC128Sz)^, dTol);
+    end;
+  end;
+end;
+
+procedure TTestVectorMath.MixedScalar_Subtract;
+var source, dest: TBytes;
+    pX, pY: PCmplx128;
+    value, expected, numerator: TCmplx128;
+    scalar: Double;
+    count, I: Integer;
+begin
+  scalar := 3;
+  numerator := Cmplx128(3,-2);
+  SetLength(source, 1 + 6*SizeOf(TCmplx128));
+  SetLength(dest, Length(source));
+  pX := PCmplx128(@source[1]);
+  pY := PCmplx128(@dest[1]);
+  for count := 0 to 5 do begin
+    FillChar(dest[0], Length(dest), $7F);
+    for I := 0 to 5 do
+      PCmplx128(PByte(pX) + I*SizeOf(TCmplx128))^ := Cmplx128(I + 1, 2*I - 1);
+
+    VecSub(pX, scalar, pY, count);
+
+    for I := 0 to count - 1 do begin
+      value := Cmplx128(I + 1, 2*I - 1);
+      expected := Cmplx128(value.Re - scalar, value.Im);
+      CheckEquals(expected, PCmplx128(PByte(pY) + I*SizeOf(TCmplx128))^, dTol);
+      CheckEquals(value, PCmplx128(PByte(pX) + I*SizeOf(TCmplx128))^, 0);
+    end;
+    CheckEquals($7F, dest[0]);
+    CheckEquals($7F, dest[1 + count*SizeOf(TCmplx128)]);
+
+    VecSub(pX, scalar, pX, count);
+
+    for I := 0 to count - 1 do begin
+      value := Cmplx128(I + 1, 2*I - 1);
+      expected := Cmplx128(value.Re - scalar, value.Im);
+      CheckEquals(expected, PCmplx128(PByte(pX) + I*SizeOf(TCmplx128))^, dTol);
+    end;
+  end;
+end;
+
+procedure TTestVectorMath.MixedScalar_SubtractFrom;
+var source, dest: TBytes;
+    pX, pY: PCmplx128;
+    value, expected, numerator: TCmplx128;
+    scalar: Double;
+    count, I: Integer;
+begin
+  scalar := 3;
+  numerator := Cmplx128(3,-2);
+  SetLength(source, 1 + 6*cC128Sz);
+  SetLength(dest, Length(source));
+  pX := PCmplx128(@source[1]);
+  pY := PCmplx128(@dest[1]);
+  for count := 0 to 5 do begin
+    FillChar(dest[0], Length(dest), $7F);
+    for I := 0 to 5 do
+      PCmplx128(PByte(pX) + I*cC128Sz)^ := Cmplx128(I + 1, 2*I - 1);
+
+    VecSub(scalar, pX, pY, count);
+
+    for I := 0 to count - 1 do begin
+      value := Cmplx128(I + 1, 2*I - 1);
+      expected := Cmplx128(scalar - value.Re, -value.Im);
+      CheckEquals(expected, PCmplx128(PByte(pY) + I*cC128Sz)^, dTol);
+      CheckEquals(value, PCmplx128(PByte(pX) + I*cC128Sz)^, 0);
+    end;
+    CheckEquals($7F, dest[0]);
+    CheckEquals($7F, dest[1 + count*cC128Sz]);
+
+    VecSub(scalar, pX, pX, count);
+
+    for I := 0 to count - 1 do begin
+      value := Cmplx128(I + 1, 2*I - 1);
+      expected := Cmplx128(scalar - value.Re, -value.Im);
+      CheckEquals(expected, PCmplx128(PByte(pX) + I*cC128Sz)^, dTol);
+    end;
+  end;
+end;
+
+procedure TTestVectorMath.MixedScalar_Divide;
+var source, dest: TBytes;
+    pX, pY: PCmplx128;
+    value, expected, numerator: TCmplx128;
+    scalar: Double;
+    count, I: Integer;
+begin
+  scalar := 3;
+  numerator := Cmplx128(3,-2);
+  SetLength(source, 1 + 6*SizeOf(TCmplx128));
+  SetLength(dest, Length(source));
+  pX := PCmplx128(@source[1]);
+  pY := PCmplx128(@dest[1]);
+  for count := 0 to 5 do begin
+    FillChar(dest[0], Length(dest), $7F);
+    for I := 0 to 5 do
+      PCmplx128(PByte(pX) + I*SizeOf(TCmplx128))^ := Cmplx128(I + 1, 2*I - 1);
+
+    VecDiv(numerator, pX, pY, count);
+
+    for I := 0 to count - 1 do begin
+      value := Cmplx128(I + 1, 2*I - 1);
+      expected := numerator / value;
+      CheckEquals(expected, PCmplx128(PByte(pY) + I*SizeOf(TCmplx128))^, dTol);
+      CheckEquals(value, PCmplx128(PByte(pX) + I*SizeOf(TCmplx128))^, 0);
+    end;
+    CheckEquals($7F, dest[0]);
+    CheckEquals($7F, dest[1 + count*SizeOf(TCmplx128)]);
+
+    VecDiv(numerator, pX, pX, count);
+
+    for I := 0 to count - 1 do begin
+      value := Cmplx128(I + 1, 2*I - 1);
+      expected := numerator / value;
+      CheckEquals(expected, PCmplx128(PByte(pX) + I*SizeOf(TCmplx128))^, dTol);
+    end;
+  end;
+end;
+
+procedure TTestVectorMath.MixedScalarSignedZero;
+var x, y: TCmplx128;
+    negativeZero: Double;
+begin
+  PUInt64(@negativeZero)^ := UInt64($8000000000000000);
+  x := Cmplx128(3, negativeZero);
+
+  VecAdd(PCmplx128(@x), Double(2), PCmplx128(@y), 1);
+
+  CheckEquals(UInt64($8000000000000000), PUInt64(@y.Im)^);
+
+  VecSub(PCmplx128(@x), Double(2), PCmplx128(@y), 1);
+
+  CheckEquals(UInt64($8000000000000000), PUInt64(@y.Im)^);
+
+  VecSub(Double(2), @x, @y, 1);
+
+  CheckEquals(UInt64(0), PUInt64(@y.Im)^);
+  CheckEquals(Cmplx128(3,negativeZero), x, 0);
+end;
+
+procedure TTestVectorMath.ScaleDoubleCounts;
+var source, dest: TBytes;
+    x, y: PDouble;
+    count, I: Integer;
+begin
+  SetLength(source, 1 + 6*SizeOf(Double));
+  SetLength(dest, Length(source));
+  x := PDouble(@source[1]);
+  y := PDouble(@dest[1]);
+  for count := 0 to 5 do begin
+    FillChar(dest[0], Length(dest), $7F);
+    for I := 0 to 5 do
+      PDouble(PByte(x) + I*SizeOf(Double))^ := I + 1;
+
+    VecMul(x, Double(2.5), y, count);
+
+    for I := 0 to count - 1 do
+      CheckEquals(2.5*(I + 1), PDouble(PByte(y) + I*SizeOf(Double))^, 0);
+    CheckEquals($7F, dest[1 + count*SizeOf(Double)]);
+
+    VecMul(x, Double(2.5), x, count);
+
+    for I := 0 to count - 1 do
+      CheckEquals(2.5*(I + 1), PDouble(PByte(x) + I*SizeOf(Double))^, 0);
+  end;
+end;
+
+procedure TTestVectorMath.AddSubtractReversed_Single;
+var x: array[0..6] of Single;
+    y: array[0..3] of Single;
+    I: Integer;
+begin
+  for I := 0 to 6 do
+    x[I] := 99;
+  for I := 0 to 3 do begin
+    x[2*I] := I + 1;
+    y[I] := 10*(I + 1);
+  end;
+
+  VecAddInPlace(PSingle(@x[6]), PSingle(@y[0]), -2, 1, 4);
+
+  CheckEquals(14, x[6], 0);
+  CheckEquals(23, x[4], 0);
+  CheckEquals(32, x[2], 0);
+  CheckEquals(41, x[0], 0);
+  CheckEquals(99, x[1], 0);
+
+  VecSubInPlace(PSingle(@x[0]), PSingle(@y[3]), 2, -1, 4);
+
+  for I := 0 to 3 do
+    CheckEquals(I + 1, x[2*I], 0);
+end;
+
+procedure TTestVectorMath.CopyReversed_Single;
+var x, y: array[0..8] of Single;
+    I: Integer;
+begin
+  for I := 0 to 8 do begin
+    x[I] := I + 1;
+    y[I] := 99;
+  end;
+
+  scopy(@x[8], @y[8], 5, -2, -2);
+
+  for I := 0 to 4 do
+    CheckEquals(2*I + 1, y[2*I], 0);
+  CheckEquals(99, y[1], 0);
+
+  scopy(@x[4], @y[8], 5, 0, -2);
+
+  for I := 0 to 4 do
+    CheckEquals(5, y[2*I], 0);
+end;
+
+procedure TTestVectorMath.DotReversed_Single;
+const Expected: array[3..5] of Integer = (38,50,55);
+var x: array[0..8] of Single;
+    y: array[0..4] of Single;
+    count, I: Integer;
+begin
+  for I := 0 to 8 do
+    x[I] := I + 1;
+  for I := 0 to 4 do
+    y[I] := I + 1;
+
+  for count := 3 to 5 do
+    CheckEquals(Expected[count],
+      sdot(count, @x[8], -2*SizeOf(Single), @y[0], SizeOf(Single)), 0);
+
+  CheckEquals(15, sdot(5, @x[0], 0, @y[4], -SizeOf(Single)), 0);
+end;
+
+procedure TTestVectorMath.DifferencesReversed_Single;
+const x: array[0..8] of Single = (1,2,4,7,11,16,22,29,37);
+var y: array[0..6] of Single;
+    I: Integer;
+begin
+  for I := 0 to 6 do
+    y[I] := 99;
+
+  Differences(PSingle(@x[8]), PSingle(@y[6]), -2, -2, 9);
+
+  CheckEquals(-15, y[6], 0);
+  CheckEquals(-11, y[4], 0);
+  CheckEquals(-7, y[2], 0);
+  CheckEquals(-3, y[0], 0);
+  CheckEquals(99, y[1], 0);
+end;
+
+procedure TTestVectorMath.AddSubtractReversed_Double;
+var x: array[0..6] of Double;
+    y: array[0..3] of Double;
+    I: Integer;
+begin
+  for I := 0 to 6 do
+    x[I] := 99;
+  for I := 0 to 3 do begin
+    x[2*I] := I + 1;
+    y[I] := 10*(I + 1);
+  end;
+
+  VecAddInPlace(PDouble(@x[6]), PDouble(@y[0]), -2, 1, 4);
+
+  CheckEquals(14, x[6], 0);
+  CheckEquals(23, x[4], 0);
+  CheckEquals(32, x[2], 0);
+  CheckEquals(41, x[0], 0);
+  CheckEquals(99, x[1], 0);
+
+  VecSubInPlace(PDouble(@x[0]), PDouble(@y[3]), 2, -1, 4);
+
+  for I := 0 to 3 do
+    CheckEquals(I + 1, x[2*I], 0);
+end;
+
+procedure TTestVectorMath.CopyReversed_Double;
+var x, y: array[0..8] of Double;
+    I: Integer;
+begin
+  for I := 0 to 8 do begin
+    x[I] := I + 1;
+    y[I] := 99;
+  end;
+
+  dcopy(@x[8], @y[8], 5, -2, -2);
+
+  for I := 0 to 4 do
+    CheckEquals(2*I + 1, y[2*I], 0);
+  CheckEquals(99, y[1], 0);
+
+  dcopy(@x[4], @y[8], 5, 0, -2);
+
+  for I := 0 to 4 do
+    CheckEquals(5, y[2*I], 0);
+end;
+
+procedure TTestVectorMath.DotReversed_Double;
+const Expected: array[3..5] of Integer = (38,50,55);
+var x: array[0..8] of Double;
+    y: array[0..4] of Double;
+    count, I: Integer;
+begin
+  for I := 0 to 8 do
+    x[I] := I + 1;
+  for I := 0 to 4 do
+    y[I] := I + 1;
+
+  for count := 3 to 5 do
+    CheckEquals(Expected[count],
+      ddot(count, @x[8], -2*SizeOf(Double), @y[0], SizeOf(Double)), 0);
+
+  CheckEquals(15, ddot(5, @x[0], 0, @y[4], -SizeOf(Double)), 0);
+end;
+
+procedure TTestVectorMath.DifferencesReversed_Double;
+const x: array[0..8] of Double = (1,2,4,7,11,16,22,29,37);
+var y: array[0..6] of Double;
+    I: Integer;
+begin
+  for I := 0 to 6 do
+    y[I] := 99;
+
+  Differences(PDouble(@x[8]), PDouble(@y[6]), -2, -2, 9);
+
+  CheckEquals(-15, y[6], 0);
+  CheckEquals(-11, y[4], 0);
+  CheckEquals(-7, y[2], 0);
+  CheckEquals(-3, y[0], 0);
+  CheckEquals(99, y[1], 0);
+end;
+
+procedure TTestVectorMath.AccumReversed;
+const x: array[0..4] of Single = (1,99,2,99,3);
+var y: array[0..4] of Single;
+begin
+  y[1] := 99;
+
+  svAccum(@x[4], -2*SizeOf(Single), @y[4], -2*SizeOf(Single), 3);
+
+  CheckEquals(3, y[4], 0);
+  CheckEquals(5, y[2], 0);
+  CheckEquals(6, y[0], 0);
+  CheckEquals(99, y[1], 0);
+end;
+
+procedure TTestVectorMath.ComplexDivideInPlace;
+var x, y, expected: array[0..2] of TCmplx128;
+    I: Integer;
+begin
+  for I := 0 to 2 do begin
+    x[I] := Cmplx128(I + 1, I + 2);
+    y[I] := Cmplx128(I + 3, -I - 1);
+    expected[I] := x[I] / y[I];
+  end;
+
+  VecDiv(PCmplx128(@x[0]), PCmplx128(@y[0]), PCmplx128(@x[0]), 3);
+
+  for I := 0 to 2 do
+    CheckEquals(expected[I], x[I], 1e-12);
+
+  for I := 0 to 2 do
+    x[I] := Cmplx128(I + 1, I + 2);
+
+  VecDiv(PCmplx128(@x[0]), PCmplx128(@y[0]), PCmplx128(@y[0]), 3);
+
+  for I := 0 to 2 do
+    CheckEquals(expected[I], y[I], 1e-12);
 end;
 
 {$endregion}

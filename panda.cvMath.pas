@@ -543,9 +543,11 @@ procedure svAccum(aData: PSingle; aDataStep: NativeInt;
 var pEnd: PByte;
     s: Double;
 begin
+  Assert(aDataStep <> 0);
+
   pEnd := PByte(aData) + aCount * aDataStep;
   s := 0;
-  while PByte(aData) < pEnd do begin
+  while PByte(aData) <> pEnd do begin
     s := s + aData^;
     aRes^ := s;
     Inc(PByte(aData), aDataStep);

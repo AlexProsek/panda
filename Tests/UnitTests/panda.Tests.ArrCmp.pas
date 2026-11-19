@@ -21,6 +21,8 @@ type
     procedure MaxSV_1D_F32;
     procedure MaxVV_1D_Cont_F32;
     procedure MaxVV_1D_F32;
+    procedure MaxReversedDestination;
+    procedure ThresholdReversedDestination;
   end;
 
   TTensorCmpTests = class(TNDATestCase)
@@ -33,6 +35,8 @@ type
     procedure GreaterThanOrEqualOp_I32_VV;
 
     procedure GreaterThanOp_I32_VS;
+    procedure EqualReversedRows;
+    procedure GreaterThanReversedRows;
   end;
 
   TTensorMaskingTests = class(TNDATestCase)
@@ -271,6 +275,84 @@ begin
   CheckFalse(ndaAllIsFinite(m[[NDISpan(0, 2)]]));
   CheckFalse(ndaAllIsFinite(m[[NDISpan(-2, -1)]]));
   CheckTrue(ndaAllIsFinite(m[[NDISpan(1, 3, 2), NDIAll(2)]]));
+end;
+
+{$endregion}
+
+{$region 'TArrCmpTests'}
+
+procedure TArrCmpTests.MaxReversedDestination;
+var A, B, base, R: INDArray<Single>;
+begin
+  A := TNDAUt.AsArray<Single>([1,2,3]);
+  B := TNDAUt.AsArray<Single>([4,1,2]);
+  base := TNDAUt.Full<Single>([5], 99);
+  R := base[[NDISpan(4,0,-2)]];
+
+  ndaMax(A, B, R);
+
+  CheckEquals(4, R.GetItem([0]), 0);
+  CheckEquals(2, R.GetItem([1]), 0);
+  CheckEquals(3, R.GetItem([2]), 0);
+  CheckEquals(99, base.GetItem([1]), 0);
+
+  ndaMax(Single(3), A, R);
+
+  CheckEquals(3, R.GetItem([0]), 0);
+  CheckEquals(3, R.GetItem([1]), 0);
+  CheckEquals(3, R.GetItem([2]), 0);
+end;
+
+procedure TArrCmpTests.ThresholdReversedDestination;
+var A, base, R: INDArray<Byte>;
+begin
+  A := TNDAUt.AsArray<Byte>([1,2,3]);
+  base := TNDAUt.Full<Byte>([5], 99);
+  R := base[[NDISpan(4,0,-2)]];
+
+  ndaThreshold(A, 2, R);
+
+  CheckEquals(0, R.GetItem([0]));
+  CheckEquals(0, R.GetItem([1]));
+  CheckEquals(3, R.GetItem([2]));
+  CheckEquals(99, base.GetItem([1]));
+end;
+
+{$endregion}
+
+{$region 'TTensorCmpTests'}
+
+procedure TTensorCmpTests.EqualReversedRows;
+var base: INDArray<Integer>;
+    A, B: TTensorI32;
+    R: TTensorBool;
+    m: TArray<TArray<Boolean>>;
+begin
+  base := TNDAUt.AsArray<Integer>([[1, 2, 3],[4, 5, 6]]);
+  A := base[[NDISpan(1, 0, -1), NDIAll]];
+  B := TNDAUt.AsArray<Integer>([[4, 0, 6],[0, 2, 0]]);
+
+  R := (A = B);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Boolean>(R, m));
+  CheckEquals([ True, False,  True], m[0]);
+  CheckEquals([False,  True, False], m[1]);
+end;
+
+procedure TTensorCmpTests.GreaterThanReversedRows;
+var base: INDArray<Integer>;
+    A: TTensorI32;
+    R: TTensorBool;
+    I, J: Integer;
+begin
+  base := TNDAUt.AsArray<Integer>([[1, 2, 3], [4, 5, 6]]);
+  A := base[[NDISpan(1, 0, -1), NDIAll]];
+
+  R := (A > 3);
+
+  for I := 0 to 1 do
+    for J := 0 to 2 do
+      CheckEquals(I = 0, R.NDA.GetItem([I,J]));
 end;
 
 {$endregion}
