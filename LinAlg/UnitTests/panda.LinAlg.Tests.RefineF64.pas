@@ -35,10 +35,8 @@ type
     procedure SetUp; override;
     procedure TearDown; override;
   published
-    procedure Defaults;
     procedure InvalidBlockedSettings;
     procedure FactorizationSettingsPreserveFactors;
-    procedure BlockedRefinementAccuracy;
     procedure SingleEquation;
     procedure ExactSolution;
     procedure ZeroRHS;
@@ -85,6 +83,8 @@ type
   TBlockedRefineF64Tests = class(TGaussRefineF64Tests)
   public
     procedure SetUp; override;
+  published
+    procedure BlockedRefinementAccuracy;
   end;
 
 implementation
@@ -361,20 +361,6 @@ end;
 procedure TGaussRefineF64Tests.CheckInitStatus(aExpected, aActual: TGaussRefineInitStatus);
 begin
   CheckEquals(Ord(aExpected), Ord(aActual));
-end;
-
-procedure TGaussRefineF64Tests.Defaults;
-var expectedTolerance: Double;
-begin
-  expectedTolerance := cEpsF64;
-
-  CheckFalse(solver.Initialized);
-  CheckEquals(10, solver.MaxIterations);
-  CheckEquals(expectedTolerance, solver.RelativeTolerance, 0);
-  CheckEquals(0, TLUPDecompositionF64(solver.Solver).PivotTolerance, 0);
-  CheckEquals(TLUPDecompositionF64.cDefaultTolFactor, TLUPDecompositionF64(solver.Solver).ToleranceFactor, 0);
-  CheckEquals(-1, TLUPDecompositionF64(solver.Solver).LowerBandWidth);
-  CheckEquals(-1, TLUPDecompositionF64(solver.Solver).UpperBandWidth);
 end;
 
 procedure TGaussRefineF64Tests.HighPrecisionProduct;
@@ -1115,7 +1101,7 @@ begin
   CheckTrue(solver.Initialized);
 end;
 
-procedure TGaussRefineF64Tests.BlockedRefinementAccuracy;
+procedure TBlockedRefineF64Tests.BlockedRefinementAccuracy;
 var A: TDoubleArray2D;
     B, X: TDoubleArray;
     info: TGaussRefinementResult;

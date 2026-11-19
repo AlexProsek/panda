@@ -160,22 +160,28 @@ type
   TLinearSolverInitStatus = (
     /// <summary>The factors are ready.</summary>
     lsisInitialized,
-    /// <summary>The matrix dimensions, storage layout, or settings are invalid.</summary>
+    /// <summary>The matrix dimensions, values, storage layout, or settings are invalid.</summary>
     lsisInvalidInput,
     /// <summary>A pivot was rejected by the solver's singularity policy.</summary>
     lsisSingular,
     /// <summary>A Cholesky diagonal residual was rejected by its pivot policy.</summary>
-    lsisNotPositiveDefinite
+    lsisNotPositiveDefinite,
+    /// <summary>A descendant reported an arithmetic or nonfinite-value failure.</summary>
+    lsisNumericalFailure
   );
 
   /// <summary>Outcome of solving using an initialized linear solver.</summary>
   TLinearSolverSolveStatus = (
-    /// <summary>An independent solution was returned.</summary>
+    /// <summary>An independent solution was returned under the solver's acceptance policy.</summary>
     lsssSolved,
-    /// <summary>The RHS dimensions or storage layout are invalid.</summary>
+    /// <summary>The RHS dimensions, values, storage layout, or solve settings are invalid.</summary>
     lsssInvalidInput,
     /// <summary>No matrix has been successfully initialized.</summary>
-    lsssNotInitialized
+    lsssNotInitialized,
+    /// <summary>An iterative solver did not meet its convergence policy.</summary>
+    lsssNotConverged,
+    /// <summary>A descendant reported an arithmetic or nonfinite-value failure.</summary>
+    lsssNumericalFailure
   );
 
   /// <summary>
@@ -188,14 +194,20 @@ type
   ///   inputs may contain partial factors. Callers must not modify or resize
   ///   borrowed storage while initialized. Solve reuses factors without changing
   ///   them or the RHS; results own independent storage. Arithmetic/allocation
-  ///   exceptions propagate. Calls on one instance must not overlap. Current
-  ///   dense descendants factor in O(N^3) and solve K RHS columns in O(N^2 K).
+  ///   exceptions propagate unless a descendant documents numerical failure
+  ///   statuses. Calls on one instance must not overlap. Current
+  ///   direct dense descendants factor in O(N^3) and solve K RHS columns in O(N^2 K).
   /// </remarks>
   TLinearSolver<T> = class abstract(TLinAlgBase<T>)
   protected
     fInitialized: Boolean;
     procedure ClearAnchors; override;
   public
+    /// <summary>
+    ///   Invalidates initialization and releases retained matrix storage through
+    ///   the descendant's cleanup hook. Preserves configuration settings.
+    /// </summary>
+    procedure Reset;
     /// <summary>Copies and factors a nonempty square matrix aA; returns its status.</summary>
     function Initialize(const aA: TArray<TArray<T>>): TLinearSolverInitStatus; overload; virtual; abstract;
     /// <summary>Copies and factors square aA with arbitrary strides, including read-only views.</summary>
@@ -234,6 +246,11 @@ uses
   ;
 
 {$POINTERMATH ON}
+
+procedure TLinearSolver<T>.Reset;
+begin
+  ClearAnchors;
+end;
 
 procedure TLinearSolver<T>.ClearAnchors;
 begin
@@ -326,17 +343,14 @@ function TLinAlgBase<T>.BindDyn(const aA: TArray<TArray<T>>): Boolean;
 var I, N, W: Integer;
     rows: TArray<PT>;
 begin
-  Result := False;
   N := Length(aA);
-  if N = 0 then exit;
   W := Length(aA[0]);
+  Assert((N > 0) and (W > 0));
+
   SetLength(rows, N);
   for I := 0 to N - 1 do begin
-    if Length(aA[I]) <> W then exit;
-    if W > 0 then
-      rows[I] := @aA[I][0]
-    else
-      rows[I] := nil;
+    if Length(aA[I]) <> W then exit(False);
+    rows[I] := @aA[I][0]
   end;
 
   ClearAnchors;

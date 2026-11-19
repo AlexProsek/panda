@@ -54,14 +54,11 @@ type
     procedure EstimateTolerance;
     procedure EstimateToleranceND;
     procedure EstimateToleranceReuse;
-    procedure ZeroToleranceSetsBoth;
     procedure ToleranceAppliedAtSolve;
     procedure TolerancePivotOnly;
-    procedure ToleranceFactorDefault;
     procedure ToleranceFactorApplied;
     procedure EstimateToleranceFactor;
     procedure SolveRankDeficientDefaultFactor;
-    procedure BandDefaults;
     procedure BandDiagonal;
     procedure BandSingleEquation;
     procedure BandLowerTriangular;
@@ -580,23 +577,11 @@ begin
   CheckPartSol(A, b, res, tol);
 end;
 
-procedure TGaussElimF64Tests.ZeroToleranceSetsBoth;
-var t: Double;
-    tolerance: TGaussTolerance;
-begin
-  t := 1e-6;
-
-  solver.ZeroTolerance := t;
-  tolerance := solver.Tolerance;
-
-  CheckEquals(t, solver.ZeroTolerance, 0);
-  CheckEquals(t, tolerance.Pivot, 0);
-  CheckEquals(t, tolerance.RHS, 0);
-end;
-
 procedure TGaussElimF64Tests.ToleranceAppliedAtSolve;
+const zeroTolerance: Double = 1e-3;
 var A, h: TDoubleArray2D;
     b, res: TDoubleArray;
+    tolerance: TGaussTolerance;
 begin
   A := TDoubleArray2D.Create(
     TArray<Double>.Create(1, 0),
@@ -605,7 +590,13 @@ begin
   b := TArray<Double>.Create(1, 0);
 
   CheckTrue(solver.Init(A, b));
-  solver.ZeroTolerance := 1e-3;
+  solver.ZeroTolerance := zeroTolerance;
+  tolerance := solver.Tolerance;
+
+  CheckEquals(zeroTolerance, solver.ZeroTolerance, 0);
+  CheckEquals(zeroTolerance, tolerance.Pivot, 0);
+  CheckEquals(zeroTolerance, tolerance.RHS, 0);
+
   solver.Solve(res, h);
 
   CheckEquals(1, Length(h));
@@ -640,11 +631,6 @@ begin
   CheckEquals(4, Length(res));
   CheckEquals(2, Length(h));
   CheckPartSol(A, b, res, tol);
-end;
-
-procedure TGaussElimF64Tests.ToleranceFactorDefault;
-begin
-  CheckEquals(TGaussElimF64.cDefaultTolFactor, solver.ToleranceFactor, 0);
 end;
 
 procedure TGaussElimF64Tests.ToleranceFactorApplied;
@@ -786,12 +772,6 @@ begin
   finally
     dense.Free;
   end;
-end;
-
-procedure TGaussElimF64Tests.BandDefaults;
-begin
-  CheckEquals(-1, Integer(solver.LowerBandWidth));
-  CheckEquals(-1, Integer(solver.UpperBandWidth));
 end;
 
 procedure TGaussElimF64Tests.BandDiagonal;

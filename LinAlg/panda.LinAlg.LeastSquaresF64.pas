@@ -4,6 +4,7 @@ interface
 
 uses
     panda.Intfs
+  , panda.LinAlg.Base
   ;
 
 type
@@ -11,10 +12,14 @@ type
   TLeastSquaresStatus = (
     /// <summary>An independent coefficient vector was returned.</summary>
     lssSolved,
-    /// <summary>The inputs do not have supported, matching dimensions.</summary>
+    /// <summary>The inputs, dimensions, supplied solver, or solver settings are invalid.</summary>
     lssInvalidInput,
     /// <summary>The normal matrix was rejected by the numerical pivot policy.</summary>
-    lssRankDeficient
+    lssRankDeficient,
+    /// <summary>The supplied solver did not meet its convergence policy.</summary>
+    lssNotConverged,
+    /// <summary>The supplied solver reported a numerical failure.</summary>
+    lssNumericalFailure
   );
 
 /// <summary>
@@ -50,24 +55,60 @@ function LeastSquares(const aA, ab: INDArray<Double>;
 function LeastSquares(const aA: TArray<TArray<Double>>; const ab: TArray<Double>;
  out aX: TArray<Double>): TLeastSquaresStatus; overload;
 
+/// <summary>
+///   Forms Double normal equations and solves them with caller-owned aSolver.
+///   Requires the same dimensions as the default overload. Valid calls replace
+///   the solver's initialization and borrow the private normal matrix for factors.
+///   Inputs are unchanged; successful aX owns independent storage.
+/// </summary>
+/// <remarks>
+///   Nil solver or invalid dimensions return InvalidInput without initializing it.
+///   Pivot rejection returns RankDeficient; nonconvergence and numerical failure
+///   return their corresponding statuses. Unsuccessful statuses clear aX.
+///   Solver configuration controls acceptance; refinement diagnostics remain on
+///   its concrete type. Refinement applies to the rounded Double normal equations,
+///   not residuals formed from original aA and ab. Exceptions propagate.
+/// </remarks>
+function LeastSquares(const aA, ab: INDArray<Double>; out aX: INDArray<Double>;
+  aSolver: TLinearSolver<Double>): TLeastSquaresStatus; overload;
+
+/// <summary>
+///   Dynamic-array equivalent of the injected-solver overload. Rejects ragged
+///   matrices. The caller owns aSolver; invalid dimensions do not initialize it.
+///   Successful aX owns independent storage; unsuccessful statuses clear aX.
+///   Uses the same normal equations, status policy, and exception behavior.
+/// </summary>
+function LeastSquares(const aA: TArray<TArray<Double>>; const ab: TArray<Double>;
+  out aX: TArray<Double>; aSolver: TLinearSolver<Double>): TLeastSquaresStatus; overload;
+
 implementation
 
 uses
     panda.Arrays
   , panda.Math
-  , panda.LinAlg.Base
   , panda.LinAlg.CholeskyF64
   , panda.DynArrayUtils
   ;
 
 function LeastSquares(const aA, ab: INDArray<Double>;
   out aX: INDArray<Double>): TLeastSquaresStatus;
+var solver: TCholeskyDecompositionF64;
+begin
+  solver := TCholeskyDecompositionF64.Create;
+  try
+    Result := LeastSquares(aA, ab, aX, solver);
+  finally
+    solver.Free;
+  end;
+end;
+
+function LeastSquares(const aA, ab: INDArray<Double>; out aX: INDArray<Double>;
+  aSolver: TLinearSolver<Double>): TLeastSquaresStatus;
 var G, At, c: INDArray<Double>;
-    solver: TCholeskyDecompositionF64;
     m, n: NativeInt;
 begin
-  Assert(Assigned(aA) and Assigned(aB));
-
+  aX := nil;
+  if not (Assigned(aSolver) and Assigned(aA) and Assigned(ab)) then exit(lssInvalidInput);
   if not (MatrixQ(aA) and VectorQ(ab)) then exit(lssInvalidInput);
 
   m := aA.Shape[0];
@@ -77,35 +118,50 @@ begin
   ndaGram(aA, G, At);
   c := ndaDot(At, TNDAUt.AsContiguousArray<Double>(ab));
 
-  solver := TCholeskyDecompositionF64.Create;
-  try
-    case solver.InitializeWithoutCopy(G) of
-      lsisInitialized:
-        case solver.Solve(c, aX) of
-          lsssSolved: Result := lssSolved;
-        else
-          Result := lssInvalidInput;
-        end;
-      lsisSingular, lsisNotPositiveDefinite:
-        Result := lssRankDeficient;
-    else
-      Result := lssInvalidInput;
-    end;
-  finally
-    solver.Free;
+  case aSolver.InitializeWithoutCopy(G) of
+    lsisInitialized:
+      case aSolver.Solve(c, aX) of
+        lsssSolved: Result := lssSolved;
+        lsssInvalidInput: Result := lssInvalidInput;
+        lsssNotConverged: Result := lssNotConverged;
+      else
+        Result := lssNumericalFailure;
+      end;
+    lsisSingular, lsisNotPositiveDefinite:
+      Result := lssRankDeficient;
+    lsisInvalidInput: Result := lssInvalidInput;
+  else
+    Result := lssNumericalFailure;
   end;
+  if Result <> lssSolved then aX := nil;
 end;
 
 function LeastSquares(const aA: TArray<TArray<Double>>; const ab: TArray<Double>;
   out aX: TArray<Double>): TLeastSquaresStatus;
 var A, b, X: INDArray<Double>;
 begin
+  aX := nil;
   if not TDynAUt.MatrixQ<Double>(aA) then exit(lssInvalidInput);
 
   A := TNDAUt.AsArray<Double>(aA);
   b := TNDAUt.AsArray<Double>(ab);
 
   Result := LeastSquares(A, b, X);
+
+  if Result = lssSolved then
+    TNDAUt.TryAsDynArray<Double>(X, aX);
+end;
+
+function LeastSquares(const aA: TArray<TArray<Double>>; const ab: TArray<Double>;
+  out aX: TArray<Double>; aSolver: TLinearSolver<Double>): TLeastSquaresStatus;
+var A, b, X: INDArray<Double>;
+begin
+  aX := nil;
+  if not TDynAUt.MatrixQ<Double>(aA) then exit(lssInvalidInput);
+
+  A := TNDAUt.AsArray<Double>(aA);
+  b := TNDAUt.AsArray<Double>(ab);
+  Result := LeastSquares(A, b, X, aSolver);
 
   if Result = lssSolved then
     TNDAUt.TryAsDynArray<Double>(X, aX);

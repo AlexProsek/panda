@@ -60,36 +60,7 @@ type
   {$endif}
   end;
 
-procedure TransposeBlocked(src, dst: PSingle; H, W: Integer);
-
 implementation
-
-procedure TransposeBlocked(src, dst: PSingle; H, W: Integer);
-type
-  TSingleArr = array[0..MaxInt div SizeOf(Single) - 1] of Single;
-  PSingleArr = ^TSingleArr;
-const
-  B = 16;
-var
-  s, d: PSingleArr;
-  i, j, bi, bj, iMax, jMax: Integer;
-begin
-  s := PSingleArr(src);
-  d := PSingleArr(dst);
-  bi := 0;
-  while bi < H do begin
-    bj := 0;
-    while bj < W do begin
-      iMax := bi + B; if iMax > H then iMax := H;
-      jMax := bj + B; if jMax > W then jMax := W;
-      for i := bi to iMax - 1 do
-        for j := bj to jMax - 1 do
-          d^[j * H + i] := s^[i * W + j];
-      Inc(bj, B);
-    end;
-    Inc(bi, B);
-  end;
-end;
 
 {$region 'TFFTTests'}
 
@@ -612,7 +583,7 @@ begin
     fft.Free;
   end;
 
-  ifft := TRealiFFTEval2DF32.Create;
+  ifft := TRealIFFTEval2DF32.Create;
   try
     ifft.SpectrumLayout := slNative;
     ifft.Normalize := True;

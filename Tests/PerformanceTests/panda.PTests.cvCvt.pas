@@ -20,7 +20,15 @@ type
     procedure Cvt_F64F32;
   end;
 
+  TNormZeroTests = class(TNDAPerformanceTestCase)
+  published
+    procedure NormZero_F32;
+    procedure NormZero_F64;
+  end;
+
 implementation
+
+{$region 'TCVCvtTests'}
 
 procedure TCVCvtTests.Cvt_UI8F32;
 var x: TArray<Byte>;
@@ -118,8 +126,45 @@ begin
   SWStop;
 end;
 
+{$endregion}
+
+{$region 'TNormZeroTests'}
+
+procedure TNormZeroTests.NormZero_F32;
+var x, y: TArray<Single>;
+    I: Integer;
+const N = 1000000;
+begin
+  SetLength(x, N);
+  SetLength(y, N);
+  for I := 0 to High(x) do
+    if I mod 4 = 0 then x[I] := -0.0;
+
+  SWStart;
+  DoTestLoop(procedure begin NormalizeZero(PSingle(x), PSingle(y), Length(x)) end, 100);
+  SWStop;
+end;
+
+procedure TNormZeroTests.NormZero_F64;
+var x, y: TArray<Double>;
+    I: Integer;
+const N = 1000000;
+begin
+  SetLength(x, N);
+  SetLength(y, N);
+  for I := 0 to High(x) do
+    if I mod 4 = 0 then x[I] := -0.0;
+
+  SWStart;
+  DoTestLoop(procedure begin NormalizeZero(PDouble(x), PDouble(y), Length(x)) end, 100);
+  SWStop;
+end;
+
+{$endregion}
+
 initialization
 
   RegisterTest(TCVCvtTests.Suite);
+  RegisterTest(TNormZeroTests.Suite);
 
 end.

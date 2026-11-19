@@ -34,7 +34,6 @@ type
     procedure FirstNonzeroAfterZero;
     procedure TinyPivot;
     procedure LUPReconstruction;
-    procedure BlockedPanelSizes;
     procedure ManagedFactorAndResultLifetime;
     procedure LUPVectorSolve;
     procedure RepeatedCopiedSolves;
@@ -57,6 +56,8 @@ type
   TBlockedLUPRationalTests = class(TLUPDecompositionRationalTests)
   public
     procedure SetUp; override;
+  published
+    procedure BlockedPanelSizes;
   end;
 
 implementation
@@ -556,7 +557,7 @@ begin
   CheckInverse(Matrix, IA);
 end;
 
-procedure TLUPDecompositionRationalTests.BlockedPanelSizes;
+procedure TBlockedLUPRationalTests.BlockedPanelSizes;
 const rows: array[0..4] of Integer = (4, 2, 0, 3, 1);
 var A, LU, IA: TRMatrix;
     B, expectedX, X: TRVector;

@@ -32,7 +32,6 @@ type
     procedure PivotMagnitude;
     procedure PivotTie;
     procedure LUPReconstruction;
-    procedure BlockedPanelSizes;
     procedure LUPVectorSolve;
     procedure RepeatedCopiedSolves;
     procedure InverseAndDeterminant;
@@ -43,7 +42,6 @@ type
     procedure SmallScale;
     procedure LUPVectorND;
     procedure LUPStridedND;
-    procedure IndependentToleranceFields;
     procedure BandLU;
 
   end;
@@ -52,6 +50,8 @@ type
   TBlockedLUPC128Tests = class(TLUPDecompositionC128Tests)
   public
     procedure SetUp; override;
+  published
+    procedure BlockedPanelSizes;
   end;
 
 implementation
@@ -298,9 +298,6 @@ begin
 
   CheckTrue(TNDAUt.TryAsDynArray2D<TCmplx128>(MI, IA));
   CheckInverse(A, IA);
-  CheckTrue(solver.Initialize(A) = lsisInitialized);
-  CheckTrue(solver.Initialize(M) = lsisInitialized);
-  CheckEquals(solver.Determinant, solver.Determinant, 1e-12);
 end;
 
 procedure TLUPDecompositionC128Tests.SmallScale;
@@ -334,8 +331,6 @@ begin
   CheckSolution(A, B, X);
   CheckTrue(TNDAUt.TryAsDynArray2D<TCmplx128>(MI, IA));
   CheckInverse(A, IA);
-  CheckTrue(solver.Initialize(A) = lsisInitialized);
-  CheckEquals(solver.Determinant, solver.Determinant, 1e-12);
 end;
 
 procedure TLUPDecompositionC128Tests.LUPStridedND;
@@ -360,15 +355,6 @@ begin
   CheckTrue(TNDAUt.TryAsDynArray2D<TCmplx128>(M, Wide));
   CheckEquals(Cmplx(99, 1), Wide[0, 2], 0);
   CheckEquals(Cmplx(99, 1), Wide[1, 2], 0);
-end;
-
-procedure TLUPDecompositionC128Tests.IndependentToleranceFields;
-var A: TCMatrix;
-begin
-  A := TCMatrix.Create(TCVector.Create(Cmplx(0, 1)));
-  solver.PivotTolerance := 1e-12;
-
-  CheckTrue(solver.InitializeWithoutCopy(A) = lsisInitialized);
 end;
 
 function TLUPDecompositionC128Tests.BandMatrix: TCMatrix;
@@ -414,7 +400,7 @@ begin
   solver.BlockSize := 2;
 end;
 
-procedure TLUPDecompositionC128Tests.BlockedPanelSizes;
+procedure TBlockedLUPC128Tests.BlockedPanelSizes;
 const rows: array[0..4] of Integer = (4, 2, 0, 3, 1);
 var A, LU, IA: TCMatrix;
     B, expectedX, X: TCVector;

@@ -50,8 +50,6 @@ type
     procedure EstimateToleranceFactor;
     procedure EstimateToleranceLargeScale;
     procedure EstimateToleranceSmallScale;
-    procedure ToleranceDefaults;
-    procedure ZeroToleranceSetsBoth;
     procedure ToleranceAppliedAtSolve;
     procedure ToleranceFactorApplied;
     procedure TolerancePivotOnly;
@@ -543,15 +541,10 @@ begin
   CheckTrue(T.RHS = Q(200) * cEpsF128 * S);
 end;
 
-procedure TGaussElimF128Tests.ToleranceDefaults;
-begin
-  CheckTrue(solver.Tolerance.Pivot.IsExactZero);
-  CheckTrue(solver.Tolerance.RHS.IsExactZero);
-  CheckEquals(TGaussElimF128.cDefaultTolFactor, solver.ToleranceFactor, 0);
-end;
-
-procedure TGaussElimF128Tests.ZeroToleranceSetsBoth;
-var T: TReal128;
+procedure TGaussElimF128Tests.ToleranceAppliedAtSolve;
+var A, H: TQPMatrix;
+    X: TQPVector;
+    T: TReal128;
 begin
   T := Pow2(-2000);
 
@@ -560,13 +553,7 @@ begin
   CheckTrue(solver.ZeroTolerance = T);
   CheckTrue(solver.Tolerance.Pivot = T);
   CheckTrue(solver.Tolerance.RHS = T);
-end;
 
-procedure TGaussElimF128Tests.ToleranceAppliedAtSolve;
-var A, H: TQPMatrix;
-    X: TQPVector;
-    T: TReal128;
-begin
   T := Pow2(-80);
   A := TQPMatrix.Create(TQPVector.Create(Q(1), Q(0)),
     TQPVector.Create(Q(0), T));

@@ -251,7 +251,7 @@ var pEnd: PByte;
 begin
   aSB.Append(fArrBegin);
   pEnd := aData + (aCount - 1) * aStep;
-  while aData < pEnd do begin
+  while aData <> pEnd do begin
     aSb.Append(fFormatter(aData^)).Append(fItemDelim);
     Inc(aData, aStep);
   end;

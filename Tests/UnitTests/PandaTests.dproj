@@ -5,7 +5,7 @@
         <FrameworkType>None</FrameworkType>
         <Base>True</Base>
         <Config Condition="'$(Config)'==''">Debug</Config>
-        <Platform Condition="'$(Platform)'==''">Win64</Platform>
+        <Platform Condition="'$(Platform)'==''">Win32</Platform>
         <ProjectName Condition="'$(ProjectName)'==''">PandaTests</ProjectName>
         <TargetedPlatforms>3</TargetedPlatforms>
         <AppType>Console</AppType>
@@ -164,11 +164,6 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
-        <DCCReference Include="panda.Tests.Arrays.pas"/>
-        <DCCReference Include="panda.Tests.Arithmetic.pas"/>
-        <DCCReference Include="panda.Tests.Math.pas"/>
-        <DCCReference Include="panda.Tests.ArrManip.pas"/>
-        <DCCReference Include="panda.Tests.Formatter.pas"/>
         <DCCReference Include="..\..\panda.Arithmetic.pas"/>
         <DCCReference Include="..\..\panda.Arrays.pas"/>
         <DCCReference Include="..\..\panda.ArrManip.pas"/>
@@ -179,32 +174,42 @@
         <DCCReference Include="..\..\panda.Intfs.pas"/>
         <DCCReference Include="..\..\panda.Math.pas"/>
         <DCCReference Include="..\..\pandalib.pas"/>
-        <DCCReference Include="panda.Tests.cvArithmetic.pas"/>
         <DCCReference Include="..\..\panda.consts.pas"/>
         <DCCReference Include="..\panda.Tests.NDATestCase.pas"/>
         <DCCReference Include="..\..\Utils\panda.Utils.StopWatch.pas"/>
-        <DCCReference Include="panda.Tests.cvMath.pas"/>
         <DCCReference Include="..\..\panda.cvCvt.pas"/>
         <DCCReference Include="..\..\panda.vCvt.pas"/>
-        <DCCReference Include="panda.Tests.cvCvt.pas"/>
         <DCCReference Include="..\..\panda.Conv.pas"/>
-        <DCCReference Include="panda.Tests.Conv.pas"/>
         <DCCReference Include="..\..\panda.BLASInit.pas"/>
         <DCCReference Include="..\..\panda.MAT4io.pas"/>
-        <DCCReference Include="panda.Tests.MAT4io.pas"/>
         <DCCReference Include="..\..\panda.Nums.pas"/>
-        <DCCReference Include="panda.Tests.Nums.pas"/>
         <DCCReference Include="..\..\panda.Poly.pas"/>
-        <DCCReference Include="panda.Tests.Poly.pas"/>
-        <DCCReference Include="panda.Tests.DynArrayUtils.pas"/>
-        <DCCReference Include="panda.Tests.cvCmp.pas"/>
-        <DCCReference Include="panda.Tests.ArrCmp.pas"/>
-        <DCCReference Include="panda.Tests.fft.pas"/>
-        <DCCReference Include="panda.Tests.IntFactor.pas"/>
         <DCCReference Include="..\..\panda.NumsLowLvl.pas"/>
         <DCCReference Include="..\..\panda.NumsQP.pas"/>
-        <DCCReference Include="panda.Tests.NumsQP.pas"/>
         <DCCReference Include="..\..\panda.fft.pas"/>
+        <DCCReference Include="panda.Tests.Arithmetic.pas"/>
+        <DCCReference Include="panda.Tests.Arrays.pas"/>
+        <DCCReference Include="panda.Tests.ArrCmp.pas"/>
+        <DCCReference Include="panda.Tests.ArrManip.pas"/>
+        <DCCReference Include="panda.Tests.Conv.pas"/>
+        <DCCReference Include="panda.Tests.cvArithmetic.pas"/>
+        <DCCReference Include="panda.Tests.cvCmp.pas"/>
+        <DCCReference Include="panda.Tests.cvCvt.pas"/>
+        <DCCReference Include="panda.Tests.cvMath.pas"/>
+        <DCCReference Include="panda.Tests.DynArrayUtils.pas"/>
+        <DCCReference Include="panda.Tests.fft.pas"/>
+        <DCCReference Include="panda.Tests.Formatter.pas"/>
+        <DCCReference Include="panda.Tests.Hashes.pas"/>
+        <DCCReference Include="panda.Tests.IntFactor.pas"/>
+        <DCCReference Include="panda.Tests.MAT4io.pas"/>
+        <DCCReference Include="panda.Tests.Math.pas"/>
+        <DCCReference Include="panda.Tests.Nums.pas"/>
+        <DCCReference Include="panda.Tests.NumsAP.pas"/>
+        <DCCReference Include="panda.Tests.NumsMathAP.pas"/>
+        <DCCReference Include="panda.Tests.NumsQP.pas"/>
+        <DCCReference Include="panda.Tests.Poly.pas"/>
+        <DCCReference Include="..\..\panda.NumsAP.pas"/>
+        <DCCReference Include="..\..\panda.NumsMathAP.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

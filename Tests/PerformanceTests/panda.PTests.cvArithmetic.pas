@@ -16,6 +16,7 @@ type
     procedure AddVec_Double;
     procedure SubVec_Single;
     procedure AddVecInPlace_Single;
+    procedure AddVecInPlace_Double;
     procedure MulVec_Single;
     procedure MulVec_Double;
     procedure MulVec_Cmplx64;
@@ -111,14 +112,54 @@ end;
 
 procedure TVecMathPerformance.AddVecInPlace_Single;
 var a, b: TArray<Single>;
-const N = 10000000;
+    tPrev: Integer;
+const N = 1000;
 begin
   SetLength(a, N);
   SetLength(b, N);
 
-  SWStart;
-  VecAddInPlace(PSingle(a), PSingle(b), 1, 1, N);
-  SWStop;
+  tPrev := cUnrollThreshold;
+  try
+    cUnrollThreshold := 0;
+
+    SWStart;
+    DoTestLoop(procedure begin VecAddInPlace(PSingle(a), PSingle(b), 1, 1, N) end, 100);
+    SWStop;
+
+    cUnrollThreshold := N + 1;
+
+    SWStart;
+    DoTestLoop(procedure begin VecAddInPlace(PSingle(a), PSingle(b), 1, 1, N) end, 100);
+    SWStop('simple loop');
+  finally
+    cUnrollThreshold := tPrev;
+  end;
+end;
+
+procedure TVecMathPerformance.AddVecInPlace_Double;
+var a, b: TArray<Double>;
+    tPrev: Integer;
+const N = 1000;
+begin
+  SetLength(a, N);
+  SetLength(b, N);
+
+  tPrev := cUnrollThreshold;
+  try
+    cUnrollThreshold := 0;
+
+    SWStart;
+    DoTestLoop(procedure begin VecAddInPlace(PDouble(a), PDouble(b), 1, 1, N) end, 100);
+    SWStop('unrolled');
+
+    cUnrollThreshold := N + 1;
+
+    SWStart;
+    DoTestLoop(procedure begin VecAddInPlace(PDouble(a), PDouble(b), 1, 1, N) end, 100);
+    SWStop('simple loop');
+  finally
+    cUnrollThreshold := tPrev;
+  end;
 end;
 
 procedure TVecMathPerformance.MulVec_Single;

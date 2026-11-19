@@ -58,6 +58,7 @@ type
     class function EstimateTolerance(const aA: INDArray<Double>;
       const ab: INDArray<Double> = nil;
       aFactor: Double = cDefaultTolFactor): TGaussTolerance; overload;
+
     /// <summary>
     ///   Pivot and consistency thresholds read when Solve runs. Nonpositive
     ///   fields are estimated from the original matrix and RHS.

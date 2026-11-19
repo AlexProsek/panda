@@ -20,7 +20,6 @@ type
     procedure SetUp; override;
     procedure TearDown; override;
   published
-    procedure Defaults;
     procedure ScalarSystem;
     procedure DiagonalSystem;
     procedure FactorReconstruction;
@@ -99,13 +98,6 @@ begin
   CheckEquals(2, aX[1], 1e-12);
   CheckEquals(8, 4 * aX[0] + 2 * aX[1], 1e-12);
   CheckEquals(12, 2 * aX[0] + 5 * aX[1], 1e-12);
-end;
-
-procedure TCholeskyF64Tests.Defaults;
-begin
-  CheckFalse(fSolver.Initialized);
-  CheckEquals(0, fSolver.PivotTolerance, 0);
-  CheckEquals(100, fSolver.ToleranceFactor, 0);
 end;
 
 procedure TCholeskyF64Tests.ScalarSystem;

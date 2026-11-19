@@ -30,7 +30,6 @@ type
     procedure TearDown; override;
   published
     procedure LUPReconstruction;
-    procedure BlockedPanelSizes;
     procedure LUPVectorSolve;
     procedure RepeatedCopiedSolves;
     procedure InverseDynamic;
@@ -51,6 +50,8 @@ type
   TBlockedLUPF128Tests = class(TLUPDecompositionF128Tests)
   public
     procedure SetUp; override;
+  published
+    procedure BlockedPanelSizes;
   end;
 
 implementation
@@ -417,7 +418,7 @@ begin
   solver.BlockSize := 2;
 end;
 
-procedure TLUPDecompositionF128Tests.BlockedPanelSizes;
+procedure TBlockedLUPF128Tests.BlockedPanelSizes;
 const rows: array[0..4] of Integer = (4, 2, 0, 3, 1);
 var A, LU, IA: TQPMatrix;
     B, expectedX, X: TQPVector;

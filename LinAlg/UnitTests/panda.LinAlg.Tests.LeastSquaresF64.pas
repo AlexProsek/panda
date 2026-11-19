@@ -6,6 +6,7 @@ uses
     TestFramework
   , panda.Intfs
   , panda.LinAlg.LeastSquaresF64
+  , panda.LinAlg.Base
   ;
 
 type
@@ -17,6 +18,9 @@ type
     procedure CheckInvalidND(const aA, ab: INDArray<Double>);
     procedure CheckInvalidDynamic(const aA: TArray<TArray<Double>>;
       const ab: TArray<Double>);
+    procedure CheckInjectedStatus(aInit: TLinearSolverInitStatus;
+      aSolve: TLinearSolverSolveStatus; aExpected: TLeastSquaresStatus);
+    procedure CheckRefinementPolicy(aUseND, aAccept: Boolean);
   published
     procedure ScalarSystem;
     procedure SquareSystem;
@@ -46,7 +50,26 @@ type
     procedure DependentColumns;
     procedure ZeroColumn;
     procedure NumericallyUnresolved;
-    procedure EquivalentInvalidStatuses;
+    procedure InjectedCholeskyDynamic;
+    procedure InjectedCholeskyND;
+    procedure InjectedRefinementDynamic;
+    procedure InjectedRefinementStridedND;
+    procedure NilSolverDynamic;
+    procedure NilSolverND;
+    procedure InvalidDynamicPreservesSolver;
+    procedure InvalidNDPreservesSolver;
+    procedure SuppliedSolverOwnershipAndReuse;
+    procedure InjectedSingularStatus;
+    procedure InjectedNotPositiveDefiniteStatus;
+    procedure InjectedInvalidInitialization;
+    procedure InjectedNumericalInitialization;
+    procedure InjectedInvalidSolve;
+    procedure InjectedNumericalSolve;
+    procedure InjectedUnexpectedUninitialized;
+    procedure RefinementRejectedDynamic;
+    procedure RefinementAcceptedDynamic;
+    procedure RefinementRejectedND;
+    procedure RefinementAcceptedND;
   end;
 
 implementation
@@ -56,7 +79,51 @@ uses
   , panda.Arrays
   , panda.ArrManip
   , panda.DynArrayUtils
+  , panda.LinAlg.CholeskyF64
+  , panda.LinAlg.RefineF64
   ;
+
+type
+  TLeastSquaresBackend = class(TCholeskyDecompositionF64)
+  public
+    class var DestroyCount: Integer;
+    var InitCount, SolveCount: Integer;
+    InitStatus: TLinearSolverInitStatus;
+    SolveStatus: TLinearSolverSolveStatus;
+    destructor Destroy; override;
+    function InitializeWithoutCopy(const aA: INDArray<Double>): TLinearSolverInitStatus; overload; override;
+    function Solve(const aB: INDArray<Double>; out aRes: INDArray<Double>): TLinearSolverSolveStatus; overload; override;
+  end;
+
+destructor TLeastSquaresBackend.Destroy;
+begin
+  Inc(DestroyCount);
+  inherited;
+end;
+
+function TLeastSquaresBackend.InitializeWithoutCopy(
+  const aA: INDArray<Double>): TLinearSolverInitStatus;
+begin
+  Inc(InitCount);
+  if InitStatus = lsisInitialized then
+    Result := inherited InitializeWithoutCopy(aA)
+  else begin
+    Reset;
+    Result := InitStatus;
+  end;
+end;
+
+function TLeastSquaresBackend.Solve(const aB: INDArray<Double>;
+  out aRes: INDArray<Double>): TLinearSolverSolveStatus;
+begin
+  Inc(SolveCount);
+  if SolveStatus = lsssSolved then
+    Result := inherited Solve(aB, aRes)
+  else begin
+    aRes := TNDAUt.AsArray<Double>([99]);
+    Result := SolveStatus;
+  end;
+end;
 
 function TLeastSquaresF64Tests.Matrix: TArray<TArray<Double>>;
 begin
@@ -308,17 +375,13 @@ begin
 end;
 
 procedure TLeastSquaresF64Tests.NilMatrix;
-var X: INDArray<Double>;
 begin
-  ExpectedException := EAssertionFailed;
-  LeastSquares(nil, TNDAUt.AsArray<Double>(RHS), X);
+  CheckInvalidND(nil, TNDAUt.AsArray<Double>(RHS));
 end;
 
 procedure TLeastSquaresF64Tests.NilRHS;
-var X: INDArray<Double>;
 begin
-  ExpectedException := EAssertionFailed;
-  LeastSquares(TNDAUt.AsArray<Double>(Matrix), nil, X);
+  CheckInvalidND(TNDAUt.AsArray<Double>(Matrix), nil);
 end;
 
 procedure TLeastSquaresF64Tests.VectorAsMatrix;
@@ -447,24 +510,311 @@ begin
   CheckEquals(0, Length(X));
 end;
 
-procedure TLeastSquaresF64Tests.EquivalentInvalidStatuses;
-var A: TArray<TArray<Double>>;
+procedure TLeastSquaresF64Tests.InjectedCholeskyDynamic;
+var solver: TCholeskyDecompositionF64;
+    A: TArray<TArray<Double>>;
     b, X: TArray<Double>;
-    ndA, ndb, ndX: INDArray<Double>;
-    dynamicStatus, ndStatus: TLeastSquaresStatus;
 begin
-  A := Matrix;
-  b := TArray<Double>.Create(1, 3);
-  ndA := TNDAUt.AsArray<Double>(A);
-  ndb := TNDAUt.AsArray<Double>(b);
+  solver := TCholeskyDecompositionF64.Create;
+  try
+    A := Matrix;
+    b := RHS;
 
-  dynamicStatus := LeastSquares(A, b, X);
-  ndStatus := LeastSquares(ndA, ndb, ndX);
+    CheckTrue(LeastSquares(A, b, X, solver) = lssSolved);
 
-  CheckTrue(dynamicStatus = lssInvalidInput);
-  CheckTrue(dynamicStatus = ndStatus);
+    CheckEquals(1, X[0], 1e-12);
+    CheckEquals(2, X[1], 1e-12);
+    CheckEquals(1, A[0, 0], 0);
+    CheckEquals(2, A[2, 1], 0);
+    CheckEquals(5, b[2], 0);
+    CheckTrue(solver.Initialized);
+  finally
+    solver.Free;
+  end;
+end;
+
+procedure TLeastSquaresF64Tests.InjectedCholeskyND;
+var solver: TCholeskyDecompositionF64;
+    X: INDArray<Double>;
+begin
+  solver := TCholeskyDecompositionF64.Create;
+  try
+    CheckTrue(LeastSquares(TNDAUt.AsArray<Double>(Matrix),
+      TNDAUt.AsArray<Double>(RHS), X, solver) = lssSolved);
+
+    CheckSolution(X);
+    CheckTrue(solver.Initialized);
+  finally
+    solver.Free;
+  end;
+end;
+
+procedure TLeastSquaresF64Tests.InjectedRefinementDynamic;
+var solver: TGaussRefineSolverF64;
+    A: TArray<TArray<Double>>;
+    b, X, Y: TArray<Double>;
+begin
+  solver := TGaussRefineSolverF64.Create(
+    TGaussRefineF64.Create(TCholeskyDecompositionF64.Create));
+  try
+    A := Matrix;
+    b := RHS;
+
+    CheckTrue(LeastSquares(A, b, X, solver) = lssSolved);
+    CheckTrue(LeastSquares(A, b, Y, solver) = lssSolved);
+
+    CheckEquals(1, X[0], 1e-12);
+    CheckEquals(2, X[1], 1e-12);
+    CheckTrue(solver.LastResults[0].Status = grsConverged);
+    CheckEquals(1, A[0, 0], 0);
+    CheckEquals(2, A[2, 1], 0);
+    CheckEquals(5, b[2], 0);
+    X[0] := 99;
+    CheckEquals(1, Y[0], 1e-12);
+  finally
+    solver.Free;
+  end;
+
+  CheckEquals(2, Y[1], 1e-12);
+end;
+
+procedure TLeastSquaresF64Tests.InjectedRefinementStridedND;
+var solver: TGaussRefineSolverF64;
+    M, A, B, V, X, Y: INDArray<Double>;
+begin
+  solver := TGaussRefineSolverF64.Create;
+  try
+    M := TNDAUt.AsArray<Double>(Matrix);
+    A := M[[NDISpan(2, 0, -1), NDISpan(1, 0, -1)]];
+    B := TNDAUt.AsArray<Double>(RHS);
+    V := B[[NDISpan(2, 0, -1)]];
+    A.UnsetFlags(NDAF_WRITEABLE);
+    V.UnsetFlags(NDAF_WRITEABLE);
+
+    CheckTrue(LeastSquares(A, V, X, solver) = lssSolved);
+    CheckTrue(LeastSquares(A, V, Y, solver) = lssSolved);
+
+    CheckEquals(2, X.GetItem([0]), 1e-12);
+    CheckEquals(1, X.GetItem([1]), 1e-12);
+    CheckEquals(2, M.GetItem([2, 1]), 0);
+    CheckEquals(5, B.GetItem([2]), 0);
+    X.SetItem([0], 99);
+    CheckEquals(2, Y.GetItem([0]), 1e-12);
+  finally
+    solver.Free;
+  end;
+
+  CheckEquals(1, Y.GetItem([1]), 1e-12);
+end;
+
+procedure TLeastSquaresF64Tests.NilSolverDynamic;
+var X: TArray<Double>;
+begin
+  X := TArray<Double>.Create(99);
+
+  CheckTrue(LeastSquares(Matrix, RHS, X, nil) = lssInvalidInput);
+
   CheckEquals(0, Length(X));
-  CheckTrue(ndX = nil);
+end;
+
+procedure TLeastSquaresF64Tests.NilSolverND;
+var X: INDArray<Double>;
+begin
+  X := TNDAUt.AsArray<Double>([99]);
+
+  CheckTrue(LeastSquares(TNDAUt.AsArray<Double>(Matrix),
+    TNDAUt.AsArray<Double>(RHS), X, nil) = lssInvalidInput);
+
+  CheckTrue(X = nil);
+end;
+
+procedure TLeastSquaresF64Tests.InvalidDynamicPreservesSolver;
+var solver: TLeastSquaresBackend;
+    X: TArray<Double>;
+begin
+  solver := TLeastSquaresBackend.Create;
+  try
+    CheckTrue(solver.Initialize(TArray<TArray<Double>>.Create(
+      TArray<Double>.Create(4))) = lsisInitialized);
+
+    CheckTrue(LeastSquares(TArray<TArray<Double>>.Create(
+      TArray<Double>.Create(1), TArray<Double>.Create(1, 2)), RHS, X, solver) = lssInvalidInput);
+
+    CheckTrue(solver.Initialized);
+    CheckEquals(0, solver.InitCount);
+    CheckEquals(0, solver.SolveCount);
+    CheckTrue(solver.Solve(TArray<Double>.Create(8), X) = lsssSolved);
+    CheckEquals(2, X[0], 0);
+  finally
+    solver.Free;
+  end;
+end;
+
+procedure TLeastSquaresF64Tests.InvalidNDPreservesSolver;
+var solver: TLeastSquaresBackend;
+    X: INDArray<Double>;
+begin
+  solver := TLeastSquaresBackend.Create;
+  try
+    CheckTrue(solver.Initialize(TNDAUt.AsArray<Double>([[4]])) = lsisInitialized);
+
+    CheckTrue(LeastSquares(INDArray<Double>(nil), TNDAUt.AsArray<Double>(RHS), X, solver) = lssInvalidInput);
+
+    CheckTrue(X = nil);
+    CheckTrue(solver.Initialized);
+    CheckEquals(0, solver.InitCount);
+
+    CheckTrue(LeastSquares(TNDAUt.AsArray<Double>(Matrix),
+      TNDAUt.AsArray<Double>([1, 2]), X, solver) = lssInvalidInput);
+
+    CheckTrue(solver.Initialized);
+    CheckEquals(0, solver.InitCount);
+  finally
+    solver.Free;
+  end;
+end;
+
+procedure TLeastSquaresF64Tests.SuppliedSolverOwnershipAndReuse;
+var solver: TLeastSquaresBackend;
+    X, Y: INDArray<Double>;
+begin
+  TLeastSquaresBackend.DestroyCount := 0;
+  solver := TLeastSquaresBackend.Create;
+  try
+    CheckTrue(solver.Initialize(TNDAUt.AsArray<Double>([[4]])) = lsisInitialized);
+
+    CheckTrue(LeastSquares(TNDAUt.AsArray<Double>(Matrix),
+      TNDAUt.AsArray<Double>(RHS), X, solver) = lssSolved);
+    CheckTrue(solver.Solve(TNDAUt.AsArray<Double>([3, 3]), Y) = lsssSolved);
+
+    CheckEquals(0, TLeastSquaresBackend.DestroyCount);
+    CheckEquals(1, solver.InitCount);
+    CheckEquals(2, solver.SolveCount);
+    CheckEquals(1, Y.GetItem([0]), 1e-12);
+    CheckEquals(0, Y.GetItem([1]), 1e-12);
+    CheckSolution(X);
+  finally
+    solver.Free;
+  end;
+
+  CheckEquals(1, TLeastSquaresBackend.DestroyCount);
+  CheckSolution(X);
+end;
+
+procedure TLeastSquaresF64Tests.CheckInjectedStatus(aInit: TLinearSolverInitStatus;
+  aSolve: TLinearSolverSolveStatus; aExpected: TLeastSquaresStatus);
+var solver: TLeastSquaresBackend;
+    X: INDArray<Double>;
+begin
+  solver := TLeastSquaresBackend.Create;
+  try
+    solver.InitStatus := aInit;
+    solver.SolveStatus := aSolve;
+    X := TNDAUt.AsArray<Double>([99]);
+
+    CheckTrue(LeastSquares(TNDAUt.AsArray<Double>(Matrix),
+      TNDAUt.AsArray<Double>(RHS), X, solver) = aExpected);
+
+    CheckTrue(X = nil);
+    CheckEquals(1, solver.InitCount);
+    if aInit = lsisInitialized then
+      CheckEquals(1, solver.SolveCount)
+    else
+      CheckEquals(0, solver.SolveCount);
+  finally
+    solver.Free;
+  end;
+end;
+
+procedure TLeastSquaresF64Tests.InjectedSingularStatus;
+begin
+  CheckInjectedStatus(lsisSingular, lsssSolved, lssRankDeficient);
+end;
+
+procedure TLeastSquaresF64Tests.InjectedNotPositiveDefiniteStatus;
+begin
+  CheckInjectedStatus(lsisNotPositiveDefinite, lsssSolved, lssRankDeficient);
+end;
+
+procedure TLeastSquaresF64Tests.InjectedInvalidInitialization;
+begin
+  CheckInjectedStatus(lsisInvalidInput, lsssSolved, lssInvalidInput);
+end;
+
+procedure TLeastSquaresF64Tests.InjectedNumericalInitialization;
+begin
+  CheckInjectedStatus(lsisNumericalFailure, lsssSolved, lssNumericalFailure);
+end;
+
+procedure TLeastSquaresF64Tests.InjectedInvalidSolve;
+begin
+  CheckInjectedStatus(lsisInitialized, lsssInvalidInput, lssInvalidInput);
+end;
+
+procedure TLeastSquaresF64Tests.InjectedNumericalSolve;
+begin
+  CheckInjectedStatus(lsisInitialized, lsssNumericalFailure, lssNumericalFailure);
+end;
+
+procedure TLeastSquaresF64Tests.InjectedUnexpectedUninitialized;
+begin
+  CheckInjectedStatus(lsisInitialized, lsssNotInitialized, lssNumericalFailure);
+end;
+
+procedure TLeastSquaresF64Tests.CheckRefinementPolicy(aUseND, aAccept: Boolean);
+var solver: TGaussRefineSolverF64;
+    A: TArray<TArray<Double>>;
+    b, X: TArray<Double>;
+    ndX: INDArray<Double>;
+    status: TLeastSquaresStatus;
+begin
+  solver := TGaussRefineSolverF64.Create;
+  try
+    A := TArray<TArray<Double>>.Create(TArray<Double>.Create(1),
+      TArray<Double>.Create(1), TArray<Double>.Create(1));
+    b := TArray<Double>.Create(1, 0, 0);
+    solver.Refiner.MaxIterations := 0;
+    solver.AcceptNonConvergedSolution := aAccept;
+
+    if aUseND then begin
+      status := LeastSquares(TNDAUt.AsArray<Double>(A), TNDAUt.AsArray<Double>(b), ndX, solver);
+      if status = lssSolved then TNDAUt.TryAsDynArray<Double>(ndX, X);
+    end else
+      status := LeastSquares(A, b, X, solver);
+
+    CheckTrue(solver.LastResults[0].Status = grsIterationLimit);
+    CheckTrue(solver.Initialized);
+    if aAccept then begin
+      CheckTrue(status = lssSolved);
+      CheckEquals(1 / 3, X[0], 1e-16);
+    end else begin
+      CheckTrue(status = lssNotConverged);
+      CheckEquals(0, Length(X));
+      CheckTrue(ndX = nil);
+    end;
+  finally
+    solver.Free;
+  end;
+end;
+
+procedure TLeastSquaresF64Tests.RefinementRejectedDynamic;
+begin
+  CheckRefinementPolicy(False, False);
+end;
+
+procedure TLeastSquaresF64Tests.RefinementAcceptedDynamic;
+begin
+  CheckRefinementPolicy(False, True);
+end;
+
+procedure TLeastSquaresF64Tests.RefinementRejectedND;
+begin
+  CheckRefinementPolicy(True, False);
+end;
+
+procedure TLeastSquaresF64Tests.RefinementAcceptedND;
+begin
+  CheckRefinementPolicy(True, True);
 end;
 
 initialization

@@ -62,8 +62,9 @@ type
   /// <remarks>
   ///   Initialize costs O(N^3) and caches O(N^2) factors and TReal128
   ///   coefficients. Each Solve uses O(N) workspace and O(N^2) work per
-  ///   refinement iteration. Inputs are unchanged; outputs own independent
-  ///   storage. No condition estimate or RHS tolerance is used. Numerical
+  ///   refinement iteration. Copying initialization preserves inputs; in-place
+  ///   initialization borrows factor storage. Outputs own independent storage.
+  ///   No condition estimate or RHS tolerance is used. Numerical
   ///   failures return a status; allocation and unrelated exceptions propagate.
   ///   Residual and RHS workspaces are reused; Solve allocates its output
   ///   buffers. Calls on one instance must not overlap. Callers select a backend
@@ -81,8 +82,8 @@ type
     fB128, fX128, fResidual: TArray<TReal128>;
     fRHS, fCorrection, fCandidate: TArray<Double>;
     // Cores trust inputs validated by the public entry points.
-    // InitializeCore takes ownership of a private, finite square matrix copy.
-    function InitializeCore(const aA: TArray<TArray<Double>>): TGaussRefineInitStatus;
+    procedure ClearInitialization;
+    function FinishInitialization(aStatus: TLinearSolverInitStatus): TGaussRefineInitStatus;
     function SolveCore(const ab: TArray<Double>; out aX: TArray<Double>): TGaussRefinementResult;
   public
     /// <summary>Creates an owned LUP backend; allocation exceptions propagate.</summary>
@@ -103,8 +104,9 @@ type
     ///   Backend input/settings rejection returns grisInvalidInput; pivot rejection
     ///   returns grisSingular or grisNotPositiveDefinite. Arithmetic exceptions
     ///   and nonfinite factors return grisNumericalFailure.
-    ///   Any unsuccessful call leaves Initialized False. Refinement settings
-    ///   are not read or reset. No original Double matrix copy is retained.
+    ///   Every attempt replaces initialization. Failure or an exception releases
+    ///   cached data and backend factors and leaves Initialized False. Settings
+    ///   are preserved. No original Double matrix copy is retained.
     /// </summary>
     function Initialize(const aA: TArray<TArray<Double>>): TGaussRefineInitStatus; overload;
     /// <summary>
@@ -112,6 +114,20 @@ type
     ///   including negative strides and read-only views.
     /// </summary>
     function Initialize(const aA: INDArray<Double>): TGaussRefineInitStatus; overload;
+    /// <summary>
+    ///   Saves original finite coefficients in TReal128, then retains and factors
+    ///   aA in place using the backend. Requires nonempty square storage with
+    ///   nonoverlapping rows. Do not modify or resize borrowed storage while
+    ///   initialized. Failure may leave partial factors; settings are preserved.
+    /// </summary>
+    function InitializeWithoutCopy(const aA: TArray<TArray<Double>>): TGaussRefineInitStatus; overload;
+    /// <summary>
+    ///   Same in-place operation for writable square ND storage with column
+    ///   stride SizeOf(Double) and nonoverlapping rows. Offset and negative row
+    ///   strides are accepted. Both original triangles are saved for residuals.
+    ///   Failure or an exception releases initialization and retained storage.
+    /// </summary>
+    function InitializeWithoutCopy(const aA: INDArray<Double>): TGaussRefineInitStatus; overload;
     /// <summary>
     ///   Solves and refines using the cached matrix and factors. Requires a finite
     ///   RHS matching the initialized matrix size and valid refinement options.
@@ -137,12 +153,12 @@ type
     /// </summary>
     function Solve(const ab: INDArray<Double>; out aX: INDArray<Double>): TGaussRefinementResult; overload;
 
-    /// <summary>True after successful Initialize, until another Initialize fails.</summary>
+    /// <summary>True while cached coefficients and backend factors are initialized.</summary>
     property Initialized: Boolean read fInitialized;
     /// <summary>
     ///   Owned backend, fixed for this instance's lifetime. Configure factorization
     ///   settings on its concrete type; changes apply at the next Initialize.
-    ///   Do not free it or independently call its Initialize or Solve methods.
+    ///   Do not free it or independently initialize, solve, or reset it.
     /// </summary>
     property Solver: TLinearSolver<Double> read fSolver;
     /// <summary>
@@ -159,6 +175,66 @@ type
     property RelativeTolerance: Double read fRelativeTolerance write fRelativeTolerance;
   end;
 
+  /// <summary>Adapts owned iterative refinement to the shared Double solver API.</summary>
+  /// <remarks>
+  ///   Copying and in-place initialization follow the refiner's storage rules.
+  ///   Matrix RHS columns are refined sequentially with the same factors; the
+  ///   first unsuccessful column stops the solve and clears the entire output.
+  ///   Solve failures preserve initialization. Allocation and unrelated exceptions
+  ///   propagate; numerical failures return statuses. Calls must not overlap.
+  ///   Inherited bandwidth properties are unused; configure Refiner.Solver.
+  /// </remarks>
+  TGaussRefineSolverF64 = class(TLinearSolver<Double>)
+  protected
+    fRefiner: TGaussRefineF64;
+    fAcceptNonConvergedSolution: Boolean;
+    fLastResults: TArray<TGaussRefinementResult>;
+    function CreateNumeric: TLinAlgNumeric<Double>; override;
+    procedure ClearAnchors; override;
+    function GetLastResults: TArray<TGaussRefinementResult>;
+    function InitStatus(aStatus: TGaussRefineInitStatus): TLinearSolverInitStatus;
+    function SolveStatus(const aInfo: TGaussRefinementResult;
+      const aX: TArray<Double>): TLinearSolverSolveStatus;
+  public
+    /// <summary>Creates an owned default refiner with its default LUP backend.</summary>
+    constructor Create; overload;
+    /// <summary>
+    ///   Takes ownership of aRefiner, preserving its settings and initialization.
+    ///   Raises EArgumentNilException for nil.
+    /// </summary>
+    constructor Create(aRefiner: TGaussRefineF64); overload;
+    /// <summary>Releases the owned refiner and its backend.</summary>
+    destructor Destroy; override;
+    /// <summary>Copies a finite square matrix and initializes refinement.</summary>
+    function Initialize(const aA: TArray<TArray<Double>>): TLinearSolverInitStatus; overload; override;
+    /// <summary>Copies arbitrary square matrix strides, including read-only views.</summary>
+    function Initialize(const aA: INDArray<Double>): TLinearSolverInitStatus; overload; override;
+    /// <summary>Saves original coefficients and borrows aA for in-place factors.</summary>
+    function InitializeWithoutCopy(const aA: TArray<TArray<Double>>): TLinearSolverInitStatus; overload; override;
+    /// <summary>Initializes in writable, row-contiguous square storage, as documented on Refiner.</summary>
+    function InitializeWithoutCopy(const aA: INDArray<Double>): TLinearSolverInitStatus; overload; override;
+    /// <summary>Refines one RHS; unsuccessful statuses clear aRes.</summary>
+    function Solve(const ab: TArray<Double>; out aRes: TArray<Double>): TLinearSolverSolveStatus; overload; override;
+    /// <summary>Refines a vector or matrix of RHS columns with arbitrary strides.</summary>
+    function Solve(const aB: INDArray<Double>; out aRes: INDArray<Double>): TLinearSolverSolveStatus; overload; override;
+    /// <summary>
+    ///   Owned refiner for configuration. Do not free it or independently call
+    ///   initialization or solve methods on it or its backend, or reset the backend.
+    /// </summary>
+    property Refiner: TGaussRefineF64 read fRefiner;
+    /// <summary>
+    ///   Initially False. When True, stagnation and iteration limits with finite
+    ///   approximations return Solved. Numerical failures always remain failures.
+    /// </summary>
+    property AcceptNonConvergedSolution: Boolean read fAcceptNonConvergedSolution write fAcceptNonConvergedSolution;
+    /// <summary>
+    ///   Independent copy of diagnostics for each RHS column attempted, including
+    ///   a failing column. Cleared before initialization, Reset, and every Solve.
+    ///   Input/options rejection before any RHS attempt leaves this array empty.
+    /// </summary>
+    property LastResults: TArray<TGaussRefinementResult> read GetLastResults;
+  end;
+
 implementation
 
 uses
@@ -170,6 +246,7 @@ uses
   , panda.Nums
   , panda.DynArrayUtils
   , panda.LinAlg.LUPF64
+  , panda.LinAlg.NumericF64
   ;
 
 function RefinementResult(aStatus: TGaussRefinementStatus): TGaussRefinementResult;
@@ -264,64 +341,126 @@ begin
   inherited;
 end;
 
-function TGaussRefineF64.Initialize(const aA: TArray<TArray<Double>>): TGaussRefineInitStatus;
-var A: TArray<TArray<Double>>;
+procedure TGaussRefineF64.ClearInitialization;
 begin
   fInitialized := False;
-  Result := grisInvalidInput;
-  if not FiniteMatrixQ(aA) then exit;
-
-  A := TDynAUt.Clone<Double>(aA);
-  Result := InitializeCore(A);
+  fSolver.Reset;
+  fA128 := nil;
+  fB128 := nil;
+  fX128 := nil;
+  fResidual := nil;
+  fRHS := nil;
+  fCorrection := nil;
+  fCandidate := nil;
 end;
 
-function TGaussRefineF64.Initialize(const aA: INDArray<Double>): TGaussRefineInitStatus;
-var A: TArray<TArray<Double>>;
+function TGaussRefineF64.FinishInitialization(
+  aStatus: TLinearSolverInitStatus): TGaussRefineInitStatus;
+var N: NativeInt;
 begin
-  fInitialized := False;
-  Result := grisInvalidInput;
-  if not (
-    Assigned(aA) and ndaAllIsFinite(aA) and SquareMatrixQ(aA) and
-    TNDAUt.TryAsDynArray2D<Double>(aA, A))
-  then
-    exit;
-
-  Result := InitializeCore(A);
-end;
-
-function TGaussRefineF64.InitializeCore(
-  const aA: TArray<TArray<Double>>): TGaussRefineInitStatus;
-var N, I, J: NativeInt;
-    status: TLinearSolverInitStatus;
-begin
-  N := Length(aA);
-  SetLength(fA128, N, N);
-  for I := 0 to N - 1 do
-    for J := 0 to N - 1 do
-      fA128[I][J] := aA[I][J];
-
-  Result := grisNumericalFailure;
-  try
-    status := fSolver.InitializeWithoutCopy(aA);
-    if not FiniteMatrixQ(aA) then exit;
-    case status of
-      lsisInitialized: ;
-      lsisInvalidInput: exit(grisInvalidInput);
-      lsisSingular: exit(grisSingular);
-      lsisNotPositiveDefinite: exit(grisNotPositiveDefinite);
-    else
-      exit;
-    end;
-  except
-    on E: EMathError do exit;
+  case aStatus of
+    lsisInitialized: ;
+    lsisInvalidInput:         exit(grisInvalidInput);
+    lsisSingular:             exit(grisSingular);
+    lsisNotPositiveDefinite:  exit(grisNotPositiveDefinite);
+  else
+    exit(grisNumericalFailure);
   end;
 
+  N := Length(fA128);
   SetLength(fB128, N);
   SetLength(fX128, N);
   SetLength(fResidual, N);
   SetLength(fRHS, N);
   fInitialized := True;
   Result := grisInitialized;
+end;
+
+function TGaussRefineF64.Initialize(const aA: TArray<TArray<Double>>): TGaussRefineInitStatus;
+begin
+  ClearInitialization;
+  if not FiniteMatrixQ(aA) then exit(grisInvalidInput);
+
+  Result := InitializeWithoutCopy(TDynAUt.Clone<Double>(aA));
+end;
+
+function TGaussRefineF64.Initialize(const aA: INDArray<Double>): TGaussRefineInitStatus;
+var A: TArray<TArray<Double>>;
+begin
+  ClearInitialization;
+  if not
+    (Assigned(aA) and SquareMatrixQ(aA) and ndaAllIsFinite(aA) and
+    TNDAUt.TryAsDynArray2D<Double>(aA, A))
+  then
+    exit(grisInvalidInput);
+
+  Result := InitializeWithoutCopy(A);
+end;
+
+function TGaussRefineF64.InitializeWithoutCopy(
+  const aA: TArray<TArray<Double>>): TGaussRefineInitStatus;
+var N, I, J: NativeInt;
+    status: TLinearSolverInitStatus;
+begin
+  ClearInitialization;
+  Result := grisInvalidInput;
+  try
+    if not FiniteMatrixQ(aA) then exit;
+
+    N := Length(aA);
+    SetLength(fA128, N, N);
+    for I := 0 to N - 1 do
+      for J := 0 to N - 1 do
+        fA128[I, J] := aA[I, J];
+
+    Result := grisNumericalFailure;
+    try
+      status := fSolver.InitializeWithoutCopy(aA);
+      if not FiniteMatrixQ(aA) then exit;
+      Result := FinishInitialization(status);
+    except
+      on E: EMathError do exit;
+    end;
+  finally
+    if not fInitialized then ClearInitialization;
+  end;
+end;
+
+function TGaussRefineF64.InitializeWithoutCopy(
+  const aA: INDArray<Double>): TGaussRefineInitStatus;
+var N, I, J: NativeInt;
+    status: TLinearSolverInitStatus;
+    mA: TNDAMatItems<Double>;
+begin
+  ClearInitialization;
+  Result := grisInvalidInput;
+  try
+    if not (
+      Assigned(aA) and WriteableQ(aA) and
+      SquareMatrixQ(aA) and ndaAllIsFinite(aA))
+    then
+      exit;
+
+    mA := aA;
+    N := mA.RowCount;
+    if N <= 0 then exit;
+
+    SetLength(fA128, N, N);
+    for I := 0 to N - 1 do
+      for J := 0 to N - 1 do
+        fA128[I, J] := mA[I, J];
+
+    Result := grisNumericalFailure;
+    try
+      status := fSolver.InitializeWithoutCopy(aA);
+      if not ndaAllIsFinite(aA) then exit;
+      Result := FinishInitialization(status);
+    except
+      on E: EMathError do exit;
+    end;
+  finally
+    if not fInitialized then ClearInitialization;
+  end;
 end;
 
 function TGaussRefineF64.Solve(const ab: TArray<Double>;
@@ -401,6 +540,7 @@ begin
       except
         on E: ERangeError do exit;
       end;
+
       if not nonzero then begin
         Result.Status := grsStagnated;
         exit;
@@ -426,6 +566,7 @@ begin
         absValue := Abs(fCandidate[I]);
         if absValue > xNorm then xNorm := absValue;
       end;
+
       if changed then begin
         // Evaluate before committing, so a failure preserves X and its diagnostics.
         exact := Residual(fA128, fB128, fX128, fResidual, error);
@@ -436,11 +577,15 @@ begin
         exact := False;
         error := Result.BackwardError;
       end;
-      if exact or ((TReal128(dNorm) <= tol * TReal128(xNorm)) and
-        (error <= fRelativeTolerance)) then begin
+
+      if
+        exact or ((TReal128(dNorm) <= tol * TReal128(xNorm)) and
+        (error <= fRelativeTolerance))
+      then begin
         Result.Status := grsConverged;
         exit;
       end;
+
       if not changed then begin
         Result.Status := grsStagnated;
         exit;
@@ -450,6 +595,183 @@ begin
     Result.Status := grsIterationLimit;
   except
     on E: EMathError do Result.Status := grsNumericalFailure;
+  end;
+end;
+
+constructor TGaussRefineSolverF64.Create;
+begin
+  inherited Create;
+  fRefiner := TGaussRefineF64.Create;
+end;
+
+constructor TGaussRefineSolverF64.Create(aRefiner: TGaussRefineF64);
+begin
+  inherited Create;
+  if aRefiner = nil then
+    raise EArgumentNilException.Create('Refiner must not be nil');
+  fRefiner := aRefiner;
+  fInitialized := aRefiner.Initialized;
+end;
+
+destructor TGaussRefineSolverF64.Destroy;
+begin
+  FreeAndNil(fRefiner);
+  inherited;
+end;
+
+function TGaussRefineSolverF64.CreateNumeric: TLinAlgNumeric<Double>;
+begin
+  Result := TLinAlgNumericF64.Create;
+end;
+
+procedure TGaussRefineSolverF64.ClearAnchors;
+begin
+  inherited;
+  fLastResults := nil;
+  if Assigned(fRefiner) then fRefiner.ClearInitialization;
+end;
+
+function TGaussRefineSolverF64.GetLastResults: TArray<TGaussRefinementResult>;
+begin
+  Result := Copy(fLastResults);
+end;
+
+function TGaussRefineSolverF64.InitStatus(
+  aStatus: TGaussRefineInitStatus): TLinearSolverInitStatus;
+begin
+  fInitialized := fRefiner.Initialized;
+  case aStatus of
+    grisInitialized: Result := lsisInitialized;
+    grisInvalidInput: Result := lsisInvalidInput;
+    grisSingular: Result := lsisSingular;
+    grisNotPositiveDefinite: Result := lsisNotPositiveDefinite;
+  else
+    Result := lsisNumericalFailure;
+  end;
+end;
+
+function TGaussRefineSolverF64.Initialize(
+  const aA: TArray<TArray<Double>>): TLinearSolverInitStatus;
+begin
+  Reset;
+  Result := InitStatus(fRefiner.Initialize(aA));
+end;
+
+function TGaussRefineSolverF64.Initialize(
+  const aA: INDArray<Double>): TLinearSolverInitStatus;
+begin
+  Reset;
+  Result := InitStatus(fRefiner.Initialize(aA));
+end;
+
+function TGaussRefineSolverF64.InitializeWithoutCopy(
+  const aA: TArray<TArray<Double>>): TLinearSolverInitStatus;
+begin
+  Reset;
+  Result := InitStatus(fRefiner.InitializeWithoutCopy(aA));
+end;
+
+function TGaussRefineSolverF64.InitializeWithoutCopy(
+  const aA: INDArray<Double>): TLinearSolverInitStatus;
+begin
+  Reset;
+  Result := InitStatus(fRefiner.InitializeWithoutCopy(aA));
+end;
+
+function TGaussRefineSolverF64.SolveStatus(const aInfo: TGaussRefinementResult;
+  const aX: TArray<Double>): TLinearSolverSolveStatus;
+begin
+  case aInfo.Status of
+    grsConverged: Result := lsssSolved;
+    grsStagnated, grsIterationLimit:
+      if fAcceptNonConvergedSolution and FiniteVectorQ(aX, Length(fRefiner.fA128)) then
+        Result := lsssSolved
+      else
+        Result := lsssNotConverged;
+    grsInvalidInput: Result := lsssInvalidInput;
+    grsNotInitialized: Result := lsssNotInitialized;
+  else
+    Result := lsssNumericalFailure;
+  end;
+end;
+
+function TGaussRefineSolverF64.Solve(const ab: TArray<Double>;
+  out aRes: TArray<Double>): TLinearSolverSolveStatus;
+var X: TArray<Double>;
+begin
+  aRes := nil;
+  fLastResults := nil;
+  if not fInitialized then exit(lsssNotInitialized);
+  if not
+    (ValidOptions(fRefiner.MaxIterations, fRefiner.RelativeTolerance) and
+    FiniteVectorQ(ab, Length(fRefiner.fA128)))
+  then
+    exit(lsssInvalidInput);
+
+  SetLength(fLastResults, 1);
+  fLastResults[0] := RefinementResult(grsNumericalFailure);
+  fLastResults[0] := fRefiner.Solve(ab, X);
+  Result := SolveStatus(fLastResults[0], X);
+  if Result = lsssSolved then aRes := X;
+end;
+
+function TGaussRefineSolverF64.Solve(const aB: INDArray<Double>;
+  out aRes: INDArray<Double>): TLinearSolverSolveStatus;
+var spec: TMatSpec;
+    N, K, J, attempted: NativeInt;
+    vector: Boolean;
+    B, X: TArray<Double>;
+    output: INDArray<Double>;
+begin
+  aRes := nil;
+  fLastResults := nil;
+  if not fInitialized then exit(lsssNotInitialized);
+
+  Result := lsssInvalidInput;
+  if not (
+    Assigned(aB) and
+    ValidOptions(fRefiner.MaxIterations, fRefiner.RelativeTolerance))
+  then
+    exit;
+
+  N := Length(fRefiner.fA128);
+  vector := VectorQ(aB);
+  if vector then begin
+    if aB.Size <> N then exit;
+    K := 1;
+  end else begin
+    if (not NDMatrix(aB, spec)) or (spec.NRows <> N) or (spec.NCols <= 0) then
+      exit;
+
+    K := spec.NCols;
+  end;
+
+  if not ndaAllIsFinite(aB) then exit;
+
+  if vector then
+    output := TNDAUt.Empty<Double>([N])
+  else
+    output := TNDAUt.Empty<Double>([N, K]);
+
+  SetLength(B, N);
+  SetLength(fLastResults, K);
+  attempted := 0;
+  try
+    for J := 0 to K - 1 do begin
+      if vector then
+        Gather(aB.Data, aB.Strides[0], N, B)
+      else
+        Gather(spec.Data + J * spec.CStep, spec.RStep, N, B);
+      fLastResults[J] := RefinementResult(grsNumericalFailure);
+      Inc(attempted);
+      fLastResults[J] := fRefiner.Solve(B, X);
+      Result := SolveStatus(fLastResults[J], X);
+      if Result <> lsssSolved then exit;
+      Store(output, J, X, vector);
+    end;
+    aRes := output;
+  finally
+    SetLength(fLastResults, attempted);
   end;
 end;
 

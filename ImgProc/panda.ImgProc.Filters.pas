@@ -306,7 +306,7 @@ begin
 
   src := TImgUt.AsArray<Single>(aSrc);
   dst := TImgUt.AsArray<Single>(aDst);
-  Integral2D(src, dst);
+  Integral(src, dst);
 end;
 
 end.

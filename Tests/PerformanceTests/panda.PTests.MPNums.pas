@@ -6,6 +6,7 @@ uses
     TestFramework
   , panda.Tests.NDATestCase
   , panda.NumsQP
+  , panda.NumsAP
   , panda.NumsLowLvl
   ;
 
@@ -19,6 +20,12 @@ type
     procedure LessCmpInt128;
     procedure MulReal128;
     procedure DivReal128;
+  end;
+
+  TAPRealTests = class(TNDAPerformanceTestCase)
+  published
+    procedure IntDivide8192;
+    procedure SchoolDivVsNewtonDiv;
   end;
 
   TLowLvlFuncTests = class(TNDAPerformanceTestCase)
@@ -145,6 +152,91 @@ end;
 
 {$endregion}
 
+{$region 'TAPRealTests'}
+
+procedure TAPRealTests.IntDivide8192;
+var a: TReal;
+    b: TReal;
+begin
+  a.Init(1, 8192);
+
+  SWStart;
+  a := a.IntDivide(77);
+  SWStop('1.0/77');
+
+
+  b.Init(77, 8192);
+
+  SWStart;
+  a := a * b.Reciprocal;
+  SWStop('1.0*Reciprocal(77)');
+end;
+
+procedure TAPRealTests.SchoolDivVsNewtonDiv;
+var a, b, c: TReal;
+const N = 100;
+begin
+  a.Init(55, 256);
+  b.Init(131, 256);
+
+  SWStart;
+  DoTestLoop(procedure begin c := TReal.SchoolDiv(a, b) end, N);
+  SWStop('SchoolDiv, 4 64b-limbs');
+
+  SWStart;
+  DoTestLoop(procedure begin c := TReal.NewtonDiv(a, b) end, N);
+  SWStop('NewtonDiv, 4 64b-limbs');
+
+  a.Init(55, 1024);
+  b.Init(131, 1024);
+
+  SWStart;
+  DoTestLoop(procedure begin c := TReal.SchoolDiv(a, b) end, N);
+  SWStop('SchoolDiv, 16 64b-limbs');
+
+  SWStart;
+  DoTestLoop(procedure begin c := TReal.NewtonDiv(a, b) end, N);
+  SWStop('NewtonDiv, 16 64b-limbs');
+
+
+  a.Init(55, 4096);
+  b.Init(131, 4096);
+
+  SWStart;
+  DoTestLoop(procedure begin c := TReal.SchoolDiv(a, b) end, N);
+  SWStop('SchoolDiv, 64 64b-limbs');
+
+  SWStart;
+  DoTestLoop(procedure begin c := TReal.NewtonDiv(a, b) end, N);
+  SWStop('NewtonDiv, 64 64b-limbs');
+
+
+  a.Init(55, 512 * 64);
+  b.Init(131, 512 * 64);
+
+  SWStart;
+  DoTestLoop(procedure begin c := TReal.SchoolDiv(a, b) end, N);
+  SWStop('SchoolDiv, 512 64b-limbs');
+
+  SWStart;
+  DoTestLoop(procedure begin c := TReal.NewtonDiv(a, b) end, N);
+  SWStop('NewtonDiv, 512 64b-limbs');
+
+
+  a.Init(55, 1024 * 64);
+  b.Init(131, 1024 * 64);
+
+  SWStart;
+  DoTestLoop(procedure begin c := TReal.SchoolDiv(a, b) end, N);
+  SWStop('SchoolDiv, 1024 64b-limbs');
+
+  SWStart;
+  DoTestLoop(procedure begin c := TReal.NewtonDiv(a, b) end, N);
+  SWStop('NewtonDiv, 1024 64b-limbs');
+end;
+
+{$endregion}
+
 {$region 'TLowLvlFuncTests'}
 
 procedure TLowLvlFuncTests.BigIntDec;
@@ -164,6 +256,7 @@ end;
 initialization
 
   RegisterTest(TMPNumTests.Suite);
+  RegisterTest(TAPRealTests.Suite);
   RegisterTest(TLowLvlFuncTests.Suite);
 
 end.

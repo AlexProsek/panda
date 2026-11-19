@@ -83,7 +83,7 @@ type
     procedure AfterConstruction; override;
   end;
 
-procedure Integral2D(const aSrc: INDArray<Single>; var aDst: INDArray<Single>);
+procedure Integral(const aSrc: INDArray<Single>; var aDst: INDArray<Single>);
 
 {$region 'low-level functions'}
 
@@ -98,6 +98,7 @@ implementation
 uses
     panda.cvArithmetic
   , panda.cvMath
+  , panda.Arithmetic
   ;
 
 {$EXCESSPRECISION OFF}
@@ -473,33 +474,78 @@ begin
   end;
 end;
 
-procedure accum_f32(N: NativeInt; X: PByte; IncX: NativeInt; Y: PByte; IncY: NativeInt);
+procedure cvAccum_f32(N: NativeInt; X: PByte; IncX: NativeInt; Y: PByte; IncY: NativeInt);
 begin
-  if (IncX = cF32Sz) and (IncY = cF32Sz) then
-    cvAccum(PSingle(X), PSingle(Y), N);
+  cvAccum(PSingle(X), PSingle(Y), N)
 end;
 
-procedure add_f32(N: NativeInt; X: PByte; IncX: NativeInt; Y: PByte; IncY: NativeInt);
+procedure svAccum_f32(N: NativeInt; X: PByte; IncX: NativeInt; Y: PByte; IncY: NativeInt);
 begin
-  if (IncX = cF32Sz) and (IncY = cF32Sz) then
-    VecAdd(PSingle(X), PSingle(Y), PSingle(Y), N);
+  svAccum(PSingle(X), IncX, PSingle(Y), IncY, N);
 end;
 
-procedure Integral2D(const aSrc: INDArray<Single>; var aDst: INDArray<Single>);
+procedure cvAddTo_f32(N: NativeInt; X: PByte; IncX: NativeInt; Y: PByte; IncY: NativeInt);
 begin
-  Assert(Assigned(aSrc) and (aSrc.NDim > 1));
+  VecAdd(PSingle(X), PSingle(Y), PSingle(Y), N);
+end;
+
+procedure svAddTo_f32(N: NativeInt; X: PByte; IncX: NativeInt; Y: PByte; IncY: NativeInt);
+var pEnd: PByte;
+begin
+  pEnd := Y + N * IncY;
+  while Y < pEnd do begin
+    PSingle(Y)^ := PSingle(Y)^ + PSingle(X)^;
+    Inc(X, IncX);
+    Inc(Y, IncY);
+  end;
+end;
+
+procedure Integral(const aSrc: INDArray<Single>; var aDst: INDArray<Single>);
+var nDim: Integer;
+    sSrc, sDst: NativeInt;
+    s0, s1: TTensorF32;
+    k: SNDIntIndex;
+    faccum, fadd: TIPProcVV;
+begin
+  Assert(Assigned(aSrc) and (1 <= aSrc.NDim) and (aSrc.NDIm <= 3));
 
   if not Assigned(aDst) then
     aDst := TNDAUt.Empty<Single>(aSrc.Shape)
   else if not SameShapeQ(aSrc, aDst) then
-    raise ENDAShapeError.Create('Integral2D: Output array has to have the same shape as an input.');
+    raise ENDAShapeError.Create('Integral: Output array has to have the same shape as an input.');
 
-  if aSrc.NDim = 2 then begin
-    _Integral2D(aSrc, aDst, accum_f32, add_f32);
+  nDim := aSrc.NDim;
+  sSrc := aSrc.Strides[nDim - 1];
+  sDst := aDst.Strides[nDim - 1];
+
+  if (sSrc = cF32Sz) and (sDst = cF32Sz) then begin
+    faccum  := cvAccum_f32;
+    fadd    := cvAddTo_f32;
+  end else begin
+    faccum := svAccum_f32;
+    fadd   := svAddTo_f32;
+  end;
+
+  if nDim = 1 then begin
+    faccum(aSrc.Shape[0], aSrc.Data, sSrc, aDst.Data, sDst);
     exit;
   end;
 
-  // todo
+  if nDim = 2 then begin
+    _Integral2D(aSrc, aDst, faccum, fadd);
+    exit;
+  end;
+
+  if nDim = 3 then begin
+    s0 := aDst[[NDI(0)]];
+    _Integral2D(aSrc[[NDI(0)]], s0, faccum, fadd);
+    for k in NDIRange(1, aSrc.Shape[0] - 1) do begin
+      s1 := aDst[[k]];
+      _Integral2D(aSrc[[k]], s1, faccum, fadd);
+      s1.AddTo(s0);
+      s0 := s1;
+    end;
+  end;
 end;
 
 {$endregion}

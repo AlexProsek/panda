@@ -7,6 +7,7 @@ uses
   , panda.Arrays
   , panda.ImgProc.Types
   , panda.ImgProc.Images
+  , panda.LinAlg.Base
   ;
 
 {$I AsmDefs.inc}
@@ -24,13 +25,16 @@ function HatWeight(const aValue: Double): Double;
 ///   Estimates 256 log-response values from intensity samples indexed by
 ///   [sample, image] and one log exposure per image. Weighted data equations
 ///   and weighted second differences scaled by aSmoothingLambda are fitted
-///   by normal equations, with the response at intensity 128 anchored to zero.
+///   by Double normal equations and default Cholesky factorization, with the
+///   response at intensity 128 anchored to zero. The solver is created and freed
+///   internally; the returned array owns its storage.
 /// </summary>
 /// <remarks>
-///   Samples and exposures must be nonempty, sample rows must match the image
-///   count, and aWeightingFunction must be assigned.
-///   Invalid inputs or an underdetermined equation count raise EArgumentException.
-///   Numerical rank failure raises EInvalidOp. Exposures and callback results
+///   Assertions require at least two samples and two images, rectangular sample
+///   rows matching the exposure count, an assigned aWeightingFunction, and
+///   positive aSmoothingLambda. Invalid least-squares input raises
+///   EArgumentException. Numerical rank failure raises EInvalidOp.
+///   Exposures and callback results
 ///   must be finite; arithmetic, allocation and callback exceptions propagate.
 /// </remarks>
 function DebevecResponseCurve(
@@ -38,7 +42,31 @@ function DebevecResponseCurve(
   const aLogExposures       : TArray<Double>;
   aSmoothingLambda          : Integer;
   aWeightingFunction        : TWeightingFunction
-): TArray<Single>;
+): TArray<Single>; overload;
+
+/// <summary>
+///   Estimates the same 256 anchored log-response values using caller-owned
+///   aSolver to solve the Double normal equations. Inputs are unchanged and the
+///   returned array owns its storage. Equation construction and input assertions
+///   are the same as in the default overload.
+/// </summary>
+/// <remarks>
+///   Nil aSolver or invalid least-squares input or solver settings raise
+///   EArgumentException. Rank rejection, nonconvergence and numerical failure
+///   raise EInvalidOp. Other exceptions propagate.
+///   Valid least-squares calls replace the solver's initialization; it retains
+///   the private normal-matrix factors. The caller must free aSolver, including
+///   after failure. Its configuration controls acceptance; diagnostics remain
+///   available on its concrete type. Refinement applies to the rounded Double
+///   normal equations, not residuals of the original weighted equations.
+/// </remarks>
+function DebevecResponseCurve(
+  const aIntensitySamples   : TArray<TArray<Byte>>;
+  const aLogExposures       : TArray<Double>;
+  aSmoothingLambda          : Integer;
+  aWeightingFunction        : TWeightingFunction;
+  aSolver                   : TLinearSolver<Double>
+): TArray<Single>; overload;
 
 procedure RadianceMap(
   const aImages: array of IImage<Byte>;
@@ -84,6 +112,7 @@ implementation
 uses
     System.SysUtils
   , panda.LinAlg.LeastSquaresF64
+  , panda.LinAlg.CholeskyF64
   , panda.DynArrayUtils
   ;
 
@@ -634,6 +663,24 @@ function DebevecResponseCurve(
   aSmoothingLambda          : Integer;
   aWeightingFunction        : TWeightingFunction
 ): TArray<Single>;
+var solver: TCholeskyDecompositionF64;
+begin
+  solver := TCholeskyDecompositionF64.Create;
+  try
+    Result := DebevecResponseCurve(aIntensitySamples, aLogExposures,
+      aSmoothingLambda, aWeightingFunction, solver);
+  finally
+    solver.Free;
+  end;
+end;
+
+function DebevecResponseCurve(
+  const aIntensitySamples   : TArray<TArray<Byte>>;
+  const aLogExposures       : TArray<Double>;
+  aSmoothingLambda          : Integer;
+  aWeightingFunction        : TWeightingFunction;
+  aSolver                   : TLinearSolver<Double>
+): TArray<Single>;
 var A: TNDAMatItems<Double>;
     b: TNDAVecItems<Double>;
     X: INDArray<Double>;
@@ -647,6 +694,7 @@ begin
   numSamples := Length(aIntensitySamples);
   numImages := Length(aLogExposures);
   Assert(
+    Assigned(aSolver) and
     (numSamples > 1) and (numImages > 1) and Assigned(aWeightingFunction) and
     (Length(aIntensitySamples[0]) = numImages) and TDynAUt.MatrixQ<Byte>(aIntensitySamples) and
     (aSmoothingLambda > 0)
@@ -677,11 +725,16 @@ begin
 
   A[k, (zmax - zmin) div 2 + 1] := 1;
 
-  case LeastSquares(INDArray<Double>(A), INDArray<Double>(b), X) of
+  case LeastSquares(INDArray<Double>(A), INDArray<Double>(b), X, aSolver) of
+    lssSolved: ;
     lssInvalidInput:
-      raise EArgumentException.Create('DebevecResponseCurve: invalid least-squares dimensions');
+      raise EArgumentException.Create('DebevecResponseCurve: invalid least-squares input or solver settings');
     lssRankDeficient:
       raise EInvalidOp.Create('DebevecResponseCurve: numerically rank-deficient equations');
+    lssNotConverged:
+      raise EInvalidOp.Create('DebevecResponseCurve: least-squares solver did not converge');
+  else
+    raise EInvalidOp.Create('DebevecResponseCurve: least-squares numerical failure');
   end;
 
   TNDAUt.TryAsDynArray<Single>(TNDAUt.AsType<Single>(X[[NDISpan(0, intensityRange)]]), Result);

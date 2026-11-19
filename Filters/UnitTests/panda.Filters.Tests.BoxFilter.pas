@@ -28,6 +28,16 @@ type
     procedure MovingAvg_N10_K3;
   end;
 
+  TIntegralTests = class(TNDATestCase)
+  protected const
+    sTol = 1e-5;
+  published
+    procedure CArr1D;
+    procedure SArr1D;
+    procedure CArr2D;
+    procedure CArr3D;
+  end;
+
 implementation
 
 {$region 'TBoxFilter1DF32Tests'}
@@ -106,8 +116,76 @@ end;
 
 {$endregion}
 
+{$region 'TIntegralTests'}
+
+procedure TIntegralTests.CArr1D;
+var a, acc: INDArray<Single>;
+    v: TArray<Single>;
+begin
+  a := TNDAUt.AsArray<Single>([1, 2, 3, 4, 5]);
+
+  Integral(a, acc);
+
+  CheckTrue(TNDAUt.TryAsDynArray<Single>(acc, v));
+  CheckEquals([1, 3, 6, 10, 15], v, sTol);
+end;
+
+procedure TIntegralTests.SArr1D;
+var a, sa, acc: INDArray<Single>;
+    v: TArray<Single>;
+begin
+  a := TNDAUt.AsArray<Single>([1, 2, 3, 4, 5]);
+  sa := a[[NDIAll(2)]];
+
+  Integral(sa, acc);
+
+  CheckTrue(TNDAUt.TryAsDynArray<Single>(acc, v));
+  CheckEquals([1, 4, 9], v, sTol);
+end;
+
+procedure TIntegralTests.CArr2D;
+var a, acc: INDArray<Single>;
+    m: TArray<TArray<Single>>;
+begin
+  a := TNDAUt.AsArray<Single>([
+    [ 1,  2,  3,  4,  5],
+    [ 6,  7,  8,  9, 10],
+    [11, 12, 13, 14, 15],
+    [16, 17, 18, 19, 20]
+  ]);
+
+  Integral(a, acc);
+
+  CheckTrue(TNDAUt.TryAsDynArray2D<Single>(acc, m));
+  CheckEquals([ 1,  3,   6,  10,  15], m[0], sTol);
+  CheckEquals([ 7, 16,  27,  40,  55], m[1], sTol);
+  CheckEquals([18, 39,  63,  90, 120], m[2], sTol);
+  CheckEquals([34, 72, 114, 160, 210], m[3], sTol);
+end;
+
+procedure TIntegralTests.CArr3D;
+var a, acc: INDArray<Single>;
+    t: TArray<TArray<TArray<Single>>>;
+begin
+  a := TNDAUt.AsArray<Single>([
+    [[1, 2, 3], [4, 5, 6]],
+    [[7, 8, 9], [10, 11, 12]]
+  ]);
+
+  Integral(a, acc);
+
+  CheckTrue(TNDAUt.TryAsDynArray3D<Single>(acc, t));
+  CheckEquals([ 1,  3,  6], t[0, 0], sTol);
+  CheckEquals([ 5, 12, 21], t[0, 1], sTol);
+  CheckEquals([ 8, 18, 30], t[1, 0], sTol);
+  CheckEquals([22, 48, 78], t[1, 1], sTol);
+end;
+
+{$endregion}
+
 initialization
 
   RegisterTest(TBoxFilter1DF32Tests.Suite);
+  RegisterTest(TIntegralTests.Suite);
 
 end.

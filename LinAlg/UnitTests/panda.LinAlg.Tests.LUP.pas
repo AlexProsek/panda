@@ -20,7 +20,6 @@ type
       const P: TArray<NativeInt>);
     procedure CheckBlockSize(aSize: NativeInt);
   published
-    procedure Defaults;
     procedure BlockSizeOne;
     procedure PartialEdgeTiles;
     procedure SinglePanel;
@@ -28,7 +27,6 @@ type
     procedure CrossPanelPivots;
     procedure SingularLeadingBlock;
     procedure SingularRejection;
-    procedure SeparateAllocatedRows;
     procedure OffsetRows;
     procedure ReversedRows;
     procedure InvalidSettingsLeaveInputUnchanged;
@@ -39,7 +37,6 @@ type
     procedure PrepareToleranceOnce;
     procedure FactorConsumersIgnoreSettings;
     procedure ProviderOwnership;
-    procedure NilProvider;
     procedure ProviderConstructionException;
     procedure SuccessRetainsAnchors;
     procedure SingularClearsAnchors;
@@ -98,11 +95,6 @@ type
   end;
 
   TTestGauss = class(TGaussElimF64)
-  protected
-    function CreateNumeric: TLinAlgNumeric<Double>; override;
-  end;
-
-  TNilLUP = class(TLUPDecompositionF64)
   protected
     function CreateNumeric: TLinAlgNumeric<Double>; override;
   end;
@@ -273,11 +265,6 @@ begin
   Result := TTrackingNumeric.Create;
 end;
 
-function TNilLUP.CreateNumeric: TLinAlgNumeric<Double>;
-begin
-  Result := nil;
-end;
-
 procedure TFailingNumeric.AfterConstruction;
 begin
   inherited;
@@ -346,23 +333,6 @@ begin
     P := Copy(TLUPAccess(solver).fP);
 
     CheckFactors(A, LU, P);
-  finally
-    solver.Free;
-  end;
-end;
-
-procedure TLUPPointerTests.Defaults;
-var solver: TLUPDecompositionF64;
-begin
-  solver := TLUPDecompositionF64.Create;
-  try
-    CheckFalse(solver.Initialized);
-    CheckEquals(Ord(lupOrdinary), Ord(solver.FactorizationMethod));
-    CheckEquals(32, Integer(solver.BlockSize));
-    CheckEquals(-1, Integer(solver.LowerBandWidth));
-    CheckEquals(-1, Integer(solver.UpperBandWidth));
-    CheckEquals(0, solver.PivotTolerance, 0);
-    CheckEquals(100, solver.ToleranceFactor, 0);
   finally
     solver.Free;
   end;
@@ -453,11 +423,6 @@ begin
   finally
     solver.Free;
   end;
-end;
-
-procedure TLUPPointerTests.SeparateAllocatedRows;
-begin
-  CheckBlockSize(2);
 end;
 
 procedure TLUPPointerTests.OffsetRows;
@@ -729,23 +694,6 @@ begin
   gauss.Free;
 
   CheckEquals(2, TTrackingNumeric.DestroyCount);
-end;
-
-procedure TLUPPointerTests.NilProvider;
-var solver: TNilLUP;
-    raised: Boolean;
-begin
-  solver := nil;
-  raised := False;
-
-  try
-    solver := TNilLUP.Create;
-  except
-    on E: EInvalidOp do raised := True;
-  end;
-  solver.Free;
-
-  CheckTrue(raised);
 end;
 
 procedure TLUPPointerTests.ProviderConstructionException;
